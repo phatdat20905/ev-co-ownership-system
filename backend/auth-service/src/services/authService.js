@@ -3,6 +3,7 @@ import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '.
 import { hashPassword, comparePassword } from '../utils/bcrypt.js';
 import logger from '../utils/logger.js';
 import { v4 as uuidv4 } from 'uuid';
+import emailService from './emailService.js';
 
 export class AuthService {
   async register(userData) {
@@ -31,6 +32,17 @@ export class AuthService {
         role: userData.role || 'co_owner'
       }, { transaction });
 
+      // Generate verification token
+      const verificationToken = uuidv4();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+      // Store verification token
+      await db.EmailVerification.create({
+        userId: user.id,
+        verificationToken,
+        expiresAt
+      }, { transaction });
+
       // Generate tokens
       const accessToken = generateAccessToken({ 
         userId: user.id, 
@@ -50,6 +62,10 @@ export class AuthService {
       }, { transaction });
 
       await transaction.commit();
+
+      // Send verification email (non-blocking)
+      emailService.sendVerificationEmail(user.email, verificationToken)
+        .catch(error => logger.error('Failed to send verification email', { error: error.message }));
 
       logger.info('User registered successfully', { userId: user.id, email: user.email });
 
@@ -202,8 +218,13 @@ export class AuthService {
   }
 
   async forgotPassword(email) {
+    const transaction = await db.sequelize.transaction();
+
     try {
-      const user = await db.User.findOne({ where: { email } });
+      const user = await db.User.findOne({ 
+        where: { email },
+        transaction 
+      });
 
       if (!user) {
         // Don't reveal if user exists or not
@@ -214,25 +235,38 @@ export class AuthService {
       const resetToken = uuidv4();
       const expiresAt = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1 hour
 
+      // Invalidate previous reset tokens
+      await db.PasswordReset.update(
+        { used: true },
+        { 
+          where: { userId: user.id, used: false },
+          transaction 
+        }
+      );
+
       // Store reset token
       await db.PasswordReset.create({
         userId: user.id,
         resetToken,
         expiresAt
-      });
+      }, { transaction });
 
-      // In a real application, you would send an email here
-      logger.info('Password reset token generated', { 
+      await transaction.commit();
+
+      // Send password reset email
+      await emailService.sendPasswordResetEmail(user.email, resetToken);
+
+      logger.info('Password reset email sent', { 
         userId: user.id, 
-        resetToken,
-        expiresAt 
+        email: user.email 
       });
 
       return { 
-        message: 'If the email exists, a reset link has been sent',
-        resetToken: process.env.NODE_ENV === 'development' ? resetToken : undefined 
+        message: 'If the email exists, a reset link has been sent'
       };
     } catch (error) {
+      await transaction.rollback();
+      logger.error('Failed to process forgot password', { error: error.message, email });
       throw error;
     }
   }
@@ -289,16 +323,20 @@ export class AuthService {
     const transaction = await db.sequelize.transaction();
 
     try {
-      // Trong thực tế, bạn sẽ có bảng email_verifications
-      // Ở đây tôi giả lập logic verify email
-      const user = await db.User.findOne({
+      const verification = await db.EmailVerification.findOne({
         where: { 
-          isVerified: false 
+          verificationToken: token,
+          used: false,
+          expiresAt: { [db.Sequelize.Op.gt]: new Date() }
         },
+        include: [{
+          model: db.User,
+          as: 'user'
+        }],
         transaction
       });
 
-      if (!user) {
+      if (!verification) {
         throw {
           code: 'INVALID_VERIFICATION_TOKEN',
           message: 'Invalid or expired verification token',
@@ -307,11 +345,20 @@ export class AuthService {
       }
 
       // Verify user
-      await user.update({ isVerified: true }, { transaction });
+      await db.User.update(
+        { isVerified: true },
+        { where: { id: verification.userId }, transaction }
+      );
+
+      // Mark token as used
+      await verification.update({ used: true }, { transaction });
 
       await transaction.commit();
 
-      logger.info('Email verified successfully', { userId: user.id });
+      logger.info('Email verified successfully', { 
+        userId: verification.userId,
+        verificationId: verification.id 
+      });
 
       return { message: 'Email verified successfully' };
     } catch (error) {
@@ -321,8 +368,10 @@ export class AuthService {
   }
 
   async sendVerificationEmail(userId) {
+    const transaction = await db.sequelize.transaction();
+
     try {
-      const user = await db.User.findByPk(userId);
+      const user = await db.User.findByPk(userId, { transaction });
       
       if (!user) {
         throw {
@@ -340,20 +389,37 @@ export class AuthService {
         };
       }
 
-      // Generate verification token
+      // Invalidate previous verification tokens
+      await db.EmailVerification.update(
+        { used: true },
+        { 
+          where: { userId: user.id, used: false },
+          transaction 
+        }
+      );
+
+      // Generate new verification token
       const verificationToken = uuidv4();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
       
-      // In production, store this token in database
-      logger.info('Verification token generated', { 
-        userId, 
-        verificationToken 
-      });
+      // Store verification token
+      await db.EmailVerification.create({
+        userId: user.id,
+        verificationToken,
+        expiresAt
+      }, { transaction });
+
+      await transaction.commit();
 
       // Send verification email
       await emailService.sendVerificationEmail(user.email, verificationToken);
 
+      logger.info('Verification email sent successfully', { userId });
+
       return { message: 'Verification email sent successfully' };
     } catch (error) {
+      await transaction.rollback();
+      logger.error('Failed to send verification email', { error: error.message, userId });
       throw error;
     }
   }

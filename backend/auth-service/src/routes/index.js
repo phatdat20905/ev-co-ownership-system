@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import authRoutes from './authRoutes.js';
 import kycRoutes from './kycRoutes.js';
+import tokenRoutes from './tokenRoutes.js';
 
 const router = Router();
 
 router.use('/auth', authRoutes);
 router.use('/kyc', kycRoutes);
+router.use('/tokens', tokenRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {

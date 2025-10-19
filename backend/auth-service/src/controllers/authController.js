@@ -16,7 +16,7 @@ export class AuthController {
 
       logger.info('User registration successful', { email });
 
-      return successResponse(res, 'Registration successful', result, 201);
+      return successResponse(res, 'Registration successful. Please check your email for verification.', result, 201);
     } catch (error) {
       logger.error('User registration failed', { error: error.message, email: req.body.email });
       next(error);
