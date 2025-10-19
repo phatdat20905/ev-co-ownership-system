@@ -1,35 +1,35 @@
-import express from 'express';
+import { Router } from 'express';
 import kycController from '../controllers/kycController.js';
-import { authenticateToken, requireRole, requireVerified } from '../middlewares/authMiddleware.js';
-import { validateRequest, authSchemas } from '../middlewares/validationMiddleware.js';
+import { authenticate, authorize } from '../middlewares/authMiddleware.js';
+import { validate } from '../middlewares/validationMiddleware.js';
+import { kycSubmitValidator, kycVerifyValidator } from '../validators/kycValidator.js';
 
-const router = express.Router();
+const router = Router();
 
-// User routes - require authentication and verification
+// User routes
 router.post('/submit', 
-  authenticateToken, 
-  requireVerified,
-  validateRequest(authSchemas.kycSubmission), 
+  authenticate,
+  validate(kycSubmitValidator),
   kycController.submitKYC
 );
 
 router.get('/status', 
-  authenticateToken, 
+  authenticate,
   kycController.getKYCStatus
 );
 
-// Admin routes - require admin role
-router.get('/pending', 
-  authenticateToken, 
-  requireRole(['admin', 'staff']), 
-  kycController.getPendingKYC
+// Admin routes
+router.put('/verify/:id', 
+  authenticate,
+  authorize('admin', 'staff'),
+  validate(kycVerifyValidator),
+  kycController.verifyKYC
 );
 
-router.put('/verify/:kycId', 
-  authenticateToken, 
-  requireRole(['admin', 'staff']), 
-  validateRequest(authSchemas.kycVerification), 
-  kycController.verifyKYC
+router.get('/pending', 
+  authenticate,
+  authorize('admin', 'staff'),
+  kycController.getPendingKYCs
 );
 
 export default router;

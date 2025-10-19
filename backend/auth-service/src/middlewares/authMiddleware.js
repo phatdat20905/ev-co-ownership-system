@@ -1,71 +1,62 @@
-import jwt from 'jsonwebtoken';
+import { verifyAccessToken } from '../utils/jwt.js';
 import { errorResponse } from '../utils/responseFormatter.js';
-import { User } from '../models/index.js';
+import db from '../models/index.js';
 
-export const authenticateToken = async (req, res, next) => {
+export const authenticate = async (req, res, next) => {
   try {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-
-    if (!token) {
-      return errorResponse(res, { 
-        code: 'ACCESS_TOKEN_REQUIRED', 
-        message: 'Access token is required' 
-      }, 401);
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const authHeader = req.headers.authorization;
     
-    // Check if user still exists and is active
-    const user = await User.findByPk(decoded.userId);
-    if (!user || !user.isActive) {
-      return errorResponse(res, { 
-        code: 'USER_NOT_FOUND', 
-        message: 'User not found or inactive' 
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return errorResponse(res, {
+        code: 'UNAUTHORIZED',
+        message: 'Access token is required'
       }, 401);
     }
 
-    req.user = {
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-      isVerified: user.isVerified
-    };
+    const token = authHeader.split(' ')[1];
+    
+    try {
+      const decoded = verifyAccessToken(token);
+      const user = await db.User.findByPk(decoded.userId, {
+        attributes: { exclude: ['passwordHash'] }
+      });
 
-    next();
+      if (!user || !user.isActive) {
+        return errorResponse(res, {
+          code: 'UNAUTHORIZED',
+          message: 'User not found or inactive'
+        }, 401);
+      }
+
+      req.user = user;
+      next();
+    } catch (error) {
+      return errorResponse(res, {
+        code: 'INVALID_TOKEN',
+        message: 'Invalid or expired token'
+      }, 401);
+    }
   } catch (error) {
-    if (error.name === 'TokenExpiredError') {
-      return errorResponse(res, { 
-        code: 'TOKEN_EXPIRED', 
-        message: 'Access token has expired' 
-      }, 401);
-    }
-    
-    return errorResponse(res, { 
-      code: 'INVALID_TOKEN', 
-      message: 'Invalid access token' 
-    }, 401);
+    next(error);
   }
 };
 
-export const requireRole = (roles) => {
+export const authorize = (...roles) => {
   return (req, res, next) => {
+    if (!req.user) {
+      return errorResponse(res, {
+        code: 'UNAUTHORIZED',
+        message: 'Authentication required'
+      }, 401);
+    }
+
     if (!roles.includes(req.user.role)) {
-      return errorResponse(res, { 
-        code: 'INSUFFICIENT_PERMISSIONS', 
-        message: 'Insufficient permissions' 
+      return errorResponse(res, {
+        code: 'FORBIDDEN',
+        message: 'Insufficient permissions'
       }, 403);
     }
+
     next();
   };
-};
-
-export const requireVerified = (req, res, next) => {
-  if (!req.user.isVerified) {
-    return errorResponse(res, { 
-      code: 'EMAIL_NOT_VERIFIED', 
-      message: 'Email verification required' 
-    }, 403);
-  }
-  next();
 };

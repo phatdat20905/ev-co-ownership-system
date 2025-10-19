@@ -1,18 +1,71 @@
-import express from 'express';
+import { Router } from 'express';
 import authController from '../controllers/authController.js';
-import { validateRequest, authSchemas } from '../middlewares/validationMiddleware.js';
+import { authenticate } from '../middlewares/authMiddleware.js';
+import { validate } from '../middlewares/validationMiddleware.js';
+import { 
+  registerValidator, 
+  loginValidator, 
+  refreshTokenValidator, 
+  forgotPasswordValidator, 
+  resetPasswordValidator,
+  verifyEmailValidator 
+} from '../validators/authValidator.js';
+import { loginRateLimiter, generalRateLimiter } from '../middlewares/rateLimiter.js';
 
-const router = express.Router();
+const router = Router();
 
 // Public routes
-router.post('/register', validateRequest(authSchemas.register), authController.register);
-router.post('/login', validateRequest(authSchemas.login), authController.login);
-router.post('/refresh-token', validateRequest(authSchemas.refreshToken), authController.refreshToken);
-router.post('/forgot-password', validateRequest(authSchemas.forgotPassword), authController.forgotPassword);
-router.post('/reset-password', validateRequest(authSchemas.resetPassword), authController.resetPassword);
-router.post('/verify-email', authController.verifyEmail);
+router.post('/register', 
+  generalRateLimiter,
+  validate(registerValidator), 
+  authController.register
+);
 
-// Protected routes (require authentication)
-router.post('/logout', authController.logout);
+router.post('/login', 
+  loginRateLimiter,
+  validate(loginValidator), 
+  authController.login
+);
+
+router.post('/refresh-token', 
+  generalRateLimiter,
+  validate(refreshTokenValidator), 
+  authController.refreshToken
+);
+
+router.post('/forgot-password', 
+  generalRateLimiter,
+  validate(forgotPasswordValidator), 
+  authController.forgotPassword
+);
+
+router.post('/reset-password', 
+  generalRateLimiter,
+  validate(resetPasswordValidator), 
+  authController.resetPassword
+);
+
+router.post('/verify-email', 
+  generalRateLimiter,
+  validate(verifyEmailValidator), 
+  authController.verifyEmail
+);
+
+// Protected routes
+router.post('/logout', 
+  authenticate,
+  validate(refreshTokenValidator), 
+  authController.logout
+);
+
+router.get('/profile', 
+  authenticate,
+  authController.getProfile
+);
+
+router.post('/send-verification-email', 
+  authenticate,
+  authController.sendVerificationEmail
+);
 
 export default router;

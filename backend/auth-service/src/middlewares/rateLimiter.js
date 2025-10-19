@@ -1,62 +1,40 @@
-import rateLimit from 'express-rate-limit';
-import { redisClient } from '../config/redis.js';
-import logger from '../utils/logger.js';
+import RedisClient from '../config/redis.js';
+import { errorResponse } from '../utils/responseFormatter.js';
 
-// Redis store for rate limiting
-const RedisStore = (redisClient) => ({
-  increment: async (key) => {
-    const current = await redisClient.get(key);
-    const count = current ? parseInt(current) + 1 : 1;
-    await redisClient.setEx(key, 60, count.toString());
-    return count;
-  }
-});
+export const rateLimiter = (windowMs = 900000, maxRequests = 100) => {
+  return async (req, res, next) => {
+    const clientIp = req.ip;
+    const key = `rate_limit:${clientIp}`;
+    
+    try {
+      const current = await RedisClient.get(key);
+      const currentCount = current ? parseInt(current) : 0;
 
-// General rate limiter
-export const generalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: {
-    success: false,
-    error: {
-      code: 'RATE_LIMIT_EXCEEDED',
-      message: 'Too many requests from this IP, please try again later'
+      if (currentCount >= maxRequests) {
+        return errorResponse(res, {
+          code: 'RATE_LIMIT_EXCEEDED',
+          message: 'Too many requests, please try again later'
+        }, 429);
+      }
+
+      if (currentCount === 0) {
+        await RedisClient.set(key, '1', windowMs / 1000);
+      } else {
+        await RedisClient.set(key, (currentCount + 1).toString(), windowMs / 1000);
+      }
+
+      res.setHeader('X-RateLimit-Limit', maxRequests);
+      res.setHeader('X-RateLimit-Remaining', maxRequests - currentCount - 1);
+      
+      next();
+    } catch (error) {
+      // If Redis fails, allow the request to proceed
+      console.error('Rate limiter Redis error:', error);
+      next();
     }
-  },
-  standardHeaders: true,
-  legacyHeaders: false
-});
+  };
+};
 
-// Strict limiter for auth endpoints
-export const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 login attempts per windowMs
-  message: {
-    success: false,
-    error: {
-      code: 'RATE_LIMIT_EXCEEDED',
-      message: 'Too many login attempts, please try again later'
-    }
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  skipSuccessfulRequests: true // Don't count successful requests
-});
-
-// KYC submission limiter
-export const kycLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 3, // Limit each user to 3 KYC submissions per hour
-  keyGenerator: (req) => {
-    return req.user ? req.user.userId : req.ip;
-  },
-  message: {
-    success: false,
-    error: {
-      code: 'RATE_LIMIT_EXCEEDED',
-      message: 'Too many KYC submission attempts, please try again later'
-    }
-  },
-  standardHeaders: true,
-  legacyHeaders: false
-});
+// Specific rate limiters for sensitive endpoints
+export const loginRateLimiter = rateLimiter(900000, 5); // 5 attempts per 15 minutes
+export const generalRateLimiter = rateLimiter(60000, 100); // 100 requests per minute

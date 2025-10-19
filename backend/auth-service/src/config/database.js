@@ -1,36 +1,36 @@
+// src/config/database.js
 import { Sequelize } from 'sequelize';
+import config from './config.js';
 import logger from '../utils/logger.js';
 
+const env = process.env.NODE_ENV || 'development';
+const dbConfig = config[env];
+
 const sequelize = new Sequelize(
-  process.env.DB_NAME || 'auth_db',
-  process.env.DB_USER || 'postgres',
-  process.env.DB_PASSWORD || 'postgres123',
+  dbConfig.database,
+  dbConfig.username,
+  dbConfig.password,
   {
-    host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 5432,
-    dialect: 'postgres',
-    logging: (msg) => logger.debug(msg),
-    pool: {
-      max: parseInt(process.env.DB_POOL_MAX) || 5,
-      min: parseInt(process.env.DB_POOL_MIN) || 0,
-      acquire: parseInt(process.env.DB_POOL_ACQUIRE) || 30000,
-      idle: parseInt(process.env.DB_POOL_IDLE) || 10000
-    }
+    host: dbConfig.host,
+    port: dbConfig.port,
+    dialect: dbConfig.dialect,
+    logging: env === 'development' ? (msg) => logger.debug(msg) : false,
+    pool: dbConfig.pool,
+    dialectOptions: dbConfig.dialectOptions,
   }
 );
 
 export const connectDatabase = async () => {
   try {
     await sequelize.authenticate();
-    logger.info('Database connection established successfully');
-    
-    // Sync database in development
-    if (process.env.NODE_ENV === 'development') {
+    logger.info('✅ Database connection established successfully.');
+
+    if (env === 'development') {
       await sequelize.sync({ alter: true });
-      logger.info('Database synced successfully');
+      logger.info('🗂 Database synced successfully (dev mode).');
     }
   } catch (error) {
-    logger.error('Unable to connect to database:', error);
+    logger.error('❌ Unable to connect to the database:', error);
     throw error;
   }
 };

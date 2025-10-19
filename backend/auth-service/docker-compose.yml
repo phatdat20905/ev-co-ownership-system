@@ -1,4 +1,3 @@
-# backend/auth-service/docker-compose.yml
 version: '3.8'
 
 services:
@@ -14,17 +13,51 @@ services:
       - "5432:5432"
     volumes:
       - postgres_auth_data:/var/lib/postgresql/data
+      - ./src/migrations:/docker-entrypoint-initdb.d
     networks:
-      - ev_network
+      - ev_auth_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Redis
   redis-auth:
     image: redis:7-alpine
     container_name: ev_auth_redis
+    command: redis-server --requirepass redis123
     ports:
       - "6379:6379"
+    volumes:
+      - redis_auth_data:/data
     networks:
-      - ev_network
+      - ev_auth_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # RabbitMQ
+  rabbitmq-auth:
+    image: rabbitmq:3-management-alpine
+    container_name: ev_auth_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_auth_data:/var/lib/rabbitmq
+    networks:
+      - ev_auth_network
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Auth Service
   auth-service:
@@ -38,23 +71,37 @@ services:
       NODE_ENV: development
       PORT: 3001
       DB_HOST: postgres-auth
+      DB_PORT: 5432
       DB_NAME: auth_db
       DB_USER: postgres
       DB_PASSWORD: postgres123
-      REDIS_URL: redis://redis-auth:6379
-      JWT_SECRET: your_jwt_secret_here
-      JWT_REFRESH_SECRET: your_refresh_secret_here
+      REDIS_HOST: redis-auth
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis123
+      RABBITMQ_URL: amqp://admin:admin123@rabbitmq-auth:5672
+      JWT_SECRET: your_super_secret_jwt_key_change_in_production
+      JWT_EXPIRES_IN: 1d
+      JWT_REFRESH_SECRET: your_refresh_token_secret_key
+      JWT_REFRESH_EXPIRES_IN: 7d
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+      redis-auth:
+        condition: service_healthy
+      rabbitmq-auth:
+        condition: service_healthy
+    networks:
+      - ev_auth_network
     volumes:
       - ./src:/app/src
-    depends_on:
-      - postgres-auth
-      - redis-auth
-    networks:
-      - ev_network
+      - ./logs:/app/logs
+    command: npm run dev
 
 networks:
-  ev_network:
+  ev_auth_network:
     driver: bridge
 
 volumes:
   postgres_auth_data:
+  redis_auth_data:
+  rabbitmq_auth_data:

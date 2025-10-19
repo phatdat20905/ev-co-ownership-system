@@ -1,22 +1,34 @@
 import kycService from '../services/kycService.js';
-import { successResponse, errorResponse } from '../utils/responseFormatter.js';
+import { successResponse, paginatedResponse } from '../utils/responseFormatter.js';
+import logger from '../utils/logger.js';
 
-class KYCController {
+export class KYCController {
   async submitKYC(req, res, next) {
     try {
-      const userId = req.user.userId; // From auth middleware
-      const result = await kycService.submitKYC(userId, req.body);
+      const userId = req.user.id;
+      const kycData = req.body;
+
+      const result = await kycService.submitKYC(userId, kycData);
+
+      logger.info('KYC submitted successfully', { userId });
+
       return successResponse(res, 'KYC submitted successfully', result, 201);
     } catch (error) {
+      logger.error('KYC submission failed', { 
+        error: error.message, 
+        userId: req.user.id 
+      });
       next(error);
     }
   }
 
   async getKYCStatus(req, res, next) {
     try {
-      const userId = req.user.userId;
+      const userId = req.user.id;
+
       const result = await kycService.getKYCStatus(userId);
-      return successResponse(res, 'KYC status retrieved', result);
+
+      return successResponse(res, 'KYC status retrieved successfully', result);
     } catch (error) {
       next(error);
     }
@@ -24,21 +36,41 @@ class KYCController {
 
   async verifyKYC(req, res, next) {
     try {
-      const adminId = req.user.userId;
-      const { kycId } = req.params;
-      const { status, rejectionReason } = req.body;
+      const { id } = req.params;
+      const adminId = req.user.id;
+      const verificationData = req.body;
 
-      const result = await kycService.verifyKYC(kycId, adminId, status, rejectionReason);
-      return successResponse(res, `KYC ${status} successfully`, result);
+      const result = await kycService.verifyKYC(id, adminId, verificationData);
+
+      logger.info('KYC verification processed', { 
+        kycId: id, 
+        adminId, 
+        status: verificationData.verificationStatus 
+      });
+
+      return successResponse(res, 'KYC verification processed successfully', result);
     } catch (error) {
+      logger.error('KYC verification failed', { 
+        error: error.message, 
+        kycId: req.params.id, 
+        adminId: req.user.id 
+      });
       next(error);
     }
   }
 
-  async getPendingKYC(req, res, next) {
+  async getPendingKYCs(req, res, next) {
     try {
-      const result = await kycService.getPendingKYC();
-      return successResponse(res, 'Pending KYC retrieved', result);
+      const { page = 1, limit = 10 } = req.query;
+
+      const result = await kycService.getPendingKYCs(parseInt(page), parseInt(limit));
+
+      return paginatedResponse(
+        res, 
+        'Pending KYCs retrieved successfully', 
+        result.kycs, 
+        result.pagination
+      );
     } catch (error) {
       next(error);
     }

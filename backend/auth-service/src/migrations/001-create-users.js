@@ -1,57 +1,56 @@
-import { DataTypes } from 'sequelize';
-
 export default {
   async up(queryInterface, Sequelize) {
     await queryInterface.createTable('users', {
       id: {
-        type: DataTypes.UUID,
-        defaultValue: DataTypes.UUIDV4,
+        type: Sequelize.UUID,
+        defaultValue: Sequelize.UUIDV4,
         primaryKey: true,
         allowNull: false
       },
       email: {
-        type: DataTypes.STRING(255),
+        type: Sequelize.STRING(255),
         allowNull: false,
         unique: true
       },
       phone: {
-        type: DataTypes.STRING(20),
+        type: Sequelize.STRING(20),
         unique: true,
         allowNull: true
       },
       password_hash: {
-        type: DataTypes.STRING(255),
+        type: Sequelize.STRING(255),
         allowNull: false
       },
       role: {
-        type: DataTypes.ENUM('co_owner', 'staff', 'admin'),
+        type: Sequelize.ENUM('co_owner', 'staff', 'admin'),
         allowNull: false,
         defaultValue: 'co_owner'
       },
       is_verified: {
-        type: DataTypes.BOOLEAN,
+        type: Sequelize.BOOLEAN,
         defaultValue: false
       },
       is_active: {
-        type: DataTypes.BOOLEAN,
+        type: Sequelize.BOOLEAN,
         defaultValue: true
       },
       last_login_at: {
-        type: DataTypes.DATE,
+        type: Sequelize.DATE,
         allowNull: true
       },
       created_at: {
-        type: DataTypes.DATE,
+        type: Sequelize.DATE,
         allowNull: false,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+        defaultValue: Sequelize.NOW
       },
       updated_at: {
-        type: DataTypes.DATE,
+        type: Sequelize.DATE,
         allowNull: false,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+        defaultValue: Sequelize.NOW
       }
     });
 
+    // Create indexes
     await queryInterface.addIndex('users', ['email']);
     await queryInterface.addIndex('users', ['phone']);
     await queryInterface.addIndex('users', ['role']);

@@ -1,20 +1,69 @@
 import redis from 'redis';
-import logger from '../utils/logger.js';
 
-const redisClient = redis.createClient({
-  url: process.env.REDIS_URL || 'redis://localhost:6379',
-  password: process.env.REDIS_PASSWORD || 'redis123'
-});
+class RedisClient {
+  constructor() {
+    this.client = null;
+    this.connect();
+  }
 
-redisClient.on('error', (err) => {
-  logger.error('Redis Client Error:', err);
-});
+  async connect() {
+    try {
+      this.client = redis.createClient({
+        socket: {
+          host: process.env.REDIS_HOST || 'localhost',
+          port: parseInt(process.env.REDIS_PORT) || 6379
+        },
+        password: process.env.REDIS_PASSWORD || 'redis123',
+        database: parseInt(process.env.REDIS_DB) || 0
+      });
 
-redisClient.on('connect', () => {
-  logger.info('Connected to Redis');
-});
+      this.client.on('error', (err) => {
+        console.error('Redis Client Error:', err);
+      });
 
-// Connect to Redis
-await redisClient.connect();
+      this.client.on('connect', () => {
+        console.log('Redis Client Connected');
+      });
 
-export { redisClient };
+      await this.client.connect();
+    } catch (error) {
+      console.error('Failed to connect to Redis:', error);
+    }
+  }
+
+  async get(key) {
+    try {
+      return await this.client.get(key);
+    } catch (error) {
+      console.error('Redis GET error:', error);
+      return null;
+    }
+  }
+
+  async set(key, value, expireTime = 3600) {
+    try {
+      await this.client.set(key, value, { EX: expireTime });
+    } catch (error) {
+      console.error('Redis SET error:', error);
+    }
+  }
+
+  async del(key) {
+    try {
+      await this.client.del(key);
+    } catch (error) {
+      console.error('Redis DEL error:', error);
+    }
+  }
+
+  async exists(key) {
+    try {
+      return await this.client.exists(key);
+    } catch (error) {
+      console.error('Redis EXISTS error:', error);
+      return 0;
+    }
+  }
+}
+
+export default new RedisClient();

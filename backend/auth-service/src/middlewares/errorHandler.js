@@ -1,71 +1,63 @@
 import logger from '../utils/logger.js';
+import { errorResponse } from '../utils/responseFormatter.js';
 
-export const errorHandler = (error, req, res, next) => {
+export const errorHandler = (err, req, res, next) => {
   logger.error('Error occurred:', {
-    message: error.message,
-    stack: error.stack,
+    message: err.message,
+    stack: err.stack,
     url: req.url,
     method: req.method,
     ip: req.ip
   });
 
-  // Handle known error types
-  if (error.message === 'USER_ALREADY_EXISTS') {
-    return res.status(409).json({
-      success: false,
-      error: {
-        code: 'USER_ALREADY_EXISTS',
-        message: 'User with this email already exists'
-      }
-    });
+  // Sequelize validation error
+  if (err.name === 'SequelizeValidationError') {
+    const details = err.errors.map(error => ({
+      field: error.path,
+      message: error.message
+    }));
+
+    return errorResponse(res, {
+      code: 'VALIDATION_ERROR',
+      message: 'Database validation failed',
+      details
+    }, 400);
   }
 
-  if (error.message === 'INVALID_CREDENTIALS') {
-    return res.status(401).json({
-      success: false,
-      error: {
-        code: 'INVALID_CREDENTIALS',
-        message: 'Invalid email or password'
+  // Sequelize unique constraint error
+  if (err.name === 'SequelizeUniqueConstraintError') {
+    return errorResponse(res, {
+      code: 'DUPLICATE_ENTRY',
+      message: 'Resource already exists',
+      details: {
+        field: err.errors[0]?.path
       }
-    });
+    }, 409);
   }
 
-  if (error.message === 'INVALID_REFRESH_TOKEN') {
-    return res.status(401).json({
-      success: false,
-      error: {
-        code: 'INVALID_REFRESH_TOKEN',
-        message: 'Invalid or expired refresh token'
-      }
-    });
+  // JWT errors
+  if (err.name === 'JsonWebTokenError') {
+    return errorResponse(res, {
+      code: 'INVALID_TOKEN',
+      message: 'Invalid token'
+    }, 401);
   }
 
-  if (error.message === 'INVALID_RESET_TOKEN') {
-    return res.status(400).json({
-      success: false,
-      error: {
-        code: 'INVALID_RESET_TOKEN',
-        message: 'Invalid or expired reset token'
-      }
-    });
-  }
-
-  if (error.message === 'KYC_ALREADY_SUBMITTED') {
-    return res.status(409).json({
-      success: false,
-      error: {
-        code: 'KYC_ALREADY_SUBMITTED',
-        message: 'KYC already submitted for this user'
-      }
-    });
+  if (err.name === 'TokenExpiredError') {
+    return errorResponse(res, {
+      code: 'TOKEN_EXPIRED',
+      message: 'Token has expired'
+    }, 401);
   }
 
   // Default error
-  res.status(500).json({
-    success: false,
-    error: {
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'An internal server error occurred'
-    }
-  });
+  const statusCode = err.statusCode || 500;
+  const message = process.env.NODE_ENV === 'production' 
+    ? 'Internal server error' 
+    : err.message;
+
+  return errorResponse(res, {
+    code: 'INTERNAL_ERROR',
+    message
+  }, statusCode);
 };

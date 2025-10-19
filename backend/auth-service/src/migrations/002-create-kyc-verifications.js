@@ -1,16 +1,14 @@
-import { DataTypes } from 'sequelize';
-
 export default {
   async up(queryInterface, Sequelize) {
     await queryInterface.createTable('kyc_verifications', {
       id: {
-        type: DataTypes.UUID,
-        defaultValue: DataTypes.UUIDV4,
+        type: Sequelize.UUID,
+        defaultValue: Sequelize.UUIDV4,
         primaryKey: true,
         allowNull: false
       },
       user_id: {
-        type: DataTypes.UUID,
+        type: Sequelize.UUID,
         allowNull: false,
         references: {
           model: 'users',
@@ -20,58 +18,61 @@ export default {
         onDelete: 'CASCADE'
       },
       id_card_number: {
-        type: DataTypes.STRING(20),
+        type: Sequelize.STRING(20),
         unique: true,
         allowNull: true
       },
       id_card_front_url: {
-        type: DataTypes.STRING(500),
+        type: Sequelize.STRING(500),
         allowNull: true
       },
       id_card_back_url: {
-        type: DataTypes.STRING(500),
+        type: Sequelize.STRING(500),
         allowNull: true
       },
       driver_license_number: {
-        type: DataTypes.STRING(20),
+        type: Sequelize.STRING(20),
         allowNull: true
       },
       driver_license_url: {
-        type: DataTypes.STRING(500),
+        type: Sequelize.STRING(500),
         allowNull: true
       },
       verification_status: {
-        type: DataTypes.ENUM('pending', 'approved', 'rejected'),
+        type: Sequelize.ENUM('pending', 'approved', 'rejected'),
         defaultValue: 'pending'
       },
       verified_by: {
-        type: DataTypes.UUID,
+        type: Sequelize.UUID,
         allowNull: true,
         references: {
           model: 'users',
           key: 'id'
-        }
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL'
       },
       verified_at: {
-        type: DataTypes.DATE,
+        type: Sequelize.DATE,
         allowNull: true
       },
       rejection_reason: {
-        type: DataTypes.TEXT,
+        type: Sequelize.TEXT,
         allowNull: true
       },
       created_at: {
-        type: DataTypes.DATE,
+        type: Sequelize.DATE,
         allowNull: false,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+        defaultValue: Sequelize.NOW
       },
       updated_at: {
-        type: DataTypes.DATE,
+        type: Sequelize.DATE,
         allowNull: false,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+        defaultValue: Sequelize.NOW
       }
     });
 
+    // Create indexes
     await queryInterface.addIndex('kyc_verifications', ['user_id']);
     await queryInterface.addIndex('kyc_verifications', ['verification_status']);
   },

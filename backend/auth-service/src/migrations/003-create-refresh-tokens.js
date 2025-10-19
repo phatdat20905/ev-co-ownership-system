@@ -1,16 +1,14 @@
-import { DataTypes } from 'sequelize';
-
 export default {
   async up(queryInterface, Sequelize) {
     await queryInterface.createTable('refresh_tokens', {
       id: {
-        type: DataTypes.UUID,
-        defaultValue: DataTypes.UUIDV4,
+        type: Sequelize.UUID,
+        defaultValue: Sequelize.UUIDV4,
         primaryKey: true,
         allowNull: false
       },
       user_id: {
-        type: DataTypes.UUID,
+        type: Sequelize.UUID,
         allowNull: false,
         references: {
           model: 'users',
@@ -20,27 +18,27 @@ export default {
         onDelete: 'CASCADE'
       },
       token: {
-        type: DataTypes.STRING(500),
+        type: Sequelize.STRING(500),
         allowNull: false
       },
       expires_at: {
-        type: DataTypes.DATE,
+        type: Sequelize.DATE,
         allowNull: false
       },
       is_revoked: {
-        type: DataTypes.BOOLEAN,
+        type: Sequelize.BOOLEAN,
         defaultValue: false
       },
       created_at: {
-        type: DataTypes.DATE,
+        type: Sequelize.DATE,
         allowNull: false,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+        defaultValue: Sequelize.NOW
       }
     });
 
+    // Create indexes
     await queryInterface.addIndex('refresh_tokens', ['user_id']);
     await queryInterface.addIndex('refresh_tokens', ['token']);
-    await queryInterface.addIndex('refresh_tokens', ['expires_at']);
   },
 
   async down(queryInterface, Sequelize) {

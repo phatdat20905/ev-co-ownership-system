@@ -1,103 +1,141 @@
-import { KYCVerification, User } from '../models/index.js';
+import db from '../models/index.js';
 import logger from '../utils/logger.js';
 
-class KYCService {
+export class KYCService {
   async submitKYC(userId, kycData) {
-    const {
-      idCardNumber,
-      idCardFrontUrl,
-      idCardBackUrl,
-      driverLicenseNumber,
-      driverLicenseUrl
-    } = kycData;
+    try {
+      // Check if user already has a KYC submission
+      const existingKYC = await db.KYCVerification.findOne({
+        where: { userId }
+      });
 
-    // Check if KYC already exists
-    const existingKYC = await KYCVerification.findOne({
-      where: { userId }
-    });
+      if (existingKYC) {
+        throw {
+          code: 'KYC_ALREADY_SUBMITTED',
+          message: 'KYC verification already submitted',
+          statusCode: 409
+        };
+      }
 
-    if (existingKYC) {
-      throw new Error('KYC_ALREADY_SUBMITTED');
+      const kyc = await db.KYCVerification.create({
+        userId,
+        ...kycData
+      });
+
+      logger.info('KYC submitted successfully', { userId, kycId: kyc.id });
+
+      return kyc;
+    } catch (error) {
+      throw error;
     }
-
-    // Create KYC record
-    const kyc = await KYCVerification.create({
-      userId,
-      idCardNumber,
-      idCardFrontUrl,
-      idCardBackUrl,
-      driverLicenseNumber,
-      driverLicenseUrl,
-      verificationStatus: 'pending'
-    });
-
-    logger.info(`KYC submitted for user: ${userId}`);
-
-    return kyc;
   }
 
   async getKYCStatus(userId) {
-    const kyc = await KYCVerification.findOne({
-      where: { userId },
-      include: [
-        {
-          model: User,
-          as: 'verifier',
-          attributes: ['id', 'email']
-        }
-      ]
-    });
+    try {
+      const kyc = await db.KYCVerification.findOne({
+        where: { userId },
+        include: [{
+          model: db.User,
+          as: 'user',
+          attributes: ['id', 'email', 'role']
+        }]
+      });
 
-    if (!kyc) {
-      throw new Error('KYC_NOT_FOUND');
+      if (!kyc) {
+        throw {
+          code: 'KYC_NOT_FOUND',
+          message: 'KYC verification not found',
+          statusCode: 404
+        };
+      }
+
+      return kyc;
+    } catch (error) {
+      throw error;
     }
-
-    return kyc;
   }
 
-  async verifyKYC(kycId, adminId, status, rejectionReason = null) {
-    const kyc = await KYCVerification.findByPk(kycId);
-    
-    if (!kyc) {
-      throw new Error('KYC_NOT_FOUND');
+  async verifyKYC(kycId, adminId, verificationData) {
+    const transaction = await db.sequelize.transaction();
+
+    try {
+      const kyc = await db.KYCVerification.findByPk(kycId, { transaction });
+
+      if (!kyc) {
+        throw {
+          code: 'KYC_NOT_FOUND',
+          message: 'KYC verification not found',
+          statusCode: 404
+        };
+      }
+
+      if (kyc.verificationStatus !== 'pending') {
+        throw {
+          code: 'KYC_ALREADY_PROCESSED',
+          message: 'KYC verification already processed',
+          statusCode: 409
+        };
+      }
+
+      // Update KYC status
+      await kyc.update({
+        verificationStatus: verificationData.verificationStatus,
+        verifiedBy: adminId,
+        verifiedAt: new Date(),
+        rejectionReason: verificationData.rejectionReason
+      }, { transaction });
+
+      // If approved, verify the user
+      if (verificationData.verificationStatus === 'approved') {
+        await db.User.update(
+          { isVerified: true },
+          { where: { id: kyc.userId }, transaction }
+        );
+      }
+
+      await transaction.commit();
+
+      logger.info('KYC verification processed', { 
+        kycId, 
+        adminId, 
+        status: verificationData.verificationStatus 
+      });
+
+      return kyc;
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
     }
-
-    if (kyc.verificationStatus !== 'pending') {
-      throw new Error('KYC_ALREADY_PROCESSED');
-    }
-
-    await kyc.update({
-      verificationStatus: status,
-      verifiedBy: adminId,
-      verifiedAt: new Date(),
-      rejectionReason: status === 'rejected' ? rejectionReason : null
-    });
-
-    // If approved, mark user as verified
-    if (status === 'approved') {
-      await User.update(
-        { isVerified: true },
-        { where: { id: kyc.userId } }
-      );
-    }
-
-    logger.info(`KYC ${status} for user: ${kyc.userId} by admin: ${adminId}`);
-
-    return kyc;
   }
 
-  async getPendingKYC() {
-    return await KYCVerification.findAll({
-      where: { verificationStatus: 'pending' },
-      include: [
-        {
-          model: User,
+  async getPendingKYCs(page = 1, limit = 10) {
+    try {
+      const offset = (page - 1) * limit;
+
+      const { count, rows } = await db.KYCVerification.findAndCountAll({
+        where: { verificationStatus: 'pending' },
+        include: [{
+          model: db.User,
           as: 'user',
           attributes: ['id', 'email', 'phone', 'role']
+        }],
+        limit,
+        offset,
+        order: [['createdAt', 'ASC']]
+      });
+
+      return {
+        kycs: rows,
+        pagination: {
+          page,
+          limit,
+          total: count,
+          totalPages: Math.ceil(count / limit)
         }
-      ],
-      order: [['createdAt', 'ASC']]
-    });
+      };
+    } catch (error) {
+      throw error;
+    }
   }
 }
 
