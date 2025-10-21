@@ -1,125 +1,130 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import { config } from 'dotenv';
+  import express from 'express';
+  import cors from 'cors';
+  import helmet from 'helmet';
+  import { config } from 'dotenv';
 
-// Load environment variables
-config();
+  // Load environment variables
+  config();
 
-import db from './models/index.js';
-import routes from './routes/index.js';
-import { errorHandler } from './middlewares/errorHandler.js';
-import { generalRateLimiter } from './middlewares/rateLimiter.js';
-import userEventSubscriber from './events/subscribers/userEventSubscriber.js';
-import logger from './utils/logger.js';
+  // Import từ shared modules
+  import { 
+    logger, 
+    errorHandler, 
+    notFoundHandler,
+    redisClient,
+    rabbitMQClient,
+    generalRateLimiter
+  } from '@ev-coownership/shared';
 
-const app = express();
-const PORT = process.env.PORT || 3001;
+  import db from './models/index.js';
+  import routes from './routes/index.js';
+  import eventService from './services/eventService.js'; // Thêm import này
 
-// Security middleware
-app.use(helmet());
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'http://localhost:5173'],
-  credentials: true
-}));
+  const app = express();
+  const PORT = process.env.PORT || 3001;
 
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+  // Security middleware
+  app.use(helmet());
+  app.use(cors({
+    origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'http://localhost:5173'],
+    credentials: true
+  }));
 
-// Rate limiting
-app.use(generalRateLimiter);
+  // Body parsing middleware
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true }));
 
-// Request logging middleware
-app.use((req, res, next) => {
-  const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  res.locals.requestId = requestId;
-  
-  logger.info('Incoming request', {
-    requestId,
-    method: req.method,
-    url: req.url,
-    ip: req.ip,
-    userAgent: req.get('User-Agent')
-  });
+  // Rate limiting
+  app.use(generalRateLimiter);
 
-  next();
-});
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Auth Service is healthy',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV
-  });
-});
-
-// API routes
-app.use('/api/v1', routes);
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    error: {
-      code: 'NOT_FOUND',
-      message: 'Route not found'
-    },
-    metadata: {
-      timestamp: new Date().toISOString(),
-      requestId: res.locals.requestId
-    }
-  });
-});
-
-// Error handling middleware
-app.use(errorHandler);
-
-// Database connection and server startup
-async function startServer() {
-  try {
-    // Test database connection
-    await db.sequelize.authenticate();
-    logger.info('Database connection established successfully');
-
-    // Sync database (in development)
-    if (process.env.NODE_ENV === 'development') {
-      await db.sequelize.sync({ alter: true });
-      logger.info('Database synced successfully');
-    }
-
-    // Start event subscriber
-    try {
-      await userEventSubscriber.startConsuming();
-    } catch (error) {
-      logger.warn('Failed to start event subscriber, continuing without it', { error: error.message });
-    }
-
-    // Start server
-    app.listen(PORT, () => {
-      logger.info(`Auth Service running on port ${PORT} in ${process.env.NODE_ENV} mode`);
+  // Request logging middleware
+  app.use((req, res, next) => {
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    res.locals.requestId = requestId;
+    
+    logger.info('Incoming request', {
+      requestId,
+      method: req.method,
+      url: req.url,
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
     });
-  } catch (error) {
-    logger.error('Failed to start server', { error: error.message });
-    process.exit(1);
+
+    next();
+  });
+
+  // Health check endpoint với event service status
+  app.get('/health', async (req, res) => {
+    const eventServiceHealth = await eventService.healthCheck();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Auth Service is healthy',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV,
+      services: {
+        database: 'healthy',
+        redis: 'healthy', 
+        eventBus: eventServiceHealth.healthy ? 'healthy' : 'unhealthy'
+      }
+    });
+  });
+
+  // API routes
+  app.use('/api/v1', routes);
+
+  // 404 handler từ shared
+  app.use(notFoundHandler);
+
+  // Error handling middleware từ shared
+  app.use(errorHandler);
+
+  // Database connection and server startup
+  async function startServer() {
+    try {
+      // Test database connection
+      await db.sequelize.authenticate();
+      logger.info('Database connection established successfully');
+
+      // Sync database (in development)
+      if (process.env.NODE_ENV === 'development') {
+        await db.sequelize.sync({ alter: true });
+        logger.info('Database synced successfully');
+      }
+
+      // Initialize event service
+      await eventService.initialize();
+      
+      // Start event consumers
+      await eventService.startEventConsumers();
+
+      // Start server
+      app.listen(PORT, () => {
+        logger.info(`Auth Service running on port ${PORT} in ${process.env.NODE_ENV} mode`);
+      });
+    } catch (error) {
+      logger.error('Failed to start server', { error: error.message });
+      process.exit(1);
+    }
   }
-}
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  await db.sequelize.close();
-  process.exit(0);
-});
+  // Graceful shutdown
+  process.on('SIGTERM', async () => {
+    logger.info('SIGTERM received, shutting down gracefully');
+    await db.sequelize.close();
+    await redisClient.disconnect();
+    await rabbitMQClient.disconnect();
+    process.exit(0);
+  });
 
-process.on('SIGINT', async () => {
-  logger.info('SIGINT received, shutting down gracefully');
-  await db.sequelize.close();
-  process.exit(0);
-});
+  process.on('SIGINT', async () => {
+    logger.info('SIGINT received, shutting down gracefully');
+    await db.sequelize.close();
+    await redisClient.disconnect();
+    await rabbitMQClient.disconnect();
+    process.exit(0);
+  });
 
-startServer();
+  startServer();
 
-export default app;
+  export default app;

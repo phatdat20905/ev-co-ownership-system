@@ -1,6 +1,10 @@
 import authService from '../services/authService.js';
-import { successResponse, errorResponse } from '../utils/responseFormatter.js';
-import logger from '../utils/logger.js';
+import { 
+  successResponse, 
+  errorResponse, 
+  logger,
+  AppError 
+} from '@ev-coownership/shared';
 
 export class AuthController {
   async register(req, res, next) {

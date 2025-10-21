@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import kycController from '../controllers/kycController.js';
-import { authenticate, authorize } from '../middlewares/authMiddleware.js';
-import { validate } from '../middlewares/validationMiddleware.js';
+import { authenticate, authorize, validate } from '@ev-coownership/shared';
 import { kycSubmitValidator, kycVerifyValidator } from '../validators/kycValidator.js';
 
 const router = Router();

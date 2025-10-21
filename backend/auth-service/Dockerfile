@@ -1,4 +1,3 @@
-# backend/auth-service/Dockerfile
 FROM node:18-alpine
 
 WORKDIR /app
@@ -6,14 +5,14 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
+# Copy shared module (đặt tên trùng với package @ev-coownership/shared)
+COPY ../shared ./node_modules/@ev-coownership/shared
 
-# Copy source code
+# Cài dependencies
+RUN npm ci --omit=dev
+
+# Copy toàn bộ source code của auth-service
 COPY . .
 
-# Expose port
 EXPOSE 3001
-
-# Start application
-CMD ["npm", "run", "dev"]
+CMD ["node", "src/app.js"]

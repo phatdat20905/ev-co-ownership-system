@@ -1,6 +1,10 @@
 import kycService from '../services/kycService.js';
-import { successResponse, paginatedResponse } from '../utils/responseFormatter.js';
-import logger from '../utils/logger.js';
+import { 
+  successResponse, 
+  paginatedResponse, 
+  logger,
+  AppError 
+} from '@ev-coownership/shared';
 
 export class KYCController {
   async submitKYC(req, res, next) {

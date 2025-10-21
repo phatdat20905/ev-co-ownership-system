@@ -1,6 +1,8 @@
 import tokenService from '../services/tokenService.js';
-import { successResponse } from '../utils/responseFormatter.js';
-import logger from '../utils/logger.js';
+import { 
+  successResponse, 
+  logger 
+} from '@ev-coownership/shared';
 
 export class TokenController {
   async revokeAllTokens(req, res, next) {

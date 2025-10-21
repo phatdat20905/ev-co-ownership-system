@@ -26,6 +26,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@ev-coownership/shared": "file:../shared",
     "amqplib": "^0.10.9",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",

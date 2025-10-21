@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import logger from '../utils/logger.js';
+import { logger } from '@ev-coownership/shared';
 
 export class EmailService {
   constructor() {

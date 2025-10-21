@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import tokenController from '../controllers/tokenController.js';
-import { authenticate } from '../middlewares/authMiddleware.js';
+import { authenticate } from '@ev-coownership/shared';
 
 const router = Router();
 

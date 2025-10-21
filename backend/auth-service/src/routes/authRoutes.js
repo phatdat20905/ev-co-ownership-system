@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import authController from '../controllers/authController.js';
-import { authenticate } from '../middlewares/authMiddleware.js';
-import { validate } from '../middlewares/validationMiddleware.js';
+import { authenticate, validate, loginRateLimiter, generalRateLimiter } from '@ev-coownership/shared';
 import { 
   registerValidator, 
   loginValidator, 
@@ -10,7 +9,6 @@ import {
   resetPasswordValidator,
   verifyEmailValidator 
 } from '../validators/authValidator.js';
-import { loginRateLimiter, generalRateLimiter } from '../middlewares/rateLimiter.js';
 
 const router = Router();
 

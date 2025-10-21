@@ -1,4 +1,5 @@
 import db from '../models/index.js';
+import { logger } from '@ev-coownership/shared';
 
 export class TokenService {
   async revokeAllUserTokens(userId) {

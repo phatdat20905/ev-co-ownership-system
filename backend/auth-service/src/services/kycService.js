@@ -1,31 +1,51 @@
 import db from '../models/index.js';
-import logger from '../utils/logger.js';
+import { 
+  logger, 
+  AppError 
+} from '@ev-coownership/shared';
+import eventService from './eventService.js';
 
 export class KYCService {
   async submitKYC(userId, kycData) {
+    const transaction = await db.sequelize.transaction();
+
     try {
       // Check if user already has a KYC submission
       const existingKYC = await db.KYCVerification.findOne({
-        where: { userId }
+        where: { userId },
+        transaction
       });
 
       if (existingKYC) {
-        throw {
-          code: 'KYC_ALREADY_SUBMITTED',
-          message: 'KYC verification already submitted',
-          statusCode: 409
-        };
+        throw new AppError('KYC verification already submitted', 409, 'KYC_ALREADY_SUBMITTED');
       }
 
       const kyc = await db.KYCVerification.create({
         userId,
         ...kycData
-      });
+      }, { transaction });
 
-      logger.info('KYC submitted successfully', { userId, kycId: kyc.id });
+      await transaction.commit();
+
+      // Publish KYC submitted event (non-blocking)
+      eventService.publishKYCSubmitted(kyc)
+        .catch(error => logger.error('Failed to publish KYC submitted event', { 
+          error: error.message,
+          kycId: kyc.id 
+        }));
+
+      logger.info('KYC submitted successfully', { 
+        userId, 
+        kycId: kyc.id 
+      });
 
       return kyc;
     } catch (error) {
+      await transaction.rollback();
+      logger.error('KYC submission failed', { 
+        error: error.message, 
+        userId 
+      });
       throw error;
     }
   }
@@ -42,15 +62,20 @@ export class KYCService {
       });
 
       if (!kyc) {
-        throw {
-          code: 'KYC_NOT_FOUND',
-          message: 'KYC verification not found',
-          statusCode: 404
-        };
+        throw new AppError('KYC verification not found', 404, 'KYC_NOT_FOUND');
       }
+
+      logger.debug('KYC status retrieved', { 
+        userId, 
+        status: kyc.verificationStatus 
+      });
 
       return kyc;
     } catch (error) {
+      logger.error('Failed to get KYC status', { 
+        error: error.message, 
+        userId 
+      });
       throw error;
     }
   }
@@ -62,19 +87,11 @@ export class KYCService {
       const kyc = await db.KYCVerification.findByPk(kycId, { transaction });
 
       if (!kyc) {
-        throw {
-          code: 'KYC_NOT_FOUND',
-          message: 'KYC verification not found',
-          statusCode: 404
-        };
+        throw new AppError('KYC verification not found', 404, 'KYC_NOT_FOUND');
       }
 
       if (kyc.verificationStatus !== 'pending') {
-        throw {
-          code: 'KYC_ALREADY_PROCESSED',
-          message: 'KYC verification already processed',
-          statusCode: 409
-        };
+        throw new AppError('KYC verification already processed', 409, 'KYC_ALREADY_PROCESSED');
       }
 
       // Update KYC status
@@ -95,6 +112,13 @@ export class KYCService {
 
       await transaction.commit();
 
+      // Publish KYC verified event (non-blocking)
+      eventService.publishKYCVerified(kyc)
+        .catch(error => logger.error('Failed to publish KYC verified event', { 
+          error: error.message,
+          kycId: kyc.id 
+        }));
+
       logger.info('KYC verification processed', { 
         kycId, 
         adminId, 
@@ -104,6 +128,10 @@ export class KYCService {
       return kyc;
     } catch (error) {
       await transaction.rollback();
+      logger.error('KYC verification failed', { 
+        error: error.message, 
+        kycId 
+      });
       throw error;
     }
   }
@@ -124,6 +152,12 @@ export class KYCService {
         order: [['createdAt', 'ASC']]
       });
 
+      logger.debug('Pending KYCs retrieved', { 
+        count, 
+        page, 
+        limit 
+      });
+
       return {
         kycs: rows,
         pagination: {
@@ -134,6 +168,9 @@ export class KYCService {
         }
       };
     } catch (error) {
+      logger.error('Failed to get pending KYCs', { 
+        error: error.message 
+      });
       throw error;
     }
   }

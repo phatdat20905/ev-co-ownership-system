@@ -1,3 +1,6 @@
+import { config } from 'dotenv';
+config(); // Đảm bảo .env được load trước
+
 import winston from 'winston';
 
 const logger = winston.createLogger({
@@ -12,7 +15,7 @@ const logger = winston.createLogger({
     new winston.transports.File({ 
       filename: 'logs/error.log', 
       level: 'error',
-      maxsize: 5242880, // 5MB
+      maxsize: 5242880, 
       maxFiles: 5
     }),
     new winston.transports.File({ 
@@ -23,7 +26,6 @@ const logger = winston.createLogger({
   ]
 });
 
-// Console transport for non-production environments
 if (process.env.NODE_ENV !== 'production') {
   logger.add(new winston.transports.Console({
     format: winston.format.combine(
@@ -33,7 +35,6 @@ if (process.env.NODE_ENV !== 'production') {
   }));
 }
 
-// Custom stream for Morgan HTTP logging
 export const stream = {
   write: (message) => {
     logger.info(message.trim());
