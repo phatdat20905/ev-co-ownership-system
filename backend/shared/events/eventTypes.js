@@ -1,3 +1,4 @@
+// backend/shared/events/eventTypes.js
 // Authentication Events
 export const AUTH_EVENTS = {
   USER_REGISTERED: 'auth.user.registered',
@@ -13,7 +14,35 @@ export const USER_EVENTS = {
   USER_CREATED: 'user.created',
   USER_UPDATED: 'user.updated',
   USER_DELETED: 'user.deleted',
-  PROFILE_UPDATED: 'user.profile.updated'
+  PROFILE_UPDATED: 'user.profile.updated',
+  PROFILE_CREATED: 'user.profile.created'
+};
+
+// Group Events (NEW - for User Service)
+export const GROUP_EVENTS = {
+  GROUP_CREATED: 'group.created',
+  GROUP_UPDATED: 'group.updated',
+  GROUP_DELETED: 'group.deleted',
+  MEMBER_ADDED: 'group.member.added',
+  MEMBER_REMOVED: 'group.member.removed',
+  MEMBER_UPDATED: 'group.member.updated',
+  OWNERSHIP_UPDATED: 'group.ownership.updated'
+};
+
+// Voting Events (NEW - for User Service)
+export const VOTE_EVENTS = {
+  VOTE_CREATED: 'vote.created',
+  VOTE_CAST: 'vote.cast',
+  VOTE_CLOSED: 'vote.closed',
+  VOTE_UPDATED: 'vote.updated'
+};
+
+// Fund Events (NEW - for User Service)
+export const FUND_EVENTS = {
+  FUND_DEPOSIT: 'fund.deposit',
+  FUND_WITHDRAWAL: 'fund.withdrawal',
+  FUND_ALLOCATION: 'fund.allocation',
+  FUND_BALANCE_UPDATED: 'fund.balance.updated'
 };
 
 // KYC Events
@@ -59,6 +88,9 @@ export const SYSTEM_EVENTS = {
 export const eventTypes = {
   ...AUTH_EVENTS,
   ...USER_EVENTS,
+  ...GROUP_EVENTS,
+  ...VOTE_EVENTS,
+  ...FUND_EVENTS,
   ...KYC_EVENTS,
   ...BOOKING_EVENTS,
   ...VEHICLE_EVENTS,
@@ -70,6 +102,9 @@ export const eventTypes = {
 export const EVENT_CATEGORIES = {
   AUTH: 'auth',
   USER: 'user',
+  GROUP: 'group',
+  VOTE: 'vote',
+  FUND: 'fund',
   KYC: 'kyc',
   BOOKING: 'booking',
   VEHICLE: 'vehicle',
