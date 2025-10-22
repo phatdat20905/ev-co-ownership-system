@@ -1,130 +1,59 @@
-  import express from 'express';
-  import cors from 'cors';
-  import helmet from 'helmet';
-  import { config } from 'dotenv';
+import express from 'express';
+import helmet from 'helmet';
+import { config } from 'dotenv';
+import { createCorsMiddleware } from '@ev-coownership/shared';
+import { createHealthRoute } from '@ev-coownership/shared';
 
-  // Load environment variables
-  config();
+// Shared imports
+import {
+  logger,
+  errorHandler,
+  notFoundHandler,
+  generalRateLimiter
+} from '@ev-coownership/shared';
 
-  // Import từ shared modules
-  import { 
-    logger, 
-    errorHandler, 
-    notFoundHandler,
-    redisClient,
-    rabbitMQClient,
-    generalRateLimiter
-  } from '@ev-coownership/shared';
+import routes from './routes/index.js';
 
-  import db from './models/index.js';
-  import routes from './routes/index.js';
-  import eventService from './services/eventService.js'; // Thêm import này
+// Load .env file
+config();
 
-  const app = express();
-  const PORT = process.env.PORT || 3001;
+const app = express();
 
-  // Security middleware
-  app.use(helmet());
-  app.use(cors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'http://localhost:5173'],
-    credentials: true
-  }));
+// 🛡️ Security middleware
+app.use(helmet());
+app.use(createCorsMiddleware());
 
-  // Body parsing middleware
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true }));
+// 📦 Body parsers
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
-  // Rate limiting
-  app.use(generalRateLimiter);
+// 🚦 Rate limiting
+app.use(generalRateLimiter);
 
-  // Request logging middleware
-  app.use((req, res, next) => {
-    const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    res.locals.requestId = requestId;
-    
-    logger.info('Incoming request', {
-      requestId,
-      method: req.method,
-      url: req.url,
-      ip: req.ip,
-      userAgent: req.get('User-Agent')
-    });
+// 🧾 Request logger
+app.use((req, res, next) => {
+  const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  res.locals.requestId = requestId;
 
-    next();
+  logger.info(`[${requestId}] ${req.method} ${req.url}`, {
+    ip: req.ip,
+    userAgent: req.get('User-Agent')
   });
 
-  // Health check endpoint với event service status
-  app.get('/health', async (req, res) => {
-    const eventServiceHealth = await eventService.healthCheck();
-    
-    res.status(200).json({
-      success: true,
-      message: 'User Service is healthy',
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV,
-      services: {
-        database: 'healthy',
-        redis: 'healthy', 
-        eventBus: eventServiceHealth.healthy ? 'healthy' : 'unhealthy'
-      }
-    });
-  });
+  next();
+});
 
-  // API routes
-  app.use('/api/v1', routes);
+// 🩺 Health check route (sử dụng tiện ích bạn tách riêng)
+app.get('/health', createHealthRoute({
+  eventBus: 'healthy',
+  cache: 'healthy'
+}));
 
-  // 404 handler từ shared
-  app.use(notFoundHandler);
+// 📍 API routes
+app.use('/api/v1', routes);
 
-  // Error handling middleware từ shared
-  app.use(errorHandler);
+// 🚫 404 và xử lý lỗi tổng quát
+app.use(notFoundHandler);
+app.use(errorHandler);
 
-  // Database connection and server startup
-  async function startServer() {
-    try {
-      // Test database connection
-      await db.sequelize.authenticate();
-      logger.info('Database connection established successfully');
-
-      // Sync database (in development)
-      if (process.env.NODE_ENV === 'development') {
-        await db.sequelize.sync({ alter: true });
-        logger.info('Database synced successfully');
-      }
-
-      // Initialize event service
-      await eventService.initialize();
-      
-      // Start event consumers
-      await eventService.startEventConsumers();
-
-      // Start server
-      app.listen(PORT, () => {
-        logger.info(`User Service running on port ${PORT} in ${process.env.NODE_ENV} mode`);
-      });
-    } catch (error) {
-      logger.error('Failed to start server', { error: error.message });
-      process.exit(1);
-    }
-  }
-
-  // Graceful shutdown
-  process.on('SIGTERM', async () => {
-    logger.info('SIGTERM received, shutting down gracefully');
-    await db.sequelize.close();
-    await redisClient.disconnect();
-    await rabbitMQClient.disconnect();
-    process.exit(0);
-  });
-
-  process.on('SIGINT', async () => {
-    logger.info('SIGINT received, shutting down gracefully');
-    await db.sequelize.close();
-    await redisClient.disconnect();
-    await rabbitMQClient.disconnect();
-    process.exit(0);
-  });
-
-  startServer();
-
-  export default app;
+export default app;

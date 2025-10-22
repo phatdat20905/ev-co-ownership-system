@@ -36,6 +36,11 @@ services:
     networks:
       - ev_network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   postgres-booking:
     image: postgres:15-alpine
@@ -51,6 +56,11 @@ services:
     networks:
       - ev_network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   postgres-cost:
     image: postgres:15-alpine
@@ -66,6 +76,11 @@ services:
     networks:
       - ev_network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   postgres-vehicle:
     image: postgres:15-alpine
@@ -81,6 +96,11 @@ services:
     networks:
       - ev_network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   postgres-contract:
     image: postgres:15-alpine
@@ -96,6 +116,11 @@ services:
     networks:
       - ev_network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   postgres-admin:
     image: postgres:15-alpine
@@ -111,6 +136,11 @@ services:
     networks:
       - ev_network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # MongoDB
   mongodb:
@@ -126,6 +156,11 @@ services:
     networks:
       - ev_network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "mongo --username ${MONGO_USER:-admin} --password ${MONGO_PASSWORD:-admin123} --eval 'db.adminCommand(\"ping\")'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Redis
   redis:
@@ -139,6 +174,11 @@ services:
     networks:
       - ev_network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # RabbitMQ
   rabbitmq:
@@ -155,6 +195,11 @@ services:
     networks:
       - ev_network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # API Gateway - Production
   api-gateway:
@@ -196,6 +241,7 @@ services:
       - "3001:3001"
     environment:
       NODE_ENV: production
+      SERVICE_NAME: auth-service
       PORT: 3001
       DB_HOST: postgres-auth
       DB_PORT: 5432
@@ -231,6 +277,7 @@ services:
       - "3002:3002"
     environment:
       NODE_ENV: production
+      SERVICE_NAME: user-service
       PORT: 3002
       DB_HOST: postgres-user
       DB_PORT: 5432
@@ -246,6 +293,11 @@ services:
     networks:
       - ev_network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Booking Service - Production
   booking-service:

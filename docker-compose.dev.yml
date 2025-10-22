@@ -13,7 +13,6 @@ services:
       - "5432:5432"
     volumes:
       - postgres_auth_data:/var/lib/postgresql/data
-      - ./backend/auth-service/src/migrations:/docker-entrypoint-initdb.d
     networks:
       - ev_network
     healthcheck:
@@ -54,6 +53,11 @@ services:
       - postgres_booking_data:/var/lib/postgresql/data
     networks:
       - ev_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   postgres-cost:
     image: postgres:15-alpine
@@ -68,6 +72,11 @@ services:
       - postgres_cost_data:/var/lib/postgresql/data
     networks:
       - ev_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   postgres-vehicle:
     image: postgres:15-alpine
@@ -82,6 +91,11 @@ services:
       - postgres_vehicle_data:/var/lib/postgresql/data
     networks:
       - ev_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   postgres-contract:
     image: postgres:15-alpine
@@ -96,6 +110,11 @@ services:
       - postgres_contract_data:/var/lib/postgresql/data
     networks:
       - ev_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   postgres-admin:
     image: postgres:15-alpine
@@ -110,6 +129,11 @@ services:
       - postgres_admin_data:/var/lib/postgresql/data
     networks:
       - ev_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # MongoDB
   mongodb:
@@ -124,6 +148,11 @@ services:
       - mongodb_data:/data/db
     networks:
       - ev_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Redis
   redis:
@@ -193,6 +222,8 @@ services:
       - ./backend/api-gateway/logs:/app/logs
     command: npm run dev
 
+  # ==================== SERVICES ====================
+
   # Auth Service - Development
   auth-service-dev:
     profiles: ["auth"]
@@ -200,23 +231,13 @@ services:
       context: ./backend/auth-service
       dockerfile: Dockerfile.dev
     container_name: ev_auth_service_dev
-    ports:
-      - "3001:3001"
+    env_file:
+      - ./backend/auth-service/.env
     environment:
       NODE_ENV: development
-      SERVICE_NAME: auth-service
-      PORT: 3001
-      DB_HOST: postgres-auth
-      DB_PORT: 5432
-      DB_NAME: auth_db
-      DB_USER: postgres
-      DB_PASSWORD: postgres123
-      REDIS_URL: redis://:redis123@redis:6379
+      DB_HOST: postgres-auth       # override localhost → container name
+      REDIS_HOST: redis
       RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
-      JWT_SECRET: your_jwt_secret_key_here_change_in_production
-      JWT_EXPIRES_IN: 1d
-      JWT_REFRESH_SECRET: your_refresh_token_secret_key
-      JWT_REFRESH_EXPIRES_IN: 7d
     depends_on:
       postgres-auth:
         condition: service_healthy
@@ -224,6 +245,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    ports:
+      - "3001:3001"
     networks:
       - ev_network
     volumes:
@@ -239,26 +262,28 @@ services:
       context: ./backend/user-service
       dockerfile: Dockerfile.dev
     container_name: ev_user_service_dev
-    ports:
-      - "3002:3002"
+    env_file:
+      - ./backend/user-service/.env
     environment:
       NODE_ENV: development
-      PORT: 3002
       DB_HOST: postgres-user
-      DB_PORT: 5432
-      DB_NAME: user_db
-      DB_USER: postgres
-      DB_PASSWORD: postgres123
-      REDIS_URL: redis://:redis123@redis:6379
+      REDIS_HOST: redis
       RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
     depends_on:
       postgres-user:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "3002:3002"
     networks:
       - ev_network
     volumes:
       - ./backend/user-service/src:/app/src
       - ./backend/user-service/logs:/app/logs
+      - ./backend/shared:/app/node_modules/@ev-coownership/shared
     command: npm run dev
 
   # Booking Service - Development
