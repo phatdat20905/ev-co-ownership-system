@@ -58,7 +58,14 @@ export const BOOKING_EVENTS = {
   BOOKING_CREATED: 'booking.created',
   BOOKING_UPDATED: 'booking.updated',
   BOOKING_CANCELLED: 'booking.cancelled',
-  BOOKING_CONFIRMED: 'booking.confirmed'
+  BOOKING_CONFIRMED: 'booking.confirmed',
+  BOOKING_COMPLETED: 'booking.completed',
+  BOOKING_CONFLICT_DETECTED: 'booking.conflict.detected',
+  BOOKING_CONFLICT_RESOLVED: 'booking.conflict.resolved',
+  CHECK_IN_SUCCESS: 'booking.checkin.success',
+  CHECK_OUT_SUCCESS: 'booking.checkout.success',
+  QR_CODE_GENERATED: 'booking.qr.generated',
+  QR_CODE_VALIDATED: 'booking.qr.validated'
 };
 
 // Vehicle Events
