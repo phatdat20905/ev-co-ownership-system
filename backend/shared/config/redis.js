@@ -1,3 +1,4 @@
+// backend/shared/config/redis.js
 import { createClient } from 'redis';
 import logger from '../utils/logger.js';
 import { URL } from 'url';
@@ -13,7 +14,6 @@ export class RedisClient {
     try {
       let redisConfig = {};
 
-      // ✅ Ưu tiên REDIS_URL (chuẩn cloud & Docker Compose)
       if (process.env.REDIS_URL) {
         const redisUrl = new URL(process.env.REDIS_URL);
         redisConfig = {
@@ -22,7 +22,7 @@ export class RedisClient {
             port: parseInt(redisUrl.port || '6379', 10),
             connectTimeout: parseInt(process.env.REDIS_CONNECT_TIMEOUT || '20000', 10),
             reconnectStrategy: (retries) => {
-              const delay = Math.min(retries * 500, 5000); // tăng dần mỗi lần reconnect
+              const delay = Math.min(retries * 500, 5000);
               logger.info(`Redis reconnect attempt #${retries} after ${delay}ms`, {
                 service: this.serviceName,
               });
@@ -33,7 +33,6 @@ export class RedisClient {
           database: parseInt(redisUrl.pathname.replace('/', '') || '0', 10),
         };
       } else {
-        // ✅ fallback khi dev local không có REDIS_URL
         redisConfig = {
           socket: {
             host: process.env.REDIS_HOST || 'localhost',
@@ -54,7 +53,6 @@ export class RedisClient {
 
       this.client = createClient(redisConfig);
 
-      // === Event listeners ===
       this.client.on('error', (err) => {
         logger.error(`Redis Client Error for ${this.serviceName}: ${err.message}`, {
           service: this.serviceName,
@@ -95,7 +93,15 @@ export class RedisClient {
 
   async set(key, value, expireTime = 3600) {
     try {
-      await this.client.set(key, value, { EX: expireTime });
+      // 🔧 FIX: Đảm bảo expireTime là số nguyên
+      const expireSeconds = Math.floor(Number(expireTime));
+      
+      if (isNaN(expireSeconds) || expireSeconds <= 0) {
+        logger.warn(`Invalid expireTime: ${expireTime}, using default 3600 seconds`);
+        await this.client.set(key, value, { EX: 3600 });
+      } else {
+        await this.client.set(key, value, { EX: expireSeconds });
+      }
     } catch (error) {
       logger.error(`Redis SET error for ${this.serviceName}: ${error.message}`);
     }
@@ -129,9 +135,21 @@ export class RedisClient {
 
   async expire(key, seconds) {
     try {
-      await this.client.expire(key, seconds);
+      const expireSeconds = Math.floor(Number(seconds));
+      if (expireSeconds > 0) {
+        await this.client.expire(key, expireSeconds);
+      }
     } catch (error) {
       logger.error(`Redis EXPIRE error for ${this.serviceName}: ${error.message}`);
+    }
+  }
+
+  async keys(pattern) {
+    try {
+      return await this.client.keys(pattern);
+    } catch (error) {
+      logger.error(`Redis KEYS error for ${this.serviceName}: ${error.message}`);
+      return [];
     }
   }
 

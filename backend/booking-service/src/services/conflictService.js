@@ -29,7 +29,10 @@ export class ConflictService {
       const detectedConflicts = conflicts.flat().filter(conflict => conflict !== null);
 
       for (const conflictData of detectedConflicts) {
-        await this.createConflictRecord(booking, conflictData);
+        const conflict = await this.createConflictRecord(booking, conflictData);
+        
+        // 🔌 NEW: Real-time conflict notification
+        socketService.publishBookingConflict(conflict);
       }
 
       if (detectedConflicts.length > 0) {
@@ -341,7 +344,11 @@ export class ConflictService {
 
       await transaction.commit();
 
+      // Publish events
       await eventService.publishBookingConflictResolved(conflict, resolution);
+      
+      // 🔌 NEW: Real-time conflict resolution notification
+      socketService.publishConflictResolved(conflict, resolution);
 
       logger.info('Conflict resolved successfully', {
         conflictId,

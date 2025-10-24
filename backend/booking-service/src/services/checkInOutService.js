@@ -59,8 +59,11 @@ export class CheckInOutService {
 
       await transaction.commit();
 
-      // Publish event
+      // Publish events
       await eventService.publishCheckInSuccess(booking, checkInLog);
+      
+      // 🔌 NEW: Real-time check-in notification
+      socketService.publishCheckInSuccess(booking, checkInLog);
 
       logger.info('Check-in completed successfully', {
         bookingId,
@@ -128,8 +131,11 @@ export class CheckInOutService {
 
       await transaction.commit();
 
-      // Publish event
+      // Publish events
       await eventService.publishCheckOutSuccess(booking, checkOutLog);
+      
+      // 🔌 NEW: Real-time check-out notification
+      socketService.publishCheckOutSuccess(booking, checkOutLog);
 
       // Calculate usage statistics
       await this.calculateUsageStatistics(booking, checkOutData);

@@ -1,4 +1,6 @@
+// booking-service/src/controllers/calendarController.js
 import calendarService from '../services/calendarService.js';
+import socketService from '../services/socketService.js';
 import { successResponse, logger } from '@ev-coownership/shared';
 
 export class CalendarController {
@@ -109,13 +111,68 @@ export class CalendarController {
 
       logger.debug('Subscribing to calendar updates', { userId, groupId });
 
-      // This would typically setup WebSocket connection
-      // For now, return subscription info
-      const subscription = await calendarService.subscribeToCalendarUpdates(userId, groupId);
+      // Trả về thông tin WebSocket connection thay vì xử lý subscription trực tiếp
+      const subscriptionInfo = {
+        subscribed: true,
+        userId,
+        groupId,
+        message: 'Use WebSocket connection for real-time calendar updates',
+        websocketEvents: {
+          subscribe: 'subscribe:calendar',
+          unsubscribe: 'unsubscribe:calendar', 
+          updates: 'calendar:updated',
+          bookingEvents: ['booking:created', 'booking:updated', 'booking:cancelled']
+        },
+        instructions: {
+          connect: 'Connect to /socket.io/ with authentication token',
+          subscribe: `Send event: { event: 'subscribe:calendar', groupId: '${groupId}' }`,
+          receive: 'Listen for calendar:updated events'
+        }
+      };
 
-      return successResponse(res, 'Subscribed to calendar updates successfully', subscription);
+      return successResponse(res, 'Calendar subscription instructions', subscriptionInfo);
     } catch (error) {
       logger.error('Failed to subscribe to calendar updates', { 
+        error: error.message, 
+        userId: req.user?.id 
+      });
+      next(error);
+    }
+  }
+
+  // 🔌 NEW: Real-time calendar broadcast endpoint (for admin/system use)
+  async broadcastCalendarUpdate(req, res, next) {
+    try {
+      const { groupId, vehicleId, updateType, data } = req.body;
+      const userId = req.user.id;
+
+      logger.info('Broadcasting calendar update', { userId, groupId, vehicleId, updateType });
+
+      // Kiểm tra quyền admin
+      if (!['staff', 'admin'].includes(req.user.role)) {
+        return res.status(403).json({
+          success: false,
+          error: {
+            code: 'PERMISSION_DENIED',
+            message: 'Only staff/admin can broadcast calendar updates'
+          }
+        });
+      }
+
+      // Broadcast real-time update via Socket.io
+      if (groupId) {
+        socketService.publishCalendarUpdate(groupId, vehicleId, updateType, data);
+      }
+
+      return successResponse(res, 'Calendar update broadcasted successfully', {
+        groupId,
+        vehicleId,
+        updateType,
+        broadcasted: true,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('Failed to broadcast calendar update', { 
         error: error.message, 
         userId: req.user?.id 
       });

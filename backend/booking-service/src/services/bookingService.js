@@ -65,6 +65,9 @@ export class BookingService {
           autoConfirmed: true 
         }, { transaction });
         await eventService.publishBookingConfirmed(booking);
+        
+        // 🔌 NEW: Real-time notification
+        socketService.publishBookingCreated(booking);
       }
 
       // 8. Check for conflicts
@@ -75,8 +78,21 @@ export class BookingService {
       // 9. Clear relevant caches
       await calendarService.clearCalendarCache(bookingData.vehicleId, bookingData.groupId);
 
-      // 10. Publish event
+      // 10. Publish events
       await eventService.publishBookingCreated(booking);
+      
+      // 🔌 NEW: Real-time notification for all cases
+      if (booking.status !== 'confirmed') {
+        socketService.publishBookingCreated(booking);
+      }
+
+      // 🔌 NEW: Trigger calendar update
+      await calendarService.triggerCalendarUpdate(
+        bookingData.vehicleId,
+        bookingData.groupId,
+        'booking_created',
+        { bookingId: booking.id }
+      );
 
       logger.info('Booking created successfully', { 
         bookingId: booking.id, 
@@ -95,6 +111,7 @@ export class BookingService {
       throw error;
     }
   }
+
 
   async getBookingById(bookingId, userId) {
     try {
@@ -190,6 +207,9 @@ export class BookingService {
     try {
       const booking = await this.getBookingById(bookingId, userId);
 
+      // Store old data for real-time comparison
+      const oldBookingData = { ...booking.toJSON() };
+
       // Check if booking can be modified
       if (!['pending', 'confirmed'].includes(booking.status)) {
         throw new AppError('Booking cannot be modified in its current state', 400, 'BOOKING_NOT_MODIFIABLE');
@@ -224,8 +244,22 @@ export class BookingService {
       // Clear caches
       await calendarService.clearCalendarCache(booking.vehicleId, booking.groupId);
 
-      // Publish event
+      // Publish events
       await eventService.publishBookingUpdated(updatedBooking);
+      
+      // 🔌 NEW: Real-time notification
+      socketService.publishBookingUpdated(updatedBooking, oldBookingData);
+
+      // 🔌 NEW: Trigger calendar update
+      await calendarService.triggerCalendarUpdate(
+        booking.vehicleId,
+        booking.groupId,
+        'booking_updated',
+        { 
+          bookingId: booking.id,
+          changes: socketService.getChangedFields(oldBookingData, updatedBooking.toJSON())
+        }
+      );
 
       logger.info('Booking updated successfully', { 
         bookingId, 
@@ -249,6 +283,9 @@ export class BookingService {
 
     try {
       const booking = await this.getBookingById(bookingId, userId);
+
+      // Store old data
+      const oldBookingData = { ...booking.toJSON() };
 
       // Check if booking can be cancelled
       if (!['pending', 'confirmed'].includes(booking.status)) {
@@ -286,8 +323,19 @@ export class BookingService {
       // Clear caches
       await calendarService.clearCalendarCache(booking.vehicleId, booking.groupId);
 
-      // Publish event
+      // Publish events
       await eventService.publishBookingCancelled(booking);
+      
+      // 🔌 NEW: Real-time notification
+      socketService.publishBookingCancelled(booking);
+
+      // 🔌 NEW: Trigger calendar update
+      await calendarService.triggerCalendarUpdate(
+        booking.vehicleId,
+        booking.groupId,
+        'booking_cancelled',
+        { bookingId: booking.id, reason }
+      );
 
       logger.info('Booking cancelled successfully', { 
         bookingId, 

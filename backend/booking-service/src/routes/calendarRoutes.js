@@ -1,6 +1,7 @@
+// booking-service/src/routes/calendarRoutes.js (bổ sung)
 import express from 'express';
 import calendarController from '../controllers/calendarController.js';
-import { authenticate, validate } from '@ev-coownership/shared';
+import { authenticate, validate, authorize } from '@ev-coownership/shared';
 import { calendarValidators } from '../validators/calendarValidators.js';
 
 const router = express.Router();
@@ -38,4 +39,13 @@ router.get('/updates/subscribe',
   calendarController.subscribeToCalendarUpdates
 );
 
+// 🔌 NEW: Admin broadcast endpoint
+router.post('/broadcast', 
+  authorize(['staff', 'admin']),
+  validate(calendarValidators.broadcastUpdate),
+  calendarController.broadcastCalendarUpdate
+);
+
 export default router;
+
+

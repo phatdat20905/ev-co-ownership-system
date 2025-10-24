@@ -60,5 +60,17 @@ export const calendarValidators = {
       startDate: Joi.date().iso().required(),
       endDate: Joi.date().iso().greater(Joi.ref('startDate')).required()
     })
-  }
+  },
+
+  broadcastUpdate: Joi.object({
+    groupId: uuidSchema,
+    vehicleId: uuidSchema.optional(),
+    updateType: Joi.string().valid(
+      'calendar_updated',
+      'availability_changed',
+      'maintenance_scheduled',
+      'vehicle_status_changed'
+    ).required(),
+    data: Joi.object().optional()
+  })
 };

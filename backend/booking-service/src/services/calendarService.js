@@ -311,15 +311,66 @@ export class CalendarService {
   }
 
   async subscribeToCalendarUpdates(userId, groupId) {
-    // This would typically setup WebSocket connection
-    // For now, return subscription info
+    // 🔌 NOW: Return WebSocket connection info instead of handling subscription directly
     return {
       subscribed: true,
       userId,
       groupId,
-      subscriptionId: `calendar_sub_${userId}_${Date.now()}`,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+      message: 'Use WebSocket connection for real-time updates',
+      connectionInfo: {
+        endpoint: '/socket.io/',
+        authentication: 'Include JWT token in handshake',
+        events: {
+          subscribe: `socket.emit('subscribe:calendar', { groupId: '${groupId}' })`,
+          listen: `socket.on('calendar:updated', (data) => { ... })`,
+          unsubscribe: `socket.emit('unsubscribe:calendar', { groupId: '${groupId}' })`
+        }
+      },
+      supportedEvents: [
+        'calendar:updated',
+        'booking:created', 
+        'booking:updated',
+        'booking:cancelled',
+        'availability:updated'
+      ]
     };
+  }
+
+  // 🔌 NEW: Method để trigger real-time calendar updates
+  async triggerCalendarUpdate(vehicleId, groupId, updateType, data) {
+    try {
+      logger.debug('Triggering calendar update', { vehicleId, groupId, updateType });
+
+      // Clear cache để đảm bảo data mới nhất
+      await this.clearCalendarCache(vehicleId, groupId);
+
+      // Broadcast real-time update via Socket.io
+      if (groupId) {
+        socketService.publishCalendarUpdate(groupId, vehicleId, updateType, data);
+      }
+
+      logger.info('Calendar update triggered', { vehicleId, groupId, updateType });
+    } catch (error) {
+      logger.error('Failed to trigger calendar update', {
+        error: error.message,
+        vehicleId,
+        groupId
+      });
+    }
+  }
+
+  // 🔌 NEW: Publish real-time availability updates
+  async publishAvailabilityUpdate(vehicleId, date, timeSlots) {
+    try {
+      socketService.publishCalendarAvailability(vehicleId, date, timeSlots);
+      
+      logger.debug('Availability update published via socket', { vehicleId, date });
+    } catch (error) {
+      logger.error('Failed to publish availability update', {
+        error: error.message,
+        vehicleId
+      });
+    }
   }
 
   // Helper methods

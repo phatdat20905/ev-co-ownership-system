@@ -293,6 +293,8 @@ services:
       context: ./backend/booking-service
       dockerfile: Dockerfile.dev
     container_name: ev_booking_service_dev
+    env_file:
+      - ./backend/booking-service/.env
     ports:
       - "3003:3003"
     environment:
@@ -306,12 +308,18 @@ services:
       REDIS_URL: redis://:redis123@redis:6379
       RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
     depends_on:
-      - postgres-booking
+      postgres-user:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
       - ev_network
     volumes:
       - ./backend/booking-service/src:/app/src
       - ./backend/booking-service/logs:/app/logs
+      - ./backend/shared:/app/node_modules/@ev-coownership/shared
     command: npm run dev
 
   # Cost Service - Development
