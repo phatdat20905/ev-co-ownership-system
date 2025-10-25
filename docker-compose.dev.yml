@@ -308,7 +308,7 @@ services:
       REDIS_URL: redis://:redis123@redis:6379
       RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
     depends_on:
-      postgres-user:
+      postgres-booking:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -348,6 +348,7 @@ services:
     volumes:
       - ./backend/cost-service/src:/app/src
       - ./backend/cost-service/logs:/app/logs
+      - ./backend/shared:/app/node_modules/@ev-coownership/shared
     command: npm run dev
 
   # Vehicle Service - Development
@@ -357,6 +358,8 @@ services:
       context: ./backend/vehicle-service
       dockerfile: Dockerfile.dev
     container_name: ev_vehicle_service_dev
+    env_file:
+      - ./backend/booking-service/.env
     ports:
       - "3005:3005"
     environment:
@@ -370,12 +373,18 @@ services:
       REDIS_URL: redis://:redis123@redis:6379
       RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
     depends_on:
-      - postgres-vehicle
+      postgres-vehicle:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
       - ev_network
     volumes:
       - ./backend/vehicle-service/src:/app/src
       - ./backend/vehicle-service/logs:/app/logs
+      - ./backend/shared:/app/node_modules/@ev-coownership/shared
     command: npm run dev
 
   # Contract Service - Development
