@@ -43,7 +43,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// 🩺 Health check route (sử dụng tiện ích bạn tách riêng)
+// 🩺 Health check route
 app.get('/health', createHealthRoute({
   eventBus: 'healthy',
   cache: 'healthy'
