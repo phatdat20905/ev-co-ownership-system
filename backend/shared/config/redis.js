@@ -91,21 +91,30 @@ export class RedisClient {
     }
   }
 
-  async set(key, value, expireTime = 3600) {
+  async set(key, value, options = {}) {
     try {
-      // 🔧 FIX: Đảm bảo expireTime là số nguyên
-      const expireSeconds = Math.floor(Number(expireTime));
-      
-      if (isNaN(expireSeconds) || expireSeconds <= 0) {
-        logger.warn(`Invalid expireTime: ${expireTime}, using default 3600 seconds`);
-        await this.client.set(key, value, { EX: 3600 });
-      } else {
-        await this.client.set(key, value, { EX: expireSeconds });
+      // Nếu truyền dạng số (expireTime cũ) → chuyển thành options.EX
+      if (typeof options === 'number') {
+        options = { EX: Math.floor(options) };
       }
+
+      // Nếu có NX hoặc EX trong options
+      const redisOptions = {};
+      if (options.NX) redisOptions.NX = true;
+      if (options.EX) {
+        const expireSeconds = Math.floor(Number(options.EX));
+        redisOptions.EX = isNaN(expireSeconds) || expireSeconds <= 0 ? 3600 : expireSeconds;
+      }
+
+      // Mặc định hết hạn sau 1h nếu không có EX
+      if (!redisOptions.EX) redisOptions.EX = 3600;
+
+      await this.client.set(key, value, redisOptions);
     } catch (error) {
       logger.error(`Redis SET error for ${this.serviceName}: ${error.message}`);
     }
   }
+
 
   async del(key) {
     try {

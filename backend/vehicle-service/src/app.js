@@ -1,3 +1,4 @@
+// src/app.js
 import express from 'express';
 import helmet from 'helmet';
 import { config } from 'dotenv';
@@ -32,7 +33,7 @@ app.use(generalRateLimiter);
 
 // 🧾 Request logger
 app.use((req, res, next) => {
-  const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const requestId = `vehicle_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   res.locals.requestId = requestId;
 
   logger.info(`[${requestId}] ${req.method} ${req.url}`, {
@@ -43,10 +44,40 @@ app.use((req, res, next) => {
   next();
 });
 
-// 🩺 Health check route (sử dụng tiện ích bạn tách riêng)
+// 🩺 Health check route
 app.get('/health', createHealthRoute({
-  eventBus: 'healthy',
-  cache: 'healthy'
+  service: 'vehicle-service',
+  checks: [
+    {
+      name: 'database',
+      check: async () => {
+        try {
+          const db = await import('./models/index.js');
+          await db.default.sequelize.authenticate();
+          return { healthy: true };
+        } catch (error) {
+          return { 
+            healthy: false, 
+            error: error.message 
+          };
+        }
+      }
+    },
+    {
+      name: 'event-bus',
+      check: async () => {
+        try {
+          const eventService = await import('./services/eventService.js');
+          return await eventService.default.healthCheck();
+        } catch (error) {
+          return { 
+            healthy: false, 
+            error: error.message 
+          };
+        }
+      }
+    }
+  ]
 }));
 
 // 📍 API routes
