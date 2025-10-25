@@ -147,7 +147,8 @@ export default {
         energy_consumed_kwh: 45.2,
         cost: 18.08,
         payment_method: 'credit_card',
-        created_at: new Date()
+        created_at: new Date(),
+        updated_at: new Date() 
       }
     ]);
   },

@@ -1,4 +1,3 @@
-// src/migrations/005-create-charging-sessions.js
 import { DataTypes } from 'sequelize';
 
 export default {
@@ -48,6 +47,11 @@ export default {
         type: DataTypes.STRING(50)
       },
       created_at: {
+        type: DataTypes.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+      },
+      updated_at: {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')

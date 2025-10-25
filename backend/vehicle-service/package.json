@@ -13,10 +13,16 @@
     "seed": "npx sequelize-cli db:seed:all",
     "seed:undo": "npx sequelize-cli db:seed:undo:all"
   },
-  "keywords": [],
+  "keywords": [
+    "ev",
+    "vehicle",
+    "microservice",
+    "co-ownership",
+    "electric-vehicle"
+  ],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "EV Co-ownership System - Vehicle Management Service",
   "dependencies": {
     "@ev-coownership/shared": "file:../shared",
     "dotenv": "^17.2.3",

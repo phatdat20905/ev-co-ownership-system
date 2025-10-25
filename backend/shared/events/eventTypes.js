@@ -70,10 +70,34 @@ export const BOOKING_EVENTS = {
 
 // Vehicle Events
 export const VEHICLE_EVENTS = {
-  VEHICLE_ADDED: 'vehicle.added',
+  // Vehicle Management
+  VEHICLE_CREATED: 'vehicle.created',
   VEHICLE_UPDATED: 'vehicle.updated',
-  VEHICLE_MAINTENANCE: 'vehicle.maintenance',
-  VEHICLE_INSURANCE: 'vehicle.insurance'
+  VEHICLE_DELETED: 'vehicle.deleted',
+  VEHICLE_STATUS_CHANGED: 'vehicle.status.changed',
+  
+  // Maintenance Events
+  MAINTENANCE_SCHEDULED: 'vehicle.maintenance.scheduled',
+  MAINTENANCE_UPDATED: 'vehicle.maintenance.updated',
+  MAINTENANCE_COMPLETED: 'vehicle.maintenance.completed',
+  MAINTENANCE_CANCELLED: 'vehicle.maintenance.cancelled',
+  MAINTENANCE_REMINDER: 'vehicle.maintenance.reminder',
+  
+  // Insurance Events
+  INSURANCE_ADDED: 'vehicle.insurance.added',
+  INSURANCE_UPDATED: 'vehicle.insurance.updated',
+  INSURANCE_EXPIRING: 'vehicle.insurance.expiring',
+  INSURANCE_EXPIRED: 'vehicle.insurance.expired',
+  
+  // Charging Events
+  CHARGING_SESSION_STARTED: 'vehicle.charging.started',
+  CHARGING_SESSION_COMPLETED: 'vehicle.charging.completed',
+  CHARGING_COST_RECORDED: 'vehicle.charging.cost.recorded',
+  
+  // Analytics Events
+  BATTERY_HEALTH_CHECKED: 'vehicle.battery.health.checked',
+  VEHICLE_UTILIZATION_CALCULATED: 'vehicle.utilization.calculated',
+  MAINTENANCE_COST_ANALYZED: 'vehicle.maintenance.cost.analyzed'
 };
 
 // Payment Events
