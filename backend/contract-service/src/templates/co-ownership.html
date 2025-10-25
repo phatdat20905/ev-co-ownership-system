@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>HỢP ĐỒNG ĐỒNG SỞ HỮU XE ĐIỆN</title>
+    <style>
+        body {
+            font-family: 'Times New Roman', serif;
+            line-height: 1.6;
+            margin: 40px;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 20px;
+        }
+        .contract-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        .contract-number {
+            font-size: 16px;
+            color: #666;
+        }
+        .section {
+            margin: 30px 0;
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 5px;
+        }
+        .party-info {
+            margin: 15px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .signature-area {
+            margin-top: 50px;
+            border-top: 1px solid #333;
+            padding-top: 20px;
+        }
+        .signature-line {
+            margin-top: 80px;
+            border-top: 1px solid #333;
+            width: 300px;
+            text-align: center;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="contract-title">HỢP ĐỒNG ĐỒNG SỞ HỮU XE ĐIỆN</div>
+        <div class="contract-number">Số: {{contract_number}}</div>
+        <div>Ngày có hiệu lực: {{effective_date}}</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">ĐIỀU 1: CÁC BÊN THAM GIA</div>
+        <p>Các bên cùng tham gia ký kết hợp đồng đồng sở hữu xe điện:</p>
+        {{#each parties}}
+        <div class="party-info">
+            <strong>{{full_name}}</strong><br>
+            Vai trò: {{role}}<br>
+            Tỷ lệ sở hữu: {{ownership_percentage}}%<br>
+            {{#if has_signed}}Đã ký ngày: {{signed_at}}{{else}}Chưa ký{{/if}}
+        </div>
+        {{/each}}
+    </div>
+
+    <div class="section">
+        <div class="section-title">ĐIỀU 2: THÔNG TIN XE ĐIỆN</div>
+        <p>Biển số xe: {{vehicle_license_plate}}</p>
+        <p>Model: {{vehicle_model}}</p>
+        <p>Năm sản xuất: {{vehicle_year}}</p>
+        <p>Số VIN: {{vehicle_vin}}</p>
+    </div>
+
+    <div class="section">
+        <div class="section-title">ĐIỀU 3: NGUYÊN TẮC SỬ DỤNG</div>
+        <p>3.1. Quyền sử dụng xe được phân bổ theo tỷ lệ sở hữu.</p>
+        <p>3.2. Các bên cam kết sử dụng xe đúng mục đích, bảo quản và bảo dưỡng định kỳ.</p>
+        <p>3.3. Thời gian sử dụng được đăng ký trước thông qua hệ thống đặt lịch.</p>
+    </div>
+
+    <div class="section">
+        <div class="section-title">ĐIỀU 4: CHI PHÍ VÀ THANH TOÁN</div>
+        <p>4.1. Chi phí vận hành (sạc điện, bảo hiểm, bảo dưỡng) được chia theo tỷ lệ sở hữu.</p>
+        <p>4.2. Thanh toán được thực hiện hàng tháng thông qua hệ thống.</p>
+        <p>4.3. Quỹ chung được sử dụng cho các chi phí phát sinh.</p>
+    </div>
+
+    <div class="section">
+        <div class="section-title">ĐIỀU 5: QUYỀN VÀ NGHĨA VỤ</div>
+        <p>5.1. Mỗi bên có quyền sử dụng xe theo tỷ lệ sở hữu.</p>
+        <p>5.2. Các bên có nghĩa vụ đóng góp chi phí theo quy định.</p>
+        <p>5.3. Mọi quyết định quan trọng cần có sự đồng thuận của tất cả các bên.</p>
+    </div>
+
+    <div class="section">
+        <div class="section-title">ĐIỀU 6: THỜI HẠN VÀ GIẢI QUYẾT TRANH CHẤP</div>
+        <p>6.1. Hợp đồng có hiệu lực từ {{effective_date}} đến {{expiry_date}}.</p>
+        <p>6.2. Mọi tranh chấp được ưu tiên giải quyết thông qua thương lượng.</p>
+        <p>6.3. Trường hợp không thương lượng được, sẽ giải quyết theo quy định pháp luật.</p>
+    </div>
+
+    <div class="signature-area">
+        <div class="section-title">CHỮ KÝ CÁC BÊN</div>
+        <div style="display: flex; justify-content: space-between; flex-wrap: wrap;">
+            {{#each parties}}
+            <div style="margin: 20px; text-align: center;">
+                <div style="margin-bottom: 60px;"><strong>{{full_name}}</strong></div>
+                <div class="signature-line">Chữ ký</div>
+            </div>
+            {{/each}}
+        </div>
+    </div>
+</body>
+</html>

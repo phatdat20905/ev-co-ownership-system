@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>PHỤ LỤC HỢP ĐỒNG</title>
+    <style>
+        body {
+            font-family: 'Times New Roman', serif;
+            line-height: 1.6;
+            margin: 40px;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 20px;
+        }
+        .document-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        .document-number {
+            font-size: 16px;
+            color: #666;
+        }
+        .section {
+            margin: 30px 0;
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 5px;
+        }
+        .changes-list {
+            margin: 15px 0;
+            padding-left: 20px;
+        }
+        .changes-list li {
+            margin: 8px 0;
+        }
+        .signature-area {
+            margin-top: 50px;
+            border-top: 1px solid #333;
+            padding-top: 20px;
+        }
+        .signature-line {
+            margin-top: 80px;
+            border-top: 1px solid #333;
+            width: 300px;
+            text-align: center;
+            padding-top: 10px;
+        }
+        .highlight {
+            background-color: #fff3cd;
+            padding: 10px;
+            border-left: 4px solid #ffc107;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="document-title">PHỤ LỤC HỢP ĐỒNG</div>
+        <div class="document-number">Số: {{amendment_number}}</div>
+        <div>Ngày có hiệu lực: {{effective_date}}</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">THÔNG TIN HỢP ĐỒNG GỐC</div>
+        <p><strong>Số hợp đồng:</strong> {{original_contract_number}}</p>
+        <p><strong>Tiêu đề:</strong> {{original_contract_title}}</p>
+        <p><strong>Ngày ký:</strong> {{original_contract_date}}</p>
+    </div>
+
+    <div class="section">
+        <div class="section-title">LÝ DO SỬA ĐỔI</div>
+        <div class="highlight">
+            {{amendment_reason}}
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">NỘI DUNG SỬA ĐỔI</div>
+        <div class="changes-list">
+            {{#each changes}}
+            <li><strong>{{this.section}}:</strong> {{this.description}}</li>
+            {{/each}}
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">ĐIỀU KHOẢN THI HÀNH</div>
+        <p>1. Phụ lục này là một phần không thể tách rời của Hợp đồng gốc.</p>
+        <p>2. Phụ lục có hiệu lực kể từ ngày {{effective_date}}.</p>
+        <p>3. Mọi điều khoản không được sửa đổi trong Phụ lục này vẫn giữ nguyên hiệu lực.</p>
+    </div>
+
+    <div class="signature-area">
+        <div class="section-title">CHỮ KÝ CÁC BÊN</div>
+        <p><em>(Các bên đã đọc và đồng ý với nội dung Phụ lục này)</em></p>
+        
+        <div style="display: flex; justify-content: space-between; flex-wrap: wrap;">
+            {{#each parties}}
+            <div style="margin: 20px; text-align: center;">
+                <div style="margin-bottom: 60px;">
+                    <strong>{{full_name}}</strong><br>
+                    <small>{{role}} - {{ownership_percentage}}% sở hữu</small>
+                </div>
+                <div class="signature-line">Chữ ký</div>
+            </div>
+            {{/each}}
+        </div>
+    </div>
+
+    <div class="section" style="margin-top: 100px; font-size: 12px; color: #666; text-align: center;">
+        <p>--- Phụ lục được tạo tự động bởi Hệ thống Đồng sở hữu Xe Điện ---</p>
+        <p>Thời điểm tạo: {{generated_at}}</p>
+    </div>
+</body>
+</html>

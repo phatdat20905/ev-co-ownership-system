@@ -23,6 +23,10 @@ router.get('/',
   templateController.getTemplates
 );
 
+router.get('/files', 
+  templateController.getAvailableFiles
+);
+
 router.get('/:templateId', 
   templateController.getTemplate
 );

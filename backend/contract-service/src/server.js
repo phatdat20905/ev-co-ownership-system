@@ -4,6 +4,7 @@ import eventService from './services/eventService.js';
 import contractExpiryJob from './jobs/contractExpiryJob.js';
 import signatureReminderJob from './jobs/signatureReminderJob.js';
 import documentCleanupJob from './jobs/documentCleanupJob.js';
+import templateService from './services/templateService.js';
 import {
   logger,
   redisClient,
@@ -22,6 +23,9 @@ async function startServer() {
       await db.sequelize.sync({ alter: true });
       logger.info('🗂 Contract Service Database synced successfully (dev mode).');
     }
+
+    // Initialize default templates
+      await templateService.initializeDefaultTemplates();
 
     // 🐇 Init Event Service
     await eventService.initialize();

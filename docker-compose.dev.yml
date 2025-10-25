@@ -235,7 +235,7 @@ services:
       - ./backend/auth-service/.env
     environment:
       NODE_ENV: development
-      DB_HOST: postgres-auth       # override localhost → container name
+      DB_HOST: postgres-auth       
       REDIS_HOST: redis
       RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
     depends_on:
@@ -359,7 +359,7 @@ services:
       dockerfile: Dockerfile.dev
     container_name: ev_vehicle_service_dev
     env_file:
-      - ./backend/booking-service/.env
+      - ./backend/vehicle-service/.env
     ports:
       - "3005:3005"
     environment:
@@ -394,6 +394,8 @@ services:
       context: ./backend/contract-service
       dockerfile: Dockerfile.dev
     container_name: ev_contract_service_dev
+    env_file:
+      - ./backend/contract-service/.env
     ports:
       - "3006:3006"
     environment:
@@ -407,12 +409,18 @@ services:
       REDIS_URL: redis://:redis123@redis:6379
       RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
     depends_on:
-      - postgres-contract
+      postgres-contract:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
       - ev_network
     volumes:
       - ./backend/contract-service/src:/app/src
       - ./backend/contract-service/logs:/app/logs
+      - ./backend/shared:/app/node_modules/@ev-coownership/shared
     command: npm run dev
 
   # Admin Service - Development
