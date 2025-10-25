@@ -23,4 +23,6 @@ cp .env.example .env
 docker-compose up -d
 
 # Hoặc chạy development mode
-docker-compose -f docker-compose.dev.yml up
+docker-compose -f docker-compose.dev.yml up -d
+
+docker compose -f docker-compose.dev.yml --profile auth up -d
