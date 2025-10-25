@@ -108,6 +108,23 @@ export const PAYMENT_EVENTS = {
   INVOICE_GENERATED: 'payment.invoice.generated'
 };
 
+// Contract Events
+export const CONTRACT_EVENTS = {
+  CONTRACT_CREATED: 'contract.created',
+  CONTRACT_UPDATED: 'contract.updated',
+  CONTRACT_SENT_FOR_SIGNATURE: 'contract.sent_for_signature',
+  CONTRACT_SIGNED: 'contract.signed',
+  CONTRACT_ACTIVATED: 'contract.activated',
+  CONTRACT_EXPIRED: 'contract.expired',
+  CONTRACT_TERMINATED: 'contract.terminated',
+  CONTRACT_AMENDED: 'contract.amended',
+  CONTRACT_RENEWED: 'contract.renewed',
+  CONTRACT_DOWNLOADED: 'contract.downloaded',
+  SIGNATURE_REMINDER_SENT: 'contract.signature_reminder_sent',
+  CONTRACT_EXPIRY_REMINDER_SENT: 'contract.expiry_reminder_sent'
+};
+
+
 // System Events
 export const SYSTEM_EVENTS = {
   SERVICE_STARTED: 'system.service.started',
@@ -126,6 +143,7 @@ export const eventTypes = {
   ...BOOKING_EVENTS,
   ...VEHICLE_EVENTS,
   ...PAYMENT_EVENTS,
+  ...CONTRACT_EVENTS,
   ...SYSTEM_EVENTS
 };
 
