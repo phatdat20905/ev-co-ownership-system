@@ -149,10 +149,11 @@ services:
     networks:
       - ev_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
+
 
   # Redis
   redis:
@@ -430,6 +431,8 @@ services:
       context: ./backend/admin-service
       dockerfile: Dockerfile.dev
     container_name: ev_admin_service_dev
+    env_file:
+      - ./backend/admin-service/.env
     ports:
       - "3007:3007"
     environment:
@@ -444,13 +447,20 @@ services:
       REDIS_URL: redis://:redis123@redis:6379
       RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
     depends_on:
-      - postgres-admin
-      - mongodb
+      postgres-admin:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
     networks:
       - ev_network
     volumes:
       - ./backend/admin-service/src:/app/src
       - ./backend/admin-service/logs:/app/logs
+      - ./backend/shared:/app/node_modules/@ev-coownership/shared
     command: npm run dev
 
   # Notification Service - Development
