@@ -1,3 +1,4 @@
+// backend/shared/events/eventBus.js
 import { rabbitMQClient } from '../config/rabbitmq.js';
 import { eventTypes } from './eventTypes.js';
 import logger from '../utils/logger.js';
@@ -56,7 +57,23 @@ export class EventBus {
   }
 
   getRoutingKey(eventType) {
-    const [category, action] = eventType.split('.');
+    // FIX: Kiểm tra nếu eventType có dấu chấm để split
+    if (typeof eventType !== 'string') {
+      logger.warn('Invalid event type', { eventType });
+      return 'unknown.unknown';
+    }
+
+    const parts = eventType.split('.');
+    
+    // FIX: Đảm bảo có ít nhất 2 phần
+    if (parts.length < 2) {
+      logger.warn(`Event type '${eventType}' doesn't follow category.action pattern`);
+      return `${parts[0] || 'unknown'}.${parts[0] || 'unknown'}`;
+    }
+
+    const category = parts[0];
+    const action = parts.slice(1).join('.');
+    
     return `${category}.${action}`;
   }
 

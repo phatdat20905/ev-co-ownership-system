@@ -46,27 +46,6 @@ export default (sequelize, DataTypes) => {
     tableName: 'audit_logs',
     timestamps: true,
     underscored: true,
-    indexes: [
-      {
-        fields: ['user_id']
-      },
-      {
-        fields: ['action']
-      },
-      {
-        fields: ['entity_type', 'entity_id']
-      },
-      {
-        fields: ['created_at']
-      },
-      {
-        fields: ['user_role']
-      },
-      {
-        fields: ['created_at'],
-        order: [['created_at', 'DESC']]
-      }
-    ]
   });
 
   return AuditLog;

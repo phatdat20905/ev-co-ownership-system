@@ -18,7 +18,7 @@ export const USER_EVENTS = {
   PROFILE_CREATED: 'user.profile.created'
 };
 
-// Group Events (NEW - for User Service)
+// Group Events
 export const GROUP_EVENTS = {
   GROUP_CREATED: 'group.created',
   GROUP_UPDATED: 'group.updated',
@@ -29,7 +29,7 @@ export const GROUP_EVENTS = {
   OWNERSHIP_UPDATED: 'group.ownership.updated'
 };
 
-// Voting Events (NEW - for User Service)
+// Voting Events
 export const VOTE_EVENTS = {
   VOTE_CREATED: 'vote.created',
   VOTE_CAST: 'vote.cast',
@@ -37,7 +37,7 @@ export const VOTE_EVENTS = {
   VOTE_UPDATED: 'vote.updated'
 };
 
-// Fund Events (NEW - for User Service)
+// Fund Events
 export const FUND_EVENTS = {
   FUND_DEPOSIT: 'fund.deposit',
   FUND_WITHDRAWAL: 'fund.withdrawal',
@@ -70,31 +70,22 @@ export const BOOKING_EVENTS = {
 
 // Vehicle Events
 export const VEHICLE_EVENTS = {
-  // Vehicle Management
   VEHICLE_CREATED: 'vehicle.created',
   VEHICLE_UPDATED: 'vehicle.updated',
   VEHICLE_DELETED: 'vehicle.deleted',
   VEHICLE_STATUS_CHANGED: 'vehicle.status.changed',
-  
-  // Maintenance Events
   MAINTENANCE_SCHEDULED: 'vehicle.maintenance.scheduled',
   MAINTENANCE_UPDATED: 'vehicle.maintenance.updated',
   MAINTENANCE_COMPLETED: 'vehicle.maintenance.completed',
   MAINTENANCE_CANCELLED: 'vehicle.maintenance.cancelled',
   MAINTENANCE_REMINDER: 'vehicle.maintenance.reminder',
-  
-  // Insurance Events
   INSURANCE_ADDED: 'vehicle.insurance.added',
   INSURANCE_UPDATED: 'vehicle.insurance.updated',
   INSURANCE_EXPIRING: 'vehicle.insurance.expiring',
   INSURANCE_EXPIRED: 'vehicle.insurance.expired',
-  
-  // Charging Events
   CHARGING_SESSION_STARTED: 'vehicle.charging.started',
   CHARGING_SESSION_COMPLETED: 'vehicle.charging.completed',
   CHARGING_COST_RECORDED: 'vehicle.charging.cost.recorded',
-  
-  // Analytics Events
   BATTERY_HEALTH_CHECKED: 'vehicle.battery.health.checked',
   VEHICLE_UTILIZATION_CALCULATED: 'vehicle.utilization.calculated',
   MAINTENANCE_COST_ANALYZED: 'vehicle.maintenance.cost.analyzed'
@@ -124,12 +115,28 @@ export const CONTRACT_EVENTS = {
   CONTRACT_EXPIRY_REMINDER_SENT: 'contract.expiry_reminder_sent'
 };
 
-
 // System Events
 export const SYSTEM_EVENTS = {
   SERVICE_STARTED: 'system.service.started',
   SERVICE_HEALTHY: 'system.service.healthy',
   SERVICE_ERROR: 'system.service.error'
+};
+
+// Admin Events (THÊM MỚI - cho Admin Service)
+export const ADMIN_EVENTS = {
+  STAFF_CREATED: 'admin.staff.created',
+  STAFF_UPDATED: 'admin.staff.updated',
+  STAFF_PERMISSIONS_UPDATED: 'admin.staff.permissions_updated',
+  STAFF_DEACTIVATED: 'admin.staff.deactivated',
+  DISPUTE_CREATED: 'admin.dispute.created',
+  DISPUTE_ASSIGNED: 'admin.dispute.assigned',
+  DISPUTE_MESSAGE_ADDED: 'admin.dispute.message_added',
+  DISPUTE_RESOLVED: 'admin.dispute.resolved',
+  DISPUTE_ESCALATED: 'admin.dispute.escalated',
+  SYSTEM_SETTING_CREATED: 'admin.system_setting.created',
+  SYSTEM_SETTING_UPDATED: 'admin.system_setting.updated',
+  SYSTEM_SETTINGS_BATCH_UPDATED: 'admin.system_settings.batch_updated',
+  ANALYTICS_GENERATED: 'admin.analytics.generated'
 };
 
 // Combine all event types
@@ -144,7 +151,8 @@ export const eventTypes = {
   ...VEHICLE_EVENTS,
   ...PAYMENT_EVENTS,
   ...CONTRACT_EVENTS,
-  ...SYSTEM_EVENTS
+  ...SYSTEM_EVENTS,
+  ...ADMIN_EVENTS  // THÊM ADMIN EVENTS
 };
 
 // Event categories for routing
@@ -158,5 +166,8 @@ export const EVENT_CATEGORIES = {
   BOOKING: 'booking',
   VEHICLE: 'vehicle',
   PAYMENT: 'payment',
-  SYSTEM: 'system'
+  CONTRACT: 'contract',
+  SYSTEM: 'system',
+  ADMIN: 'admin'  // THÊM ADMIN CATEGORY
 };
+export default eventTypes;
