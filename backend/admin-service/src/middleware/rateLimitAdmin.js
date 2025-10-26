@@ -1,12 +1,13 @@
-// src/middleware/rateLimitAdmin.js
 import { createRateLimiter, AppError, logger } from '@ev-coownership/shared';
+import { ipKeyGenerator } from 'express-rate-limit'; // ✅ Thêm dòng này
 
 // More restrictive rate limits for admin endpoints
 export const adminRateLimiter = createRateLimiter({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // Limit each staff to 100 requests per windowMs
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
   keyGenerator: (req) => {
-    return `admin:${req.staff?.id || req.ip}`;
+    // ✅ Dùng ipKeyGenerator thay cho req.ip
+    return `admin:${req.staff?.id || ipKeyGenerator(req)}`;
   },
   handler: (req, res) => {
     logger.warn('Admin rate limit exceeded', {
@@ -14,7 +15,7 @@ export const adminRateLimiter = createRateLimiter({
       ip: req.ip,
       path: req.path
     });
-    
+
     throw new AppError(
       'Too many requests from this staff account. Please try again later.',
       429,
@@ -22,24 +23,24 @@ export const adminRateLimiter = createRateLimiter({
     );
   },
   skip: (req) => {
-    // Skip rate limiting for super admins in development
     return process.env.NODE_ENV === 'development' && req.staff?.department === 'admin';
   }
 });
 
 // Even more restrictive for sensitive endpoints
 export const sensitiveEndpointRateLimiter = createRateLimiter({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Only 10 requests per window for sensitive operations
+  windowMs: 15 * 60 * 1000,
+  max: 10,
   keyGenerator: (req) => {
-    return `admin_sensitive:${req.staff?.id}`;
+    // ✅ Nếu staff chưa có id (chưa đăng nhập), fallback qua ipKeyGenerator
+    return `admin_sensitive:${req.staff?.id || ipKeyGenerator(req)}`;
   },
   handler: (req, res) => {
     logger.warn('Sensitive admin endpoint rate limit exceeded', {
       staffId: req.staff?.id,
       path: req.path
     });
-    
+
     throw new AppError(
       'Too many sensitive operations. Please contact super administrator.',
       429,

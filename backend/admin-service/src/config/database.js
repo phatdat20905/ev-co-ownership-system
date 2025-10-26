@@ -14,7 +14,8 @@ const sequelize = new Sequelize(
     host: dbConfig.host,
     port: dbConfig.port,
     dialect: dbConfig.dialect,
-    logging: env === 'development' ? (msg) => logger.debug(msg) : false,
+    // logging: env === 'development' ? (msg) => logger.debug(msg) : false,
+    logging: false,
     pool: dbConfig.pool,
     dialectOptions: dbConfig.dialectOptions,
   }
