@@ -1,3 +1,4 @@
+// src/app.js
 import express from 'express';
 import helmet from 'helmet';
 import { config } from 'dotenv';
@@ -12,6 +13,10 @@ import {
   generalRateLimiter
 } from '@ev-coownership/shared';
 
+// Middleware
+import { adminRequestLogger } from './middleware/requestLogger.js';
+
+// Routes
 import routes from './routes/index.js';
 
 // Load .env file
@@ -31,28 +36,19 @@ app.use(express.urlencoded({ extended: true }));
 app.use(generalRateLimiter);
 
 // 🧾 Request logger
-app.use((req, res, next) => {
-  const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  res.locals.requestId = requestId;
+app.use(adminRequestLogger);
 
-  logger.info(`[${requestId}] ${req.method} ${req.url}`, {
-    ip: req.ip,
-    userAgent: req.get('User-Agent')
-  });
-
-  next();
-});
-
-// 🩺 Health check route (sử dụng tiện ích bạn tách riêng)
+// 🩺 Health check route
 app.get('/health', createHealthRoute({
   eventBus: 'healthy',
-  cache: 'healthy'
+  cache: 'healthy',
+  database: 'healthy'
 }));
 
 // 📍 API routes
 app.use('/api/v1', routes);
 
-// 🚫 404 và xử lý lỗi tổng quát
+// 🚫 404 and error handling
 app.use(notFoundHandler);
 app.use(errorHandler);
 
