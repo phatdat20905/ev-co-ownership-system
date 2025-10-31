@@ -134,6 +134,25 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  
+  postgres-notification:
+    image: postgres:15-alpine
+    container_name: ev_postgres_notification
+    environment:
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+    ports:
+      - "5439:5432"
+    volumes:
+      - postgres_notification_data:/var/lib/postgresql/data
+    networks:
+      - ev_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # MongoDB
   mongodb:
@@ -470,11 +489,18 @@ services:
       context: ./backend/notification-service
       dockerfile: Dockerfile.dev
     container_name: ev_notification_service_dev
+    env_file:
+      - ./backend/notification-service/.env
     ports:
       - "3008:3008"
     environment:
       NODE_ENV: development
       PORT: 3008
+      DB_HOST: postgres-notification
+      DB_PORT: 5432
+      DB_NAME: notification_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres123
       REDIS_URL: redis://:redis123@redis:6379
       RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
       SMTP_HOST: smtp.gmail.com
@@ -482,13 +508,18 @@ services:
       SMTP_USER: your_email@gmail.com
       SMTP_PASSWORD: your_app_password
     depends_on:
-      - redis
-      - rabbitmq
+      postgres-notification:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
       - ev_network
     volumes:
       - ./backend/notification-service/src:/app/src
       - ./backend/notification-service/logs:/app/logs
+      - ./backend/shared:/app/node_modules/@ev-coownership/shared
     command: npm run dev
 
   # Frontend - Development
@@ -523,6 +554,7 @@ volumes:
   postgres_vehicle_data:
   postgres_contract_data:
   postgres_admin_data:
+  postgres_notification_data:
   mongodb_data:
   redis_data:
   rabbitmq_data:

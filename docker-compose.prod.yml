@@ -141,6 +141,27 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+  
+  postgres-notification:
+    image: postgres:15-alpine
+    container_name: ev_postgres_notification
+    environment:
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres123}
+    ports:
+      - "5439:5432"
+    volumes:
+      - postgres_notification_data:/var/lib/postgresql/data
+    networks:
+      - ev_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 
   # MongoDB
   mongodb:
@@ -441,7 +462,13 @@ services:
       - "3008:3008"
     environment:
       NODE_ENV: production
+      SERVICE_NAME: notification-service
       PORT: 3008
+      DB_HOST: postgres-notification
+      DB_PORT: 5432
+      DB_NAME: notification_db
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres123}
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379
       RABBITMQ_URL: amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-admin123}@rabbitmq:5672
       SMTP_HOST: ${SMTP_HOST}
@@ -449,11 +476,17 @@ services:
       SMTP_USER: ${SMTP_USER}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
     depends_on:
+      - postgres-notification
       - redis
       - rabbitmq
     networks:
       - ev_network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3008/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Frontend - Production
   frontend:
@@ -482,6 +515,7 @@ volumes:
   postgres_vehicle_data:
   postgres_contract_data:
   postgres_admin_data:
+  postgres_notification_data:
   mongodb_data:
   redis_data:
   rabbitmq_data:
