@@ -1,0 +1,487 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Databases
+  postgres-auth:
+    image: postgres:15-alpine
+    container_name: ev_postgres_auth
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres123}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_auth_data:/var/lib/postgresql/data
+    networks:
+      - ev_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  postgres-user:
+    image: postgres:15-alpine
+    container_name: ev_postgres_user
+    environment:
+      POSTGRES_DB: user_db
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres123}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_user_data:/var/lib/postgresql/data
+    networks:
+      - ev_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  postgres-booking:
+    image: postgres:15-alpine
+    container_name: ev_postgres_booking
+    environment:
+      POSTGRES_DB: booking_db
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres123}
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_booking_data:/var/lib/postgresql/data
+    networks:
+      - ev_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  postgres-cost:
+    image: postgres:15-alpine
+    container_name: ev_postgres_cost
+    environment:
+      POSTGRES_DB: cost_db
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres123}
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_cost_data:/var/lib/postgresql/data
+    networks:
+      - ev_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  postgres-vehicle:
+    image: postgres:15-alpine
+    container_name: ev_postgres_vehicle
+    environment:
+      POSTGRES_DB: vehicle_db
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres123}
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres_vehicle_data:/var/lib/postgresql/data
+    networks:
+      - ev_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  postgres-contract:
+    image: postgres:15-alpine
+    container_name: ev_postgres_contract
+    environment:
+      POSTGRES_DB: contract_db
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres123}
+    ports:
+      - "5437:5432"
+    volumes:
+      - postgres_contract_data:/var/lib/postgresql/data
+    networks:
+      - ev_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  postgres-admin:
+    image: postgres:15-alpine
+    container_name: ev_postgres_admin
+    environment:
+      POSTGRES_DB: admin_db
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres123}
+    ports:
+      - "5438:5432"
+    volumes:
+      - postgres_admin_data:/var/lib/postgresql/data
+    networks:
+      - ev_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MongoDB
+  mongodb:
+    image: mongo:7
+    container_name: ev_mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-admin123}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - ev_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "mongo --username ${MONGO_USER:-admin} --password ${MONGO_PASSWORD:-admin123} --eval 'db.adminCommand(\"ping\")'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: ev_redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis123}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ev_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # RabbitMQ
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: ev_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-admin123}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - ev_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # API Gateway - Production
+  api-gateway:
+    build:
+      context: ./backend/api-gateway
+      dockerfile: Dockerfile
+    container_name: ev_api_gateway
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      AUTH_SERVICE_URL: http://auth-service:3001
+      USER_SERVICE_URL: http://user-service:3002
+      BOOKING_SERVICE_URL: http://booking-service:3003
+      COST_SERVICE_URL: http://cost-service:3004
+      VEHICLE_SERVICE_URL: http://vehicle-service:3005
+      CONTRACT_SERVICE_URL: http://contract-service:3006
+      ADMIN_SERVICE_URL: http://admin-service:3007
+    depends_on:
+      - redis
+    networks:
+      - ev_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Auth Service - Production
+  auth-service:
+    build:
+      context: ./backend/auth-service
+      dockerfile: Dockerfile
+    container_name: ev_auth_service
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      SERVICE_NAME: auth-service
+      PORT: 3001
+      DB_HOST: postgres-auth
+      DB_PORT: 5432
+      DB_NAME: auth_db
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres123}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-admin123}@rabbitmq:5672
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: 1d
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_REFRESH_EXPIRES_IN: 7d
+    depends_on:
+      - postgres-auth
+      - redis
+      - rabbitmq
+    networks:
+      - ev_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # User Service - Production
+  user-service:
+    build:
+      context: ./backend/user-service
+      dockerfile: Dockerfile
+    container_name: ev_user_service
+    ports:
+      - "3002:3002"
+    environment:
+      NODE_ENV: production
+      SERVICE_NAME: user-service
+      PORT: 3002
+      DB_HOST: postgres-user
+      DB_PORT: 5432
+      DB_NAME: user_db
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres123}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-admin123}@rabbitmq:5672
+    depends_on:
+      - postgres-user
+      - redis
+      - rabbitmq
+    networks:
+      - ev_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Booking Service - Production
+  booking-service:
+    build:
+      context: ./backend/booking-service
+      dockerfile: Dockerfile
+    container_name: ev_booking_service
+    ports:
+      - "3003:3003"
+    environment:
+      NODE_ENV: production
+      PORT: 3003
+      DB_HOST: postgres-booking
+      DB_PORT: 5432
+      DB_NAME: booking_db
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres123}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-admin123}@rabbitmq:5672
+    depends_on:
+      - postgres-booking
+      - redis
+      - rabbitmq
+    networks:
+      - ev_network
+    restart: unless-stopped
+
+  # Cost Service - Production
+  cost-service:
+    build:
+      context: ./backend/cost-service
+      dockerfile: Dockerfile
+    container_name: ev_cost_service
+    ports:
+      - "3004:3004"
+    environment:
+      NODE_ENV: production
+      PORT: 3004
+      DB_HOST: postgres-cost
+      DB_PORT: 5432
+      DB_NAME: cost_db
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres123}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-admin123}@rabbitmq:5672
+    depends_on:
+      - postgres-cost
+      - redis
+      - rabbitmq
+    networks:
+      - ev_network
+    restart: unless-stopped
+
+  # Vehicle Service - Production
+  vehicle-service:
+    build:
+      context: ./backend/vehicle-service
+      dockerfile: Dockerfile
+    container_name: ev_vehicle_service
+    ports:
+      - "3005:3005"
+    environment:
+      NODE_ENV: production
+      PORT: 3005
+      DB_HOST: postgres-vehicle
+      DB_PORT: 5432
+      DB_NAME: vehicle_db
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres123}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-admin123}@rabbitmq:5672
+    depends_on:
+      - postgres-vehicle
+      - redis
+      - rabbitmq
+    networks:
+      - ev_network
+    restart: unless-stopped
+
+  # Contract Service - Production
+  contract-service:
+    build:
+      context: ./backend/contract-service
+      dockerfile: Dockerfile
+    container_name: ev_contract_service
+    ports:
+      - "3006:3006"
+    environment:
+      NODE_ENV: production
+      PORT: 3006
+      DB_HOST: postgres-contract
+      DB_PORT: 5432
+      DB_NAME: contract_db
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres123}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-admin123}@rabbitmq:5672
+    depends_on:
+      - postgres-contract
+      - redis
+      - rabbitmq
+    networks:
+      - ev_network
+    restart: unless-stopped
+
+  # Admin Service - Production
+  admin-service:
+    build:
+      context: ./backend/admin-service
+      dockerfile: Dockerfile
+    container_name: ev_admin_service
+    ports:
+      - "3007:3007"
+    environment:
+      NODE_ENV: production
+      PORT: 3007
+      DB_HOST: postgres-admin
+      DB_PORT: 5432
+      DB_NAME: admin_db
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres123}
+      MONGODB_URL: mongodb://${MONGO_USER:-admin}:${MONGO_PASSWORD:-admin123}@mongodb:27017
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-admin123}@rabbitmq:5672
+    depends_on:
+      - postgres-admin
+      - mongodb
+      - redis
+      - rabbitmq
+    networks:
+      - ev_network
+    restart: unless-stopped
+
+  # Notification Service - Production
+  notification-service:
+    build:
+      context: ./backend/notification-service
+      dockerfile: Dockerfile
+    container_name: ev_notification_service
+    ports:
+      - "3008:3008"
+    environment:
+      NODE_ENV: production
+      PORT: 3008
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-admin123}@rabbitmq:5672
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+    depends_on:
+      - redis
+      - rabbitmq
+    networks:
+      - ev_network
+    restart: unless-stopped
+
+  # Frontend - Production
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ev_frontend
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_BASE_URL: ${API_BASE_URL:-http://localhost:3000/api/v1}
+      VITE_NODE_ENV: production
+    networks:
+      - ev_network
+    restart: unless-stopped
+
+networks:
+  ev_network:
+    driver: bridge
+
+volumes:
+  postgres_auth_data:
+  postgres_user_data:
+  postgres_booking_data:
+  postgres_cost_data:
+  postgres_vehicle_data:
+  postgres_contract_data:
+  postgres_admin_data:
+  mongodb_data:
+  redis_data:
+  rabbitmq_data:
