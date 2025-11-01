@@ -1,8 +1,7 @@
 {
-  "name": "notification-service",
+  "name": "cost-service",
   "version": "1.0.0",
   "main": "src/server.js",
-  "type": "module",
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
@@ -17,24 +16,12 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "EV Co-ownership Notification Service",
+  "description": "EV Co-ownership Cost Service",
   "dependencies": {
-    "@ev-coownership/shared": "file:../shared",
-    "amqplib": "^0.10.9",
     "dotenv": "^17.2.3",
-    "express": "^5.1.0",
-    "firebase-admin": "^13.5.0",
-    "helmet": "^8.1.0",
-    "joi": "^18.0.1",
-    "nodemailer": "^7.0.10",
-    "pg": "^8.16.3",
-    "pg-hstore": "^2.3.4",
-    "sequelize": "^6.37.7",
-    "socket.io": "^4.8.1",
-    "twilio": "^5.10.4"
+    "express": "^5.1.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10",
-    "sequelize-cli": "^6.6.3"
+    "nodemon": "^3.1.10"
   }
 }
