@@ -91,6 +91,41 @@ export const VEHICLE_EVENTS = {
   MAINTENANCE_COST_ANALYZED: 'vehicle.maintenance.cost.analyzed'
 };
 
+export const COST_EVENTS = {
+  COST_CREATED: 'cost.created',
+  COST_UPDATED: 'cost.updated',
+  COST_DELETED: 'cost.deleted',
+  COST_SPLIT_CALCULATED: 'cost.split.calculated',
+  COST_SPLIT_UPDATED: 'cost.split.updated',
+  COST_OVERDUE: 'cost.overdue',
+  COST_CATEGORY_CREATED: 'cost.category.created',
+  COST_CATEGORY_UPDATED: 'cost.category.updated',
+  
+  // Payment Events (mở rộng)
+  PAYMENT_INITIATED: 'payment.initiated',
+  PAYMENT_PROCESSING: 'payment.processing',
+  PAYMENT_REFUNDED: 'payment.refunded',
+  PAYMENT_WEBHOOK_RECEIVED: 'payment.webhook.received',
+  
+  // Wallet Events
+  WALLET_CREATED: 'wallet.created',
+  WALLET_BALANCE_UPDATED: 'wallet.balance.updated',
+  WALLET_DEPOSIT: 'wallet.deposit',
+  WALLET_WITHDRAWAL: 'wallet.withdrawal',
+  WALLET_TRANSFER: 'wallet.transfer',
+  
+  // Invoice Events
+  INVOICE_GENERATED: 'invoice.generated',
+  INVOICE_SENT: 'invoice.sent',
+  INVOICE_PAID: 'invoice.paid',
+  INVOICE_OVERDUE: 'invoice.overdue',
+  INVOICE_REMINDER: 'invoice.reminder',
+  
+  // Report Events
+  REPORT_GENERATED: 'report.generated',
+  USAGE_ANALYSIS_COMPLETED: 'usage.analysis.completed'
+};
+
 // Payment Events
 export const PAYMENT_EVENTS = {
   PAYMENT_CREATED: 'payment.created',
@@ -152,7 +187,8 @@ export const eventTypes = {
   ...PAYMENT_EVENTS,
   ...CONTRACT_EVENTS,
   ...SYSTEM_EVENTS,
-  ...ADMIN_EVENTS  // THÊM ADMIN EVENTS
+  ...ADMIN_EVENTS,
+  ...COST_EVENTS,
 };
 
 // Event categories for routing
@@ -168,6 +204,7 @@ export const EVENT_CATEGORIES = {
   PAYMENT: 'payment',
   CONTRACT: 'contract',
   SYSTEM: 'system',
-  ADMIN: 'admin'  // THÊM ADMIN CATEGORY
+  ADMIN: 'admin',
+  COST: 'cost'
 };
 export default eventTypes;
