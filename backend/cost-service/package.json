@@ -2,6 +2,7 @@
   "name": "cost-service",
   "version": "1.0.0",
   "main": "src/server.js",
+  "type": "module",
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
@@ -16,7 +17,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "EV Co-ownership Cost Service",
+  "description": "EV Co-ownership Cost Service - Manages costs, payments, wallets, and invoices",
   "dependencies": {
     "@ev-coownership/shared": "file:../shared",
     "amqplib": "^0.10.9",
