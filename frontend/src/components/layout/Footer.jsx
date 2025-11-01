@@ -1,8 +1,7 @@
 import React from "react";
-import { Phone, Mail } from "lucide-react";
+import { Phone, Mail, Building, MapPin, User, FileText } from "lucide-react";
 import GooglePlayBadge from "../../assets/google-play.png";
 import AppStoreBadge from "../../assets/app-store.png";
-
 
 export default function Footer() {
   return (
@@ -12,18 +11,19 @@ export default function Footer() {
         <div>
           <h4 className="text-xl font-bold text-white mb-4">Cộng Đồng EV Co-ownership</h4>
           <p className="flex items-center gap-2 mb-2">
-            <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24"><path d="M3 3h18v18H3V3z"/></svg>
+            <Building className="w-5 h-5 text-sky-500" />
             Công ty TNHH EV Co-ownership
           </p>
           <p className="flex items-center gap-2 mb-2">
-            <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 12h3v8h14v-8h3L12 2z"/></svg>
+            <MapPin className="w-5 h-5 text-sky-500" />
             123 Đường Tô Ký, Quận 12, TP. Hồ Chí Minh
           </p>
           <p className="flex items-center gap-2 mb-2">
-            <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12a5 5 0 100-10 5 5 0 000 10z"/></svg>
+            <User className="w-5 h-5 text-sky-500" />
             Người chịu trách nhiệm: Nguyễn Thành Chiến
           </p>
           <p className="flex items-center gap-2 mb-2 text-gray-500 text-sm">
+            <FileText className="w-5 h-5 text-sky-500" />
             Giấy phép MXH: 001/EV-2025, cấp ngày 18/10/2025
           </p>
         </div>
