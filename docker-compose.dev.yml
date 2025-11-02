@@ -464,7 +464,7 @@ services:
       DB_NAME: admin_db
       DB_USER: postgres
       DB_PASSWORD: postgres123
-      MONGODB_URL: mongodb://admin:admin123@mongodb:27017
+      MONGODB_URL: mongodb://admin:admin123@mongodb:27017/admin_analytics
       REDIS_URL: redis://:redis123@redis:6379
       RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
     depends_on:

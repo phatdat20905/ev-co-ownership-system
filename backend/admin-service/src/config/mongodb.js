@@ -1,4 +1,3 @@
-// src/config/mongodb.js
 import { MongoClient } from 'mongodb';
 import { logger } from '@ev-coownership/shared';
 
@@ -10,24 +9,29 @@ class MongoDBClient {
   }
 
   async connect() {
+    const mongoUrl = process.env.MONGODB_URL || 'mongodb://admin:admin123@localhost:27017/admin_analytics';
+
     try {
-      const mongoUrl = process.env.MONGODB_URL || 'mongodb://admin:admin123@localhost:27017';
-      
+      logger.info(`🚀 Connecting to MongoDB at: ${mongoUrl}`);
+
       this.client = new MongoClient(mongoUrl, {
         maxPoolSize: 10,
-        minPoolSize: 5,
-        maxIdleTimeMS: 30000,
+        minPoolSize: 2,
         serverSelectionTimeoutMS: 5000,
         socketTimeoutMS: 45000,
       });
 
       await this.client.connect();
-      this.db = this.client.db('admin_analytics');
+
+      // ✅ Lấy db từ URL (nếu có), fallback về admin_analytics
+      const dbName = this.client.options.dbName || 'admin_analytics';
+      this.db = this.client.db(dbName);
       this.isConnected = true;
-      
-      logger.info('✅ MongoDB connected successfully for Admin Service');
+
+      logger.info(`✅ MongoDB connected successfully → Database: ${dbName}`);
     } catch (error) {
-      logger.error('❌ Failed to connect to MongoDB:', error);
+      logger.error('❌ Failed to connect to MongoDB:', error.message);
+      this.isConnected = false;
       throw error;
     }
   }
@@ -40,17 +44,16 @@ class MongoDBClient {
     }
   }
 
-  getCollection(collectionName) {
+  getCollection(name) {
     if (!this.isConnected || !this.db) {
       throw new Error('MongoDB not connected');
     }
-    return this.db.collection(collectionName);
+    return this.db.collection(name);
   }
 
   async healthCheck() {
     try {
       if (!this.isConnected) return { healthy: false, error: 'Not connected' };
-      
       await this.db.command({ ping: 1 });
       return { healthy: true, service: 'mongodb' };
     } catch (error) {
