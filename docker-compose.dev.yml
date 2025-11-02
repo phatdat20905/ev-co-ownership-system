@@ -349,6 +349,8 @@ services:
       context: ./backend/cost-service
       dockerfile: Dockerfile.dev
     container_name: ev_cost_service_dev
+    env_file:
+      - ./backend/cost-service/.env
     ports:
       - "3004:3004"
     environment:
