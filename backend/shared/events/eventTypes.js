@@ -174,6 +174,30 @@ export const ADMIN_EVENTS = {
   ANALYTICS_GENERATED: 'admin.analytics.generated'
 };
 
+export const AI_EVENTS = {
+  // Recommendation Events
+  RECOMMENDATION_GENERATED: 'ai.recommendation.generated',
+  RECOMMENDATION_ACCEPTED: 'ai.recommendation.accepted',
+  RECOMMENDATION_REJECTED: 'ai.recommendation.rejected',
+  RECOMMENDATION_FEEDBACK_RECEIVED: 'ai.recommendation.feedback_received',
+  
+  // Analysis Events
+  SCHEDULE_OPTIMIZED: 'ai.schedule.optimized',
+  COST_ANOMALY_DETECTED: 'ai.cost.anomaly_detected',
+  DISPUTE_ANALYZED: 'ai.dispute.analyzed',
+  USAGE_PATTERN_ANALYZED: 'ai.usage.pattern_analyzed',
+  
+  // System Events
+  AI_SERVICE_HEALTHY: 'ai.service.healthy',
+  AI_SERVICE_ERROR: 'ai.service.error',
+  AI_MODEL_UPDATED: 'ai.model.updated',
+  
+  // Auto-triggered Events
+  AUTO_SCHEDULE_REOPTIMIZED: 'ai.schedule.auto_reoptimized',
+  AUTO_COST_ANALYSIS_TRIGGERED: 'ai.cost.auto_analysis_triggered'
+};
+
+
 // Combine all event types
 export const eventTypes = {
   ...AUTH_EVENTS,
@@ -189,6 +213,7 @@ export const eventTypes = {
   ...SYSTEM_EVENTS,
   ...ADMIN_EVENTS,
   ...COST_EVENTS,
+  ...AI_EVENTS
 };
 
 // Event categories for routing
@@ -205,6 +230,7 @@ export const EVENT_CATEGORIES = {
   CONTRACT: 'contract',
   SYSTEM: 'system',
   ADMIN: 'admin',
-  COST: 'cost'
+  COST: 'cost',
+  AI: 'ai'
 };
 export default eventTypes;
