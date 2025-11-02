@@ -1,16 +1,16 @@
 {
   "name": "ai-service",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "src/server.js",
   "type": "module",
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js"
   },
-  "keywords": [],
+  "keywords": ["ai", "gemini", "ev", "co-ownership"],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "AI Service for EV Co-ownership System using Google Gemini",
   "dependencies": {
     "dotenv": "^17.2.3",
     "express": "^5.1.0"
