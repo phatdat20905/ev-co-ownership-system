@@ -14,7 +14,13 @@
     "seed:undo": "sequelize-cli db:seed:undo:all",
     "reset": "npm run db:migrate:undo && npm run db:migrate && npm run db:seed"
   },
-  "keywords": [],
+  "keywords": [
+    "ev",
+    "co-ownership",
+    "cost",
+    "payment",
+    "microservice"
+  ],
   "author": "",
   "license": "ISC",
   "description": "EV Co-ownership Cost Service - Manages costs, payments, wallets, and invoices",

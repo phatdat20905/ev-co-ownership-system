@@ -1,11 +1,11 @@
 // src/services/costService.js
 import { 
   costRepository, 
-  splitRepository,
-  eventService 
+  splitRepository, 
 } from '../repositories/index.js';
 import { AppError, logger } from '@ev-coownership/shared';
 import splitCalculator from '../utils/splitCalculator.js';
+import eventService from './eventService.js';
 
 export class CostService {
   async createCost(costData, userId) {

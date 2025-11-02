@@ -1,9 +1,9 @@
 // src/services/walletService.js
 import { 
   walletRepository,
-  eventService 
 } from '../repositories/index.js';
 import { AppError, logger } from '@ev-coownership/shared';
+import eventService from './eventService.js';
 
 export class WalletService {
   async getUserWallet(userId) {

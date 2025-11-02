@@ -1,9 +1,9 @@
 // src/services/groupWalletService.js
 import { 
-  groupWalletRepository,
-  eventService 
+  groupWalletRepository, 
 } from '../repositories/index.js';
 import { AppError, logger } from '@ev-coownership/shared';
+import eventService from './eventService.js';
 
 export class GroupWalletService {
   async getGroupWallet(groupId) {

@@ -3,12 +3,12 @@ import {
   paymentRepository, 
   splitRepository,
   walletRepository,
-  eventService 
 } from '../repositories/index.js';
 import { AppError, logger } from '@ev-coownership/shared';
 import momoAdapter from './momoAdapter.js';
 import vnpayAdapter from './vnpayAdapter.js';
 import vietqrAdapter from './vietqrAdapter.js';
+import eventService from './eventService.js';
 import db from '../models/index.js'; // THÊM DÒNG NÀY
 
 export class PaymentService {

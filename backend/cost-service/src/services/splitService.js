@@ -2,9 +2,9 @@
 import { 
   splitRepository, 
   costRepository,
-  eventService 
 } from '../repositories/index.js';
 import { AppError, logger } from '@ev-coownership/shared';
+import eventService from './eventService.js';
 
 export class SplitService {
   async getUserSplits(userId, filters) {

@@ -3,10 +3,10 @@ import {
   invoiceRepository, 
   invoiceItemRepository,
   costRepository,
-  eventService 
 } from '../repositories/index.js';
 import { AppError, logger } from '@ev-coownership/shared';
 import pdfInvoiceGenerator from '../utils/pdfInvoiceGenerator.js';
+import eventService from './eventService.js';
 
 export class InvoiceService {
   async generateInvoice(invoiceData, userId) {
