@@ -9,10 +9,10 @@ class MongoDBClient {
   }
 
   async connect() {
-    const mongoUrl = process.env.MONGODB_URL || 'mongodb://admin:admin123@localhost:27017/admin_analytics';
+    const mongoUrl = process.env.MONGODB_URL || 'mongodb://admin:admin123@localhost:27017/admin_analytics?authSource=admin';
 
     try {
-      logger.info(`🚀 Connecting to MongoDB at: ${mongoUrl}`);
+      logger.info(`🚀 Connecting to MongoDB...`);
 
       this.client = new MongoClient(mongoUrl, {
         maxPoolSize: 10,
@@ -23,12 +23,13 @@ class MongoDBClient {
 
       await this.client.connect();
 
-      // ✅ Lấy db từ URL (nếu có), fallback về admin_analytics
-      const dbName = this.client.options.dbName || 'admin_analytics';
+      // Lấy db name từ URL hoặc dùng mặc định
+      const url = new URL(mongoUrl);
+      const dbName = url.pathname.replace('/', '') || 'admin_analytics';
       this.db = this.client.db(dbName);
       this.isConnected = true;
 
-      logger.info(`✅ MongoDB connected successfully → Database: ${dbName}`);
+      logger.info(`✅ MongoDB connected → Database: ${dbName}`);
     } catch (error) {
       logger.error('❌ Failed to connect to MongoDB:', error.message);
       this.isConnected = false;
