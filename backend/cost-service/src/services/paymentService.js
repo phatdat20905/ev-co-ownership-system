@@ -9,15 +9,16 @@ import { AppError, logger } from '@ev-coownership/shared';
 import momoAdapter from './momoAdapter.js';
 import vnpayAdapter from './vnpayAdapter.js';
 import vietqrAdapter from './vietqrAdapter.js';
+import db from '../models/index.js'; // THÊM DÒNG NÀY
 
 export class PaymentService {
   async createPayment(paymentData, userId) {
     try {
       const { costSplitId, amount, paymentMethod, providerName } = paymentData;
 
-      // Validate cost split
-      const costSplit = await splitRepository.findByCostId(costSplitId);
-      const split = costSplit.find(s => s.id === costSplitId);
+      // Validate cost split exists and belongs to user
+      const costSplits = await splitRepository.findByCostId(costSplitId);
+      const split = costSplits.find(s => s.id === costSplitId);
       
       if (!split) {
         throw new AppError('Cost split not found', 404, 'COST_SPLIT_NOT_FOUND');
@@ -27,9 +28,9 @@ export class PaymentService {
         throw new AppError('Not authorized to pay this cost split', 403, 'PAYMENT_UNAUTHORIZED');
       }
 
-      const remainingAmount = parseFloat(split.splitAmount) - parseFloat(split.paidAmount);
+      const remainingAmount = parseFloat(split.splitAmount) - parseFloat(split.paidAmount || 0);
       if (amount > remainingAmount) {
-        throw new AppError('Payment amount exceeds remaining balance', 400, 'PAYMENT_AMOUNT_EXCEEDED');
+        throw new AppError(`Payment amount exceeds remaining balance. Remaining: ${remainingAmount}`, 400, 'PAYMENT_AMOUNT_EXCEEDED');
       }
 
       let paymentResult;
@@ -78,9 +79,15 @@ export class PaymentService {
         paymentStatus: paymentMethod === 'internal_wallet' ? 'completed' : 'pending',
         transactionId: paymentResult.transactionId,
         orderRef: paymentResult.orderRef,
-        paymentUrl: paymentResult.paymentUrl,
+        paymentUrl: paymentResult.paymentUrl || paymentResult.qrCodeUrl, // Handle both URL types
         gatewayResponse: paymentResult
       });
+
+      // If internal wallet payment, update related payment ID
+      if (paymentMethod === 'internal_wallet' && paymentResult.transactionId) {
+        // Find the wallet transaction and update it with payment ID
+        // This would require additional wallet service method
+      }
 
       // Publish event
       await eventService.publishPaymentInitiated({
@@ -112,14 +119,13 @@ export class PaymentService {
       }
 
       // Deduct from wallet
-      await walletRepository.updateBalance(wallet.id, -amount, transaction);
+      const updatedWallet = await walletRepository.updateBalance(wallet.id, -amount, transaction);
       
-      // Create wallet transaction
-      await walletRepository.createTransaction({
+      // Create wallet transaction first without relatedPaymentId
+      const walletTransaction = await walletRepository.createTransaction({
         walletId: wallet.id,
         type: 'withdraw',
         amount,
-        relatedPaymentId: null, // Will be updated after payment creation
         description: `Payment for cost split ${costSplitId}`
       }, transaction);
 
@@ -135,10 +141,12 @@ export class PaymentService {
 
       return {
         transactionId: `wallet_${Date.now()}`,
-        status: 'completed'
+        status: 'completed',
+        walletTransactionId: walletTransaction.id
       };
     } catch (error) {
       await transaction.rollback();
+      logger.error('Internal wallet payment failed', { userId, amount, costSplitId, error: error.message });
       throw error;
     }
   }
@@ -201,7 +209,11 @@ export class PaymentService {
       const updatedPayment = await paymentRepository.updateStatus(
         payment.id, 
         'completed', 
-        { verified: true, verifiedAt: new Date() },
+        { 
+          verified: true, 
+          verifiedAt: new Date(),
+          paymentDate: new Date()
+        },
         transaction
       );
 
@@ -227,6 +239,7 @@ export class PaymentService {
       return updatedPayment;
     } catch (error) {
       await transaction.rollback();
+      logger.error('Payment completion failed', { transactionId, error: error.message });
       throw error;
     }
   }

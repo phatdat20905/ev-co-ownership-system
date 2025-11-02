@@ -1,53 +1,56 @@
-import express from 'express';
-import helmet from 'helmet';
-import { connectDatabase } from './config/database.js';
-import { logger } from '@ev-coownership/shared';
+// src/server.js
+import app from './app.js';
+import db from './models/index.js';
+import eventService from './services/eventService.js';
+import {
+  logger,
+  redisClient,
+  rabbitMQClient
+} from '@ev-coownership/shared';
 
-const app = express();
-const PORT = process.env.PORT || 3003;
+const PORT = process.env.PORT || 3005;
 
-// Middlewares
-app.use(helmet());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    service: 'Cost Service',
-    timestamp: new Date().toISOString()
-  });
-});
-
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    error: {
-      code: 'NOT_FOUND',
-      message: 'Route not found'
-    }
-  });
-});
-
-// Start server
-const startServer = async () => {
+async function startServer() {
   try {
-    await connectDatabase();
-    
+    // 🔗 Connect DB
+    await db.sequelize.authenticate();
+    logger.info('✅ Cost Service Database connected successfully.');
+
+    if (process.env.NODE_ENV === 'development') {
+      await db.sequelize.sync({ alter: true });
+      logger.info('🗂 Cost Service Database synced successfully (dev mode).');
+    }
+
+    // 🐇 Init Event Service
+    await eventService.initialize();
+    await eventService.startEventConsumers();
+
+    // 🚀 Start Express app
     app.listen(PORT, () => {
-      logger.info(`Cost Service running on port ${PORT}`);
-      logger.info(`Environment: ${process.env.NODE_ENV}`);
+      logger.info(`🚀 Cost Service running on port ${PORT} [${process.env.NODE_ENV}]`);
     });
   } catch (error) {
-    logger.error('Failed to start Cost Service:', error);
+    logger.error('❌ Cost Service failed to start', { error: error.message });
+    process.exit(1);
+  }
+}
+
+// Graceful shutdown
+const shutdown = async (signal) => {
+  logger.info(`${signal} received. Cleaning up Cost Service...`);
+  try {
+    await db.sequelize.close();
+    await redisClient.disconnect();
+    await rabbitMQClient.disconnect();
+    logger.info('✅ Cost Service cleanup complete. Exiting.');
+    process.exit(0);
+  } catch (err) {
+    logger.error('❌ Error during Cost Service shutdown', { error: err.message });
     process.exit(1);
   }
 };
 
-startServer();
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
-export default app;
+startServer();
