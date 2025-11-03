@@ -1,126 +1,34 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { AuthProvider } from '@/context/auth'
-import ProtectedRoute from '@/components/common/ProtectedRoute'
-import MainLayout from '@/components/layout/MainLayout'
-import Home from '@/pages/Home'
-import Login from '@/pages/auth/Login'
-import Register from '@/pages/auth/Register'
-import Dashboard from '@/pages/dashboard/Index'
-import Booking from '@/pages/booking/Index'
-import Vehicle from '@/pages/vehicle/Index'
-import Group from '@/pages/group/Index'
-import Cost from '@/pages/cost/Index'
-import Contract from '@/pages/contract/Index'
-import Admin from '@/pages/admin/Index'
-import NotFound from '@/pages/NotFound'
+import { useState } from 'react'
+import reactLogo from './assets/react.svg'
+import viteLogo from '/vite.svg'
+import './App.css'
 
 function App() {
+  const [count, setCount] = useState(0)
+
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <MainLayout>
-                <Home />
-              </MainLayout>
-            }
-          />
-
-          <Route
-            path="/login"
-            element={
-              <MainLayout>
-                <Login />
-              </MainLayout>
-            }
-          />
-          <Route
-            path="/register"
-            element={
-              <MainLayout>
-                <Register />
-              </MainLayout>
-            }
-          />
-
-          {/* Protected routes */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Dashboard />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/booking"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Booking />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/vehicle"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Vehicle />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/group"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Group />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/cost"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Cost />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/contract"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Contract />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Admin />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <>
+      <div>
+        <a href="https://vite.dev" target="_blank">
+          <img src={viteLogo} className="logo" alt="Vite logo" />
+        </a>
+        <a href="https://react.dev" target="_blank">
+          <img src={reactLogo} className="logo react" alt="React logo" />
+        </a>
+      </div>
+      <h1>Vite + React</h1>
+      <div className="card">
+        <button onClick={() => setCount((count) => count + 1)}>
+          count is {count}
+        </button>
+        <p>
+          Edit <code>src/App.jsx</code> and save to test HMR
+        </p>
+      </div>
+      <p className="read-the-docs">
+        Click on the Vite and React logos to learn more
+      </p>
+    </>
   )
 }
 
