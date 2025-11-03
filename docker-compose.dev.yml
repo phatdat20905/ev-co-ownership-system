@@ -240,6 +240,7 @@ services:
     volumes:
       - ./backend/api-gateway/src:/app/src
       - ./backend/api-gateway/logs:/app/logs
+      - ./backend/shared:/app/node_modules/@ev-coownership/shared
     command: npm run dev
 
   # ==================== SERVICES ====================
@@ -534,10 +535,10 @@ services:
     env_file:
       - ./backend/ai-service/.env
     ports:
-      - "3010:3010"
+      - "3009:3009"
     environment:
       NODE_ENV: development
-      PORT: 3010
+      PORT: 3009
       MONGODB_URL: mongodb://admin:admin123@mongodb:27017/ev_ai_service?authSource=admin
       REDIS_URL: redis://:redis123@redis:6379
       RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672

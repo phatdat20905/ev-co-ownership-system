@@ -14,5 +14,5 @@ RUN npm ci --omit=dev
 # Copy toàn bộ source code của auth-service
 COPY . .
 
-EXPOSE 3010
+EXPOSE 3009
 CMD ["node", "src/server.js"]

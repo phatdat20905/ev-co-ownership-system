@@ -60,7 +60,7 @@ ai-service/
 
 | Variable          | Description                        | Default |
 |-------------------|------------------------------------|---------|
-| PORT              | Service port                       | 3010    |
+| PORT              | Service port                       | 3009    |
 | GEMINI_API_KEY    | Google AI API key                  | -       |
 | MONGODB_URL       | MongoDB connection string          | -       |
 | REDIS_HOST        | Redis host                         | localhost |
