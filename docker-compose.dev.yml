@@ -542,7 +542,7 @@ services:
       MONGODB_URL: mongodb://admin:admin123@mongodb:27017/ev_ai_service?authSource=admin
       REDIS_URL: redis://:redis123@redis:6379
       RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
-      GEMINI_API_KEY: your_gemini_api_key_here
+      GEMINI_API_KEY: AIzaSyD8Upex3XTh6n-I2IYjskh1Xkq2vXvKO18
       GEMINI_MODEL: gemini-2.0-flash
     depends_on:
       mongodb:

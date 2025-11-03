@@ -4,7 +4,7 @@ import {
   authenticate, 
   validate 
 } from '@ev-coownership/shared';
-import { costValidators } from '../validators/costValidators.js';
+import { costValidators } from '../validators/index.js';
 
 const router = express.Router();
 
