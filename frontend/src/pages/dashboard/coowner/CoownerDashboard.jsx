@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { 
-  Car, 
-  Calendar, 
-  DollarSign, 
-  Users, 
-  FileText, 
+import {
+  Car,
+  Calendar,
+  DollarSign,
+  Users,
+  FileText,
   BarChart3,
   Clock,
   MapPin,
@@ -17,7 +17,7 @@ import {
   Zap,
   CheckCircle,
   Play,
-  ArrowRight
+  ArrowRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Header from "../../../components/layout/Header";
@@ -44,10 +44,28 @@ export default function CoownerDashboard() {
           usageThisMonth: 12,
           usageLimit: 30,
           recentActivity: [
-            { id: 1, type: "booking", message: "Đã đặt lịch sử dụng xe Tesla Model 3", time: "2 giờ trước", status: "completed" },
-            { id: 2, type: "payment", message: "Đã thanh toán phí bảo dưỡng tháng 12", time: "1 ngày trước", status: "completed" },
-            { id: 3, type: "maintenance", message: "Xe cần bảo dưỡng định kỳ", time: "3 ngày trước", status: "pending" },
-          ]
+            {
+              id: 1,
+              type: "booking",
+              message: "Đã đặt lịch sử dụng xe Tesla Model 3",
+              time: "2 giờ trước",
+              status: "completed",
+            },
+            {
+              id: 2,
+              type: "payment",
+              message: "Đã thanh toán phí bảo dưỡng tháng 12",
+              time: "1 ngày trước",
+              status: "completed",
+            },
+            {
+              id: 3,
+              type: "maintenance",
+              message: "Xe cần bảo dưỡng định kỳ",
+              time: "3 ngày trước",
+              status: "pending",
+            },
+          ],
         });
         setLoading(false);
       }, 1500);
@@ -72,7 +90,7 @@ export default function CoownerDashboard() {
       icon: Car,
       color: "from-blue-500 to-cyan-500",
       link: "/dashboard/coowner/ownership",
-      description: "Xe đang đồng sở hữu"
+      description: "Xe đang đồng sở hữu",
     },
     {
       title: "Tỷ lệ sở hữu",
@@ -80,7 +98,7 @@ export default function CoownerDashboard() {
       icon: Users,
       color: "from-green-500 to-emerald-500",
       link: "/dashboard/coowner/ownership",
-      description: "Quyền sở hữu của bạn"
+      description: "Quyền sở hữu của bạn",
     },
     {
       title: "Chi phí tháng",
@@ -88,7 +106,7 @@ export default function CoownerDashboard() {
       icon: DollarSign,
       color: "from-purple-500 to-pink-500",
       link: "/dashboard/coowner/financial",
-      description: "Tổng chi phí tháng này"
+      description: "Tổng chi phí tháng này",
     },
     {
       title: "Thành viên nhóm",
@@ -96,8 +114,8 @@ export default function CoownerDashboard() {
       icon: Users,
       color: "from-orange-500 to-amber-500",
       link: "/dashboard/coowner/group",
-      description: "Đồng sở hữu với"
-    }
+      description: "Đồng sở hữu với",
+    },
   ];
 
   // Quick actions
@@ -108,7 +126,7 @@ export default function CoownerDashboard() {
       icon: Calendar,
       link: "/dashboard/coowner/booking",
       color: "from-blue-500 to-cyan-500",
-      buttonColor: "bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-200"
+      buttonColor: "bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-200",
     },
     {
       title: "Xem hợp đồng",
@@ -116,7 +134,8 @@ export default function CoownerDashboard() {
       icon: FileText,
       link: "/dashboard/coowner/ownership",
       color: "from-green-500 to-emerald-500",
-      buttonColor: "bg-green-50 text-green-600 hover:bg-green-100 border-green-200"
+      buttonColor:
+        "bg-green-50 text-green-600 hover:bg-green-100 border-green-200",
     },
     {
       title: "Quản lý chi phí",
@@ -124,7 +143,8 @@ export default function CoownerDashboard() {
       icon: DollarSign,
       link: "/dashboard/coowner/financial",
       color: "from-purple-500 to-pink-500",
-      buttonColor: "bg-purple-50 text-purple-600 hover:bg-purple-100 border-purple-200"
+      buttonColor:
+        "bg-purple-50 text-purple-600 hover:bg-purple-100 border-purple-200",
     },
     {
       title: "Phân tích sử dụng",
@@ -132,8 +152,9 @@ export default function CoownerDashboard() {
       icon: BarChart3,
       link: "/dashboard/coowner/history",
       color: "from-orange-500 to-amber-500",
-      buttonColor: "bg-orange-50 text-orange-600 hover:bg-orange-100 border-orange-200"
-    }
+      buttonColor:
+        "bg-orange-50 text-orange-600 hover:bg-orange-100 border-orange-200",
+    },
   ];
 
   // Car status
@@ -149,7 +170,7 @@ export default function CoownerDashboard() {
       usageThisMonth: "12/30 giờ",
       image: "/api/placeholder/400/250",
       efficiency: "6.2 km/kWh",
-      range: "420 km"
+      range: "420 km",
     },
     {
       id: 2,
@@ -162,25 +183,33 @@ export default function CoownerDashboard() {
       usageThisMonth: "8/30 giờ",
       image: "/api/placeholder/400/250",
       efficiency: "5.8 km/kWh",
-      range: "320 km"
-    }
+      range: "320 km",
+    },
   ];
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'available': return 'text-green-600 bg-green-100';
-      case 'in_use': return 'text-blue-600 bg-blue-100';
-      case 'maintenance': return 'text-orange-600 bg-orange-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case "available":
+        return "text-green-600 bg-green-100";
+      case "in_use":
+        return "text-blue-600 bg-blue-100";
+      case "maintenance":
+        return "text-orange-600 bg-orange-100";
+      default:
+        return "text-gray-600 bg-gray-100";
     }
   };
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'available': return 'Có sẵn';
-      case 'in_use': return 'Đang sử dụng';
-      case 'maintenance': return 'Bảo dưỡng';
-      default: return 'Không xác định';
+      case "available":
+        return "Có sẵn";
+      case "in_use":
+        return "Đang sử dụng";
+      case "maintenance":
+        return "Bảo dưỡng";
+      default:
+        return "Không xác định";
     }
   };
 
@@ -210,7 +239,7 @@ export default function CoownerDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      
+
       {/* Main Content */}
       <main className="pt-20">
         <div className="max-w-7xl mx-auto px-6 py-8">
@@ -228,17 +257,22 @@ export default function CoownerDashboard() {
               </span>
             </h1>
             <p className="text-xl text-gray-600 mt-4 max-w-2xl">
-              Quản lý phương tiện đồng sở hữu của bạn một cách thông minh và hiệu quả
+              Quản lý phương tiện đồng sở hữu của bạn một cách thông minh và
+              hiệu quả
             </p>
-            
+
             {/* Quick Stats */}
             <div className="grid grid-cols-3 gap-8 mt-8 pt-8 border-t border-gray-200/50 max-w-2xl">
               <div className="text-center">
-                <div className="text-2xl font-bold text-gray-900">{userData?.totalSavings?.toLocaleString()}đ</div>
+                <div className="text-2xl font-bold text-gray-900">
+                  {userData?.totalSavings?.toLocaleString()}đ
+                </div>
                 <div className="text-sm text-gray-600">Đã tiết kiệm</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-gray-900">{userData?.usageThisMonth}/{userData?.usageLimit}h</div>
+                <div className="text-2xl font-bold text-gray-900">
+                  {userData?.usageThisMonth}/{userData?.usageLimit}h
+                </div>
                 <div className="text-sm text-gray-600">Sử dụng tháng</div>
               </div>
               <div className="text-center">
@@ -265,18 +299,26 @@ export default function CoownerDashboard() {
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-600">{stat.title}</p>
+                        <p className="text-sm font-medium text-gray-600">
+                          {stat.title}
+                        </p>
                         <p className="text-2xl font-bold text-gray-900 mt-2">
                           {stat.value}
                         </p>
-                        <p className="text-xs text-gray-500 mt-1">{stat.description}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {stat.description}
+                        </p>
                       </div>
-                      <div className={`p-3 rounded-xl bg-gradient-to-r ${stat.color} text-white shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                      <div
+                        className={`p-3 rounded-xl bg-gradient-to-r ${stat.color} text-white shadow-lg group-hover:scale-110 transition-transform duration-300`}
+                      >
                         <IconComponent className="w-6 h-6" />
                       </div>
                     </div>
                     <div className="flex items-center justify-between mt-4">
-                      <span className="text-xs text-gray-500 group-hover:text-gray-700 transition-colors">Xem chi tiết</span>
+                      <span className="text-xs text-gray-500 group-hover:text-gray-700 transition-colors">
+                        Xem chi tiết
+                      </span>
                       <ArrowUpRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                     </div>
                   </Link>
@@ -295,7 +337,9 @@ export default function CoownerDashboard() {
                 transition={{ duration: 0.6, delay: 0.4 }}
                 className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100"
               >
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Hành động nhanh</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">
+                  Hành động nhanh
+                </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {quickActions.map((action, index) => {
                     const IconComponent = action.icon;
@@ -310,7 +354,9 @@ export default function CoownerDashboard() {
                           className={`group block p-4 rounded-xl border-2 transition-all duration-300 ${action.buttonColor}`}
                         >
                           <div className="flex items-center gap-4">
-                            <div className={`p-3 rounded-xl bg-gradient-to-r ${action.color} text-white shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                            <div
+                              className={`p-3 rounded-xl bg-gradient-to-r ${action.color} text-white shadow-lg group-hover:scale-110 transition-transform duration-300`}
+                            >
                               <IconComponent className="w-6 h-6" />
                             </div>
                             <div className="flex-1">
@@ -338,7 +384,9 @@ export default function CoownerDashboard() {
                 className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100"
               >
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">Trạng thái xe</h2>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Trạng thái xe
+                  </h2>
                   <div className="flex gap-2">
                     {carStatus.map((_, index) => (
                       <button
@@ -370,41 +418,65 @@ export default function CoownerDashboard() {
                             <h3 className="text-xl font-bold text-gray-900">
                               {carStatus[activeCarIndex].name}
                             </h3>
-                            <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(carStatus[activeCarIndex].status)}`}>
+                            <span
+                              className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
+                                carStatus[activeCarIndex].status
+                              )}`}
+                            >
                               {getStatusText(carStatus[activeCarIndex].status)}
                             </span>
                           </div>
-                          
-                          <p className="text-gray-600 mb-2">{carStatus[activeCarIndex].model}</p>
-                          
+
+                          <p className="text-gray-600 mb-2">
+                            {carStatus[activeCarIndex].model}
+                          </p>
+
                           <div className="space-y-3">
                             <div className="flex items-center gap-3">
                               <Battery className="w-5 h-5 text-green-600" />
-                              <span className="text-gray-700">Pin: {carStatus[activeCarIndex].battery}%</span>
+                              <span className="text-gray-700">
+                                Pin: {carStatus[activeCarIndex].battery}%
+                              </span>
                             </div>
                             <div className="flex items-center gap-3">
                               <MapPin className="w-5 h-5 text-blue-600" />
-                              <span className="text-gray-700">{carStatus[activeCarIndex].location}</span>
+                              <span className="text-gray-700">
+                                {carStatus[activeCarIndex].location}
+                              </span>
                             </div>
                             <div className="flex items-center gap-3">
                               <Clock className="w-5 h-5 text-orange-600" />
-                              <span className="text-gray-700">Bảo dưỡng: {carStatus[activeCarIndex].nextMaintenance}</span>
+                              <span className="text-gray-700">
+                                Bảo dưỡng:{" "}
+                                {carStatus[activeCarIndex].nextMaintenance}
+                              </span>
                             </div>
                             <div className="flex items-center gap-3">
                               <BarChart3 className="w-5 h-5 text-purple-600" />
-                              <span className="text-gray-700">Sử dụng: {carStatus[activeCarIndex].usageThisMonth}</span>
+                              <span className="text-gray-700">
+                                Sử dụng:{" "}
+                                {carStatus[activeCarIndex].usageThisMonth}
+                              </span>
                             </div>
                           </div>
                         </div>
-                        
+
                         <div className="lg:w-48 flex flex-col gap-3">
                           <div className="bg-white rounded-xl p-4 text-center border border-gray-200">
-                            <div className="text-2xl font-bold text-gray-900">{carStatus[activeCarIndex].efficiency}</div>
-                            <div className="text-sm text-gray-600">Hiệu suất</div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {carStatus[activeCarIndex].efficiency}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              Hiệu suất
+                            </div>
                           </div>
                           <div className="bg-white rounded-xl p-4 text-center border border-gray-200">
-                            <div className="text-2xl font-bold text-gray-900">{carStatus[activeCarIndex].range}</div>
-                            <div className="text-sm text-gray-600">Tầm hoạt động</div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {carStatus[activeCarIndex].range}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              Tầm hoạt động
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -423,7 +495,9 @@ export default function CoownerDashboard() {
             >
               {/* Recent Activity */}
               <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Hoạt động gần đây</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">
+                  Hoạt động gần đây
+                </h2>
                 <div className="space-y-4">
                   {userData?.recentActivity?.map((activity, index) => (
                     <motion.div
@@ -433,25 +507,31 @@ export default function CoownerDashboard() {
                       transition={{ duration: 0.4, delay: index * 0.1 }}
                       className="flex items-start gap-4 p-4 rounded-xl border border-gray-200 hover:border-blue-200 hover:bg-blue-50/50 transition-all duration-300"
                     >
-                      <div className={`p-2 rounded-lg ${
-                        activity.status === 'completed' 
-                          ? 'bg-green-100 text-green-600' 
-                          : 'bg-orange-100 text-orange-600'
-                      }`}>
-                        {activity.status === 'completed' ? (
+                      <div
+                        className={`p-2 rounded-lg ${
+                          activity.status === "completed"
+                            ? "bg-green-100 text-green-600"
+                            : "bg-orange-100 text-orange-600"
+                        }`}
+                      >
+                        {activity.status === "completed" ? (
                           <CheckCircle className="w-5 h-5" />
                         ) : (
                           <Clock className="w-5 h-5" />
                         )}
                       </div>
                       <div className="flex-1">
-                        <p className="text-gray-800 font-medium">{activity.message}</p>
-                        <p className="text-sm text-gray-500 mt-1">{activity.time}</p>
+                        <p className="text-gray-800 font-medium">
+                          {activity.message}
+                        </p>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {activity.time}
+                        </p>
                       </div>
                     </motion.div>
                   ))}
                 </div>
-                
+
                 <Link
                   to="/dashboard/coowner/history"
                   className="block mt-6 text-center py-3 text-blue-600 font-medium rounded-xl border-2 border-blue-200 hover:bg-blue-50 transition-all duration-300 group"
@@ -470,7 +550,8 @@ export default function CoownerDashboard() {
                   <h3 className="text-xl font-bold">Đề xuất thông minh</h3>
                 </div>
                 <p className="text-blue-100 mb-4">
-                  Dựa trên lịch sử sử dụng, chúng tôi đề xuất bạn nên đặt lịch vào cuối tuần này để tối ưu chi phí.
+                  Dựa trên lịch sử sử dụng, chúng tôi đề xuất bạn nên đặt lịch
+                  vào cuối tuần này để tối ưu chi phí.
                 </p>
                 <motion.button
                   whileHover={{ scale: 1.05 }}

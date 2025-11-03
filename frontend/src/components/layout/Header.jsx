@@ -422,16 +422,18 @@ export default function Header() {
 
           {/* Desktop Actions */}
           <div className="hidden lg:flex items-center gap-3">
-            {/* Search icon */}
+            {/* Search icon - hiển thị cho cả logged in và guest */}
             <button className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded-full hover:bg-gray-200 cursor-pointer transition-all duration-300 hover:scale-110">
               <Search className="h-5 w-5 text-gray-600" />
             </button>
 
-            {/* Notification icon */}
-            <button className="relative flex items-center justify-center w-10 h-10 bg-gray-100 rounded-full hover:bg-gray-200 cursor-pointer transition-all duration-300 hover:scale-110">
-              <Bell className="h-5 w-5 text-gray-600" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
+            {/* Notification icon - CHỈ hiển thị khi đã login */}
+            {isLoggedIn && (
+              <button className="relative flex items-center justify-center w-10 h-10 bg-gray-100 rounded-full hover:bg-gray-200 cursor-pointer transition-all duration-300 hover:scale-110">
+                <Bell className="h-5 w-5 text-gray-600" />
+                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
+              </button>
+            )}
 
             {/* Auth Buttons hoặc User Menu */}
             {isLoggedIn ? (
@@ -564,7 +566,7 @@ export default function Header() {
                 ))}
               </>
             ) : (
-              // Mobile guest navigation - ĐÃ ĐƯỢC SỬA
+              // Mobile guest navigation
               <>
                 {guestNavItems.map((item, index) => (
                   <button
@@ -619,13 +621,18 @@ export default function Header() {
             
             <div className="pt-4 border-t border-gray-200">
               <div className="flex items-center gap-3 mb-4">
+                {/* Search icon - hiển thị cho cả logged in và guest */}
                 <button className="flex-1 p-3 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">
                   <Search className="w-5 h-5 mx-auto" />
                 </button>
-                <button className="flex-1 p-3 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors relative">
-                  <Bell className="w-5 h-5 mx-auto" />
-                  <span className="absolute top-2 right-6 w-2 h-2 bg-red-500 rounded-full"></span>
-                </button>
+                
+                {/* Notification icon - CHỈ hiển thị khi đã login */}
+                {isLoggedIn && (
+                  <button className="flex-1 p-3 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors relative">
+                    <Bell className="w-5 h-5 mx-auto" />
+                    <span className="absolute top-2 right-6 w-2 h-2 bg-red-500 rounded-full"></span>
+                  </button>
+                )}
               </div>
               
               {isLoggedIn ? (
