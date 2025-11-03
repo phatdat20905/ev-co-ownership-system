@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { AlertTriangle, Search, Filter, MessageCircle, CheckCircle, XCircle, Clock, User, Car, Calendar, Download, FileText, CreditCard, MapPin, Wrench, BarChart3, Send, ChevronDown, X, MoreVertical, Bell, LogOut, Menu, Plus, PieChart } from "lucide-react";
+import { AlertTriangle, Search, Filter, MessageCircle, CheckCircle, XCircle, Clock, User, Car,QrCode, Calendar, Download, FileText, CreditCard, MapPin, Wrench, BarChart3, Send, ChevronDown, X, MoreVertical, Bell, LogOut, Menu, Plus, PieChart } from "lucide-react";
 
 const DisputeManagement = () => {
   const navigate = useNavigate();
@@ -14,6 +14,49 @@ const DisputeManagement = () => {
   const [newMessage, setNewMessage] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
+  // Thêm state cho dropdown menus
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+
+  // Refs để detect click outside
+  const userMenuRef = useRef(null);
+  const notificationsRef = useRef(null);
+
+  // Notifications data
+  const [notifications, setNotifications] = useState([
+    { id: 1, title: "Tranh chấp mới", message: "Tranh chấp lịch sử dụng cần xử lý", time: "5 phút trước", type: "warning", read: false },
+    { id: 2, title: "Cập nhật hệ thống", message: "Cập nhật hệ thống lúc 02:00", time: "2 giờ trước", type: "info", read: true },
+    { id: 3, title: "Tranh chấp đã giải quyết", message: "Tranh chấp thanh toán đã được giải quyết", time: "1 ngày trước", type: "success", read: true }
+  ]);
+
+  // Hàm xử lý đăng xuất
+  const handleLogout = () => {
+    // Xóa tất cả dữ liệu đăng nhập khỏi localStorage
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("userData");
+    localStorage.removeItem("authExpires");
+    localStorage.removeItem("rememberedLogin");
+    window.dispatchEvent(new Event('storage'));
+    navigate("/");
+  };
+
+  // useEffect để đóng dropdown khi click ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setUserMenuOpen(false);
+      }
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
+        setNotificationsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   // Menu items cho sidebar
   const menuItems = [
     { id: "overview", label: "Tổng quan", icon: <BarChart3 className="w-5 h-5" />, link: "/admin" },
@@ -21,9 +64,10 @@ const DisputeManagement = () => {
     { id: "staff", label: "Nhân viên", icon: <User className="w-5 h-5" />, link: "/admin/staff" },
     { id: "contracts", label: "Hợp đồng", icon: <FileText className="w-5 h-5" />, link: "/admin/contracts" },
     { id: "services", label: "Dịch vụ xe", icon: <Wrench className="w-5 h-5" />, link: "/admin/services" },
+    { id: "checkinout", label: "Check in/out", icon: <QrCode className="w-5 h-5" />, link: "/admin/checkin" },
     { id: "disputes", label: "Tranh chấp", icon: <AlertTriangle className="w-5 h-5" />, link: "/admin/disputes" },
     { id: "reports", label: "Báo cáo TC", icon: <PieChart className="w-5 h-5" />, link: "/admin/financial-reports" }
-  ];
+];
 
   const getActiveTab = () => {
     const currentPath = location.pathname;
@@ -220,6 +264,8 @@ const DisputeManagement = () => {
     totalFinancialImpact: disputes.reduce((sum, dispute) => sum + dispute.financialImpact, 0)
   };
 
+  const unreadNotifications = notifications.filter(n => !n.read).length;
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Mobile Menu Button */}
@@ -279,14 +325,12 @@ const DisputeManagement = () => {
                   <User className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">Admin User</p>
+                  <p className="text-sm font-medium text-gray-900">Admin</p>
                   <p className="text-xs text-gray-600">Quản trị viên</p>
                 </div>
                 <button 
                   className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  onClick={() => {
-                    console.log('Đăng xuất');
-                  }}
+                  onClick={handleLogout}
                 >
                   <LogOut className="w-4 h-4 text-gray-600" />
                 </button>
@@ -321,27 +365,115 @@ const DisputeManagement = () => {
                 <input
                   type="text"
                   placeholder="Tìm kiếm..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64 text-sm bg-gray-50 focus:bg-white transition-colors"
                 />
               </div>
 
               {/* Notifications */}
-              <div className="relative">
-                <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative">
+              <div className="relative" ref={notificationsRef}>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setNotificationsOpen(!notificationsOpen);
+                  }}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative"
+                >
                   <Bell className="w-5 h-5 text-gray-600" />
-                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white" />
+                  {unreadNotifications > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white text-xs text-white flex items-center justify-center">
+                      {unreadNotifications}
+                    </span>
+                  )}
                 </button>
+
+                <AnimatePresence>
+                  {notificationsOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-10"
+                    >
+                      <div className="p-4 border-b border-gray-100">
+                        <h3 className="font-semibold text-gray-900">Thông báo</h3>
+                      </div>
+                      <div className="max-h-96 overflow-y-auto">
+                        {notifications.map((notification) => (
+                          <div key={notification.id} className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${!notification.read ? 'bg-blue-50' : ''}`}>
+                            <div className="flex items-start space-x-3">
+                              <div className={`w-2 h-2 rounded-full mt-2 ${
+                                notification.type === 'success' ? 'bg-green-500' :
+                                notification.type === 'warning' ? 'bg-amber-500' :
+                                notification.type === 'info' ? 'bg-blue-500' : 'bg-red-500'
+                              }`} />
+                              <div className="flex-1">
+                                <p className="font-medium text-gray-900 text-sm">{notification.title}</p>
+                                <p className="text-gray-600 text-sm mt-1">{notification.message}</p>
+                                <p className="text-gray-400 text-xs mt-2">{notification.time}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="p-4 border-t border-gray-100">
+                        <button className="text-blue-600 text-sm font-medium w-full text-center hover:text-blue-800 transition-colors">
+                          Xem tất cả thông báo
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               {/* User Menu */}
-              <div className="flex items-center space-x-3">
-                <div className="text-right hidden md:block">
-                  <p className="text-sm font-medium text-gray-900">Admin User</p>
-                  <p className="text-xs text-gray-600">Quản trị viên</p>
-                </div>
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-sm">
-                  <User className="w-4 h-4 text-white" />
-                </div>
+              <div className="relative" ref={userMenuRef}>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setUserMenuOpen(!userMenuOpen);
+                  }}
+                  className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <div className="text-right hidden md:block">
+                    <p className="text-sm font-medium text-gray-900">Admin</p>
+                    <p className="text-xs text-gray-600">Quản trị viên</p>
+                  </div>
+                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-sm">
+                    <User className="w-4 h-4 text-white" />
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                <AnimatePresence>
+                  {userMenuOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute right-0 top-12 w-48 bg-white rounded-xl shadow-lg border border-gray-200 z-10"
+                    >
+                      <div className="p-2">
+                        <button
+                          onClick={() => navigate("/admin/profile")}
+                          className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm text-gray-700"
+                        >
+                          <User className="w-4 h-4" />
+                          <span>Hồ sơ cá́ nhân</span>
+                        </button>
+                        <div className="border-t border-gray-100 my-1" />
+                        <button 
+                          onClick={handleLogout}
+                          className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors text-sm text-red-600"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          <span>Đăng xuất</span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
           </div>
