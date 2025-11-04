@@ -233,8 +233,11 @@ services:
       VEHICLE_SERVICE_URL: http://vehicle-service-dev:3005
       CONTRACT_SERVICE_URL: http://contract-service-dev:3006
       ADMIN_SERVICE_URL: http://admin-service-dev:3007
+      NOTIFICATION_SERVICE_URL: http://notification-service-dev:3008
+      AI_SERVICE_URL: http://ai-service-dev:3009
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     networks:
       - ev_network
     volumes:
@@ -542,8 +545,6 @@ services:
       MONGODB_URL: mongodb://admin:admin123@mongodb:27017/ev_ai_service?authSource=admin
       REDIS_URL: redis://:redis123@redis:6379
       RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
-      GEMINI_API_KEY: AIzaSyD8Upex3XTh6n-I2IYjskh1Xkq2vXvKO18
-      GEMINI_MODEL: gemini-2.0-flash
     depends_on:
       mongodb:
         condition: service_healthy

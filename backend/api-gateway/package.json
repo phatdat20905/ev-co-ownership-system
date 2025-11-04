@@ -1,19 +1,30 @@
 {
   "name": "api-gateway",
   "version": "1.0.0",
-  "main": "src/app.js",
+  "main": "src/server.js",
   "type": "module",
   "scripts": {
-    "start": "node src/app.js",
-    "dev": "nodemon src/app.js"
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
   },
-  "keywords": [],
+  "keywords": [
+    "api-gateway",
+    "microservices",
+    "nodejs",
+    "express",
+    "reverse-proxy",
+    "ev-coownership"
+  ],
   "author": "",
   "license": "ISC",
   "description": "API Gateway for EV Co-ownership System",
   "dependencies": {
+    "@ev-coownership/shared": "file:../shared",
     "dotenv": "^17.2.3",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "http-proxy-middleware": "^3.0.5",
+    "opossum": "^9.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

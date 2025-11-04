@@ -17,7 +17,7 @@ router.get('/health', (req, res) => {
 });
 
 // API routes
-router.use('/notifications', notificationRoutes);
+router.use('/', notificationRoutes);
 router.use('/templates', templateRoutes);
 router.use('/preferences', preferenceRoutes);
 

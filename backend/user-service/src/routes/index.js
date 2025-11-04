@@ -7,7 +7,7 @@ import fundRoutes from './fundRoutes.js';
 
 const router = express.Router();
 
-router.use('/users', userRoutes);
+router.use('/', userRoutes);
 router.use('/groups', groupRoutes);
 router.use('/votes', voteRoutes);
 router.use('/fund', fundRoutes);

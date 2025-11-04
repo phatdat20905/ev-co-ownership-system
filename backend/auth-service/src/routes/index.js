@@ -5,7 +5,7 @@ import tokenRoutes from './tokenRoutes.js';
 
 const router = Router();
 
-router.use('/auth', authRoutes);
+router.use('/', authRoutes);
 router.use('/kyc', kycRoutes);
 router.use('/tokens', tokenRoutes);
 

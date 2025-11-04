@@ -9,11 +9,13 @@ import templateRoutes from './templateRoutes.js';
 const router = express.Router();
 
 // Mount all route modules
-router.use('/contracts', contractRoutes);
-router.use('/contracts', signatureRoutes);
-router.use('/contracts', partyRoutes);
-router.use('/contracts', documentRoutes);
-router.use('/contracts', amendmentRoutes);
+router.use('/', contractRoutes);
+router.use('/signatures', signatureRoutes);
+router.use('/parties', partyRoutes);
+router.use('/documents', documentRoutes);
+router.use('/amendments', amendmentRoutes);
+
+// ✅ Templates route là module riêng
 router.use('/templates', templateRoutes);
 
 export default router;

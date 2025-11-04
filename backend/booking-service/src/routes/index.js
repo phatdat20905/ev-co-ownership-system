@@ -7,10 +7,13 @@ import adminRoutes from './adminRoutes.js';
 
 const router = express.Router();
 
-router.use('/bookings', bookingRoutes);
-router.use('/bookings', calendarRoutes);
-router.use('/bookings', checkInOutRoutes);
-router.use('/bookings', conflictRoutes);
-router.use('/admin/bookings', adminRoutes);
+// ✅ Không thêm prefix “/bookings” ở đây nữa
+router.use('/', bookingRoutes);
+router.use('/calendar', calendarRoutes);
+router.use('/check-in-out', checkInOutRoutes);
+router.use('/conflicts', conflictRoutes);
+
+// ✅ Admin route tách riêng cho quản trị viên
+router.use('/admin', adminRoutes);
 
 export default router;

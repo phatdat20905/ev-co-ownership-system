@@ -10,7 +10,7 @@ import reportRoutes from './reportRoutes.js';
 
 const router = express.Router();
 
-router.use('/costs', costRoutes);
+router.use('/', costRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/wallets', walletRoutes);
 router.use('/group-wallets', groupWalletRoutes);

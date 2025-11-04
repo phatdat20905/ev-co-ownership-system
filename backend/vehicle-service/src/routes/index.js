@@ -9,7 +9,7 @@ import adminRoutes from './adminRoutes.js';
 
 const router = express.Router();
 
-router.use('/vehicles', vehicleRoutes);
+router.use('/', vehicleRoutes);
 router.use('/maintenance', maintenanceRoutes);
 router.use('/insurance', insuranceRoutes);
 router.use('/charging', chargingRoutes);
