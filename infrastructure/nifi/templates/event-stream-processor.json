@@ -1,0 +1,193 @@
+{
+  "flowContents": {
+    "identifier": "event-stream-processor",
+    "name": "Event Stream Processor",
+    "comments": "Process events from RabbitMQ and route to appropriate handlers",
+    "position": {
+      "x": 0.0,
+      "y": 0.0
+    },
+    "processGroups": [
+      {
+        "identifier": "booking-event-processor",
+        "name": "Booking Event Processor",
+        "comments": "Handle booking-related events",
+        "position": {
+          "x": 100.0,
+          "y": 100.0
+        },
+        "processors": [
+          {
+            "identifier": "consume-booking-events",
+            "name": "Consume Booking Events",
+            "type": "org.apache.nifi.amqp.processors.ConsumeAMQP",
+            "bundle": {
+              "group": "org.apache.nifi",
+              "artifact": "nifi-amqp-nar",
+              "version": "2.0.0"
+            },
+            "properties": {
+              "Host Name": "${RABBITMQ_HOST}",
+              "Port": "${RABBITMQ_PORT}",
+              "Username": "${RABBITMQ_USER}",
+              "Password": "${RABBITMQ_PASSWORD}",
+              "Queue": "booking.created",
+              "Auto-Acknowledge": "false",
+              "Batch Size": "10"
+            },
+            "schedulingPeriod": "0 sec",
+            "schedulingStrategy": "TIMER_DRIVEN"
+          },
+          {
+            "identifier": "extract-booking-data",
+            "name": "Extract Booking Data",
+            "type": "org.apache.nifi.processors.standard.EvaluateJsonPath",
+            "properties": {
+              "Destination": "flowfile-attribute",
+              "booking.id": "$.bookingId",
+              "booking.vehicleId": "$.vehicleId",
+              "booking.userId": "$.userId",
+              "booking.startTime": "$.startTime",
+              "booking.endTime": "$.endTime",
+              "booking.groupId": "$.groupId"
+            }
+          },
+          {
+            "identifier": "route-by-event-type",
+            "name": "Route by Event Type",
+            "type": "org.apache.nifi.processors.standard.RouteOnAttribute",
+            "properties": {
+              "Routing Strategy": "Route to Property name",
+              "booking.created": "${event.type:equals('booking.created')}",
+              "booking.updated": "${event.type:equals('booking.updated')}",
+              "booking.cancelled": "${event.type:equals('booking.cancelled')}"
+            }
+          },
+          {
+            "identifier": "store-to-analytics",
+            "name": "Store to Analytics DB",
+            "type": "org.apache.nifi.processors.mongodb.PutMongo",
+            "properties": {
+              "Mongo URI": "${MONGODB_URI}",
+              "Mongo Database Name": "ev_analytics",
+              "Mongo Collection Name": "booking_events",
+              "Mode": "insert",
+              "Upsert": "false"
+            }
+          }
+        ],
+        "connections": [
+          {
+            "identifier": "consume-to-extract",
+            "source": {
+              "id": "consume-booking-events",
+              "type": "PROCESSOR"
+            },
+            "destination": {
+              "id": "extract-booking-data",
+              "type": "PROCESSOR"
+            },
+            "selectedRelationships": ["success"]
+          },
+          {
+            "identifier": "extract-to-route",
+            "source": {
+              "id": "extract-booking-data",
+              "type": "PROCESSOR"
+            },
+            "destination": {
+              "id": "route-by-event-type",
+              "type": "PROCESSOR"
+            },
+            "selectedRelationships": ["matched"]
+          },
+          {
+            "identifier": "route-to-store",
+            "source": {
+              "id": "route-by-event-type",
+              "type": "PROCESSOR"
+            },
+            "destination": {
+              "id": "store-to-analytics",
+              "type": "PROCESSOR"
+            },
+            "selectedRelationships": ["booking.created", "booking.updated"]
+          }
+        ]
+      },
+      {
+        "identifier": "cost-event-processor",
+        "name": "Cost Event Processor",
+        "comments": "Handle cost and payment events",
+        "position": {
+          "x": 600.0,
+          "y": 100.0
+        },
+        "processors": [
+          {
+            "identifier": "consume-cost-events",
+            "name": "Consume Cost Events",
+            "type": "org.apache.nifi.amqp.processors.ConsumeAMQP",
+            "properties": {
+              "Host Name": "${RABBITMQ_HOST}",
+              "Port": "${RABBITMQ_PORT}",
+              "Username": "${RABBITMQ_USER}",
+              "Password": "${RABBITMQ_PASSWORD}",
+              "Queue": "cost.created",
+              "Auto-Acknowledge": "false"
+            }
+          },
+          {
+            "identifier": "aggregate-costs",
+            "name": "Aggregate Daily Costs",
+            "type": "org.apache.nifi.processors.standard.AttributesToJSON",
+            "properties": {
+              "Attributes List": "cost.amount,cost.category,cost.groupId",
+              "Destination": "flowfile-content"
+            }
+          },
+          {
+            "identifier": "store-cost-analytics",
+            "name": "Store Cost Analytics",
+            "type": "org.apache.nifi.processors.mongodb.PutMongo",
+            "properties": {
+              "Mongo URI": "${MONGODB_URI}",
+              "Mongo Database Name": "ev_analytics",
+              "Mongo Collection Name": "cost_events"
+            }
+          }
+        ]
+      }
+    ],
+    "controllerServices": [
+      {
+        "identifier": "postgres-connection-pool",
+        "name": "PostgreSQL Connection Pool",
+        "type": "org.apache.nifi.dbcp.DBCPConnectionPool",
+        "properties": {
+          "Database Connection URL": "${POSTGRES_BOOKING_URL}",
+          "Database Driver Class Name": "org.postgresql.Driver",
+          "Database Driver Location(s)": "/opt/nifi/nifi-current/lib/drivers/postgresql-42.7.1.jar",
+          "Database User": "${POSTGRES_USER}",
+          "Password": "${POSTGRES_PASSWORD}",
+          "Max Wait Time": "500 ms",
+          "Max Total Connections": "10"
+        }
+      }
+    ]
+  },
+  "externalControllerServices": {},
+  "parameterContexts": {},
+  "flowEncodingVersion": "1.0",
+  "flowSnapshot": {
+    "flowContents": {},
+    "snapshotMetadata": {
+      "bucketIdentifier": "default",
+      "flowIdentifier": "event-stream-processor",
+      "version": 1,
+      "timestamp": 0,
+      "author": "NiFi System",
+      "comments": "Initial template for event stream processing"
+    }
+  }
+}

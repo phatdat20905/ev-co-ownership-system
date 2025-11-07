@@ -1,0 +1,12 @@
+# JDBC Drivers (download via setup script)
+*.jar
+
+# NiFi Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Keep README files
+!README.md
