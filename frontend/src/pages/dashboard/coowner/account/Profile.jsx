@@ -4,6 +4,8 @@ import { User, Mail, Phone, MapPin, Calendar, Shield, Bell, CreditCard, FileText
 import { motion } from "framer-motion";
 import Header from "../../../../components/layout/Header";
 import Footer from "../../../../components/layout/Footer";
+import { userService } from "../../../../services";
+import { showSuccessToast, showErrorToast } from "../../../../utils/toast";
 
 export default function Profile() {
   const [userData, setUserData] = useState(null);
@@ -13,50 +15,23 @@ export default function Profile() {
   const [activeTab, setActiveTab] = useState("personal");
   const fileInputRef = useRef(null);
 
-  // Mock data với avatar mặc định
+  // Fetch user data from API
   useEffect(() => {
     const fetchUserData = async () => {
-      setTimeout(() => {
-        const data = {
-          id: 1,
-          name: "Nguyễn Văn A",
-          email: "nguyenvana@example.com",
-          phone: "+84 912 345 678",
-          address: "123 Nguyễn Huệ, Q.1, TP.HCM",
-          joinDate: "2023-01-15",
-          membershipType: "Co-owner Premium",
-          verified: true,
-          avatar: null, // Avatar mặc định - null sẽ dùng avatar mặc định
-          idNumber: "012345678901",
-          driverLicense: "A123456789",
-          notificationPreferences: {
-            email: true,
-            sms: true,
-            push: true,
-            bookingReminders: true,
-            maintenanceAlerts: true,
-            paymentReminders: true
-          },
-          paymentMethods: [
-            {
-              id: 1,
-              type: "credit_card",
-              lastFour: "4242",
-              brand: "visa",
-              isDefault: true
-            },
-            {
-              id: 2,
-              type: "bank_account",
-              bankName: "Techcombank",
-              accountNumber: "***6789"
-            }
-          ]
-        };
-        setUserData(data);
-        setFormData(data);
+      setLoading(true);
+      try {
+        const response = await userService.getProfile();
+        
+        if (response.success) {
+          setUserData(response.data);
+          setFormData(response.data);
+        }
+      } catch (error) {
+        showErrorToast('Không thể tải thông tin người dùng');
+        console.error('Failed to fetch user data:', error);
+      } finally {
         setLoading(false);
-      }, 1000);
+      }
     };
 
     fetchUserData();
@@ -104,12 +79,22 @@ export default function Profile() {
     return userData?.avatar;
   };
 
-  const handleSave = () => {
-    // Gọi API để lưu thông tin
-    setUserData(formData);
-    setIsEditing(false);
-    // Trong thực tế: await api.updateProfile(formData);
-    console.log("Data saved:", formData);
+  const handleSave = async () => {
+    try {
+      setLoading(true);
+      const response = await userService.updateProfile(formData);
+      
+      if (response.success) {
+        setUserData(response.data);
+        setFormData(response.data);
+        setIsEditing(false);
+        showSuccessToast('Cập nhật thông tin thành công!');
+      }
+    } catch (error) {
+      showErrorToast(error.response?.data?.message || 'Cập nhật thất bại. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancel = () => {

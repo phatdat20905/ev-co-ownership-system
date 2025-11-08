@@ -4,8 +4,12 @@ import { ArrowLeft, Users, UserPlus, Settings, Mail, Phone, Calendar, Car, MoreV
 import { Link } from "react-router-dom";
 import Header from "../../../../components/layout/Header";
 import Footer from "../../../../components/layout/Footer";
+import { userService } from "../../../../services";
+import { showSuccessToast, showErrorToast } from "../../../../utils/toast";
 
 export default function GroupManagement() {
+  const [groups, setGroups] = useState([]);
+  const [selectedGroup, setSelectedGroup] = useState(null);
   const [groupData, setGroupData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("members");
@@ -15,162 +19,133 @@ export default function GroupManagement() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [memberToDelete, setMemberToDelete] = useState(null);
 
+  // Fetch user's groups
   useEffect(() => {
-    const fetchGroupData = async () => {
-      setTimeout(() => {
-        setGroupData({
-          groupName: "Nhóm Tesla Model 3 Premium",
-          createdDate: "2024-01-15",
-          totalMembers: 4,
-          carInfo: {
-            name: "Tesla Model 3",
-            model: "2023 Long Range",
-            licensePlate: "59A-123.45",
-            status: "active"
-          },
-          members: [
-            {
-              id: 1,
-              name: "Nguyễn Văn A",
-              email: "nguyenvana@email.com",
-              phone: "0912345678",
-              joinDate: "2024-01-15",
-              ownership: 40,
-              role: "owner",
-              status: "active",
-              avatar: "NA"
-            },
-            {
-              id: 2,
-              name: "Trần Thị B",
-              email: "tranthib@email.com",
-              phone: "0912345679",
-              joinDate: "2024-01-20",
-              ownership: 30,
-              role: "member",
-              status: "active",
-              avatar: "TB"
-            },
-            {
-              id: 3,
-              name: "Lê Văn C",
-              email: "levanc@email.com",
-              phone: "0912345680",
-              joinDate: "2024-01-25",
-              ownership: 20,
-              role: "member",
-              status: "active",
-              avatar: "LC"
-            },
-            {
-              id: 4,
-              name: "Phạm Thị D",
-              email: "phamthid@email.com",
-              phone: "0912345681",
-              joinDate: "2024-02-01",
-              ownership: 10,
-              role: "member",
-              status: "pending",
-              avatar: "PD"
-            }
-          ],
-          groupRules: [
-            "Tối đa 30 giờ sử dụng/tháng cho mỗi thành viên",
-            "Đặt lịch trước 24 giờ cho các chuyến đi",
-            "Vệ sinh xe sau khi sử dụng",
-            "Báo cáo sự cố ngay khi phát hiện"
-          ],
-          recentActivities: [
-            {
-              id: 1,
-              type: "member_joined",
-              message: "Phạm Thị D đã tham gia nhóm",
-              time: "2 ngày trước",
-              user: "Phạm Thị D"
-            },
-            {
-              id: 2,
-              type: "vote_created",
-              message: "Bỏ phiếu về việc nâng cấp ghế xe",
-              time: "1 tuần trước",
-              user: "Trần Thị B"
-            },
-            {
-              id: 3,
-              type: "payment_made",
-              message: "Đã thanh toán phí bảo dưỡng tháng 1",
-              time: "2 tuần trước",
-              user: "Nguyễn Văn A"
-            }
-          ]
-        });
+    const fetchGroups = async () => {
+      setLoading(true);
+      try {
+        const response = await userService.getUserGroups();
+        
+        if (response.success && response.data) {
+          setGroups(response.data);
+          // Select first group by default
+          if (response.data.length > 0) {
+            setSelectedGroup(response.data[0].id);
+            loadGroupDetails(response.data[0].id);
+          }
+        }
+      } catch (error) {
+        showErrorToast('Không thể tải danh sách nhóm');
+        console.error('Failed to fetch groups:', error);
+      } finally {
         setLoading(false);
-      }, 1500);
+      }
     };
 
-    fetchGroupData();
+    fetchGroups();
   }, []);
 
+  // Load group details and members
+  const loadGroupDetails = async (groupId) => {
+    try {
+      setLoading(true);
+      const [groupResponse, membersResponse] = await Promise.all([
+        userService.getGroupById(groupId),
+        userService.getGroupMembers(groupId),
+      ]);
+
+      if (groupResponse.success && membersResponse.success) {
+        setGroupData({
+          ...groupResponse.data,
+          members: membersResponse.data,
+        });
+      }
+    } catch (error) {
+      showErrorToast('Không thể tải thông tin nhóm');
+      console.error('Failed to load group details:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // CÁC HÀM QUẢN LÝ THÀNH VIÊN
-  const handleInviteMember = () => {
-    if (!inviteEmail) return;
+  const handleInviteMember = async () => {
+    if (!inviteEmail || !selectedGroup) return;
     
-    // Mock gửi lời mời
-    console.log("Gửi lời mời đến:", inviteEmail);
-    // Thêm thành viên pending
-    const newMember = {
-      id: Date.now(),
-      name: "Thành viên mới",
-      email: inviteEmail,
-      phone: "Đang cập nhật",
-      joinDate: new Date().toISOString().split('T')[0],
-      ownership: 0,
-      role: "member",
-      status: "pending",
-      avatar: "TM"
-    };
+    try {
+      const response = await userService.addGroupMember(selectedGroup, {
+        email: inviteEmail,
+      });
 
-    setGroupData(prev => ({
-      ...prev,
-      members: [...prev.members, newMember],
-      totalMembers: prev.totalMembers + 1
-    }));
-
-    setInviteEmail("");
-    setShowInviteModal(false);
+      if (response.success) {
+        showSuccessToast('Đã gửi lời mời thành công');
+        setInviteEmail("");
+        setShowInviteModal(false);
+        // Reload group details to reflect changes
+        loadGroupDetails(selectedGroup);
+      }
+    } catch (error) {
+      showErrorToast('Không thể gửi lời mời');
+      console.error('Failed to invite member:', error);
+    }
   };
 
-  const handleDeleteMember = (memberId) => {
-    setGroupData(prev => ({
-      ...prev,
-      members: prev.members.filter(member => member.id !== memberId),
-      totalMembers: prev.totalMembers - 1
-    }));
-    setShowDeleteModal(false);
-    setMemberToDelete(null);
+  const handleDeleteMember = async (memberId) => {
+    if (!selectedGroup || !memberId) return;
+
+    try {
+      const response = await userService.removeGroupMember(selectedGroup, memberId);
+
+      if (response.success) {
+        showSuccessToast('Đã xóa thành viên thành công');
+        setShowDeleteModal(false);
+        setMemberToDelete(null);
+        // Reload group details to reflect changes
+        loadGroupDetails(selectedGroup);
+      }
+    } catch (error) {
+      showErrorToast('Không thể xóa thành viên');
+      console.error('Failed to delete member:', error);
+    }
   };
 
-  const handleUpdateRole = (memberId, newRole) => {
-    setGroupData(prev => ({
-      ...prev,
-      members: prev.members.map(member => 
-        member.id === memberId ? { ...member, role: newRole } : member
-      )
-    }));
-    setEditingMember(null);
+  const handleUpdateRole = async (memberId, newRole) => {
+    if (!selectedGroup) return;
+
+    try {
+      const response = await userService.updateGroupMemberRole(selectedGroup, memberId, newRole);
+
+      if (response.success) {
+        showSuccessToast('Đã cập nhật vai trò thành công');
+        setEditingMember(null);
+        // Reload group details to reflect changes
+        loadGroupDetails(selectedGroup);
+      }
+    } catch (error) {
+      showErrorToast('Không thể cập nhật vai trò');
+      console.error('Failed to update role:', error);
+    }
   };
 
-  const handleApproveMember = (memberId) => {
-    setGroupData(prev => ({
-      ...prev,
-      members: prev.members.map(member => 
-        member.id === memberId ? { ...member, status: "active" } : member
-      )
-    }));
+  const handleApproveMember = async (memberId) => {
+    if (!selectedGroup) return;
+
+    try {
+      const response = await userService.approveGroupMember(selectedGroup, memberId);
+
+      if (response.success) {
+        showSuccessToast('Đã phê duyệt thành viên thành công');
+        // Reload group details to reflect changes
+        loadGroupDetails(selectedGroup);
+      }
+    } catch (error) {
+      showErrorToast('Không thể phê duyệt thành viên');
+      console.error('Failed to approve member:', error);
+    }
   };
 
-  const handleRejectMember = (memberId) => {
-    handleDeleteMember(memberId);
+  const handleRejectMember = async (memberId) => {
+    await handleDeleteMember(memberId);
   };
 
   const handleEditRules = () => {
@@ -238,6 +213,24 @@ export default function GroupManagement() {
     );
   }
 
+  if (!groupData) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="pt-20">
+          <div className="max-w-7xl mx-auto px-6 py-8">
+            <div className="text-center py-12">
+              <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Không có nhóm nào</h2>
+              <p className="text-gray-600">Bạn chưa tham gia nhóm đồng sở hữu nào.</p>
+            </div>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
   const currentUserRole = "owner"; // Giả sử user hiện tại là owner
 
   return (
@@ -262,6 +255,24 @@ export default function GroupManagement() {
             </div>
             
             <div className="flex items-center gap-3">
+              {/* Group Selector */}
+              {groups.length > 1 && (
+                <select
+                  value={selectedGroup || ''}
+                  onChange={(e) => {
+                    setSelectedGroup(e.target.value);
+                    loadGroupDetails(e.target.value);
+                  }}
+                  className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {groups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.name || `Nhóm ${group.id}`}
+                    </option>
+                  ))}
+                </select>
+              )}
+              
               <button 
                 onClick={handleEditRules}
                 className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -289,18 +300,18 @@ export default function GroupManagement() {
               >
                 <div className="flex items-start justify-between mb-6">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">{groupData.groupName}</h2>
-                    <p className="text-gray-600 mt-1">Tạo ngày {groupData.createdDate}</p>
+                    <h2 className="text-xl font-bold text-gray-900">{groupData.name || groupData.groupName || 'Nhóm đồng sở hữu'}</h2>
+                    <p className="text-gray-600 mt-1">Tạo ngày {groupData.createdDate || groupData.createdAt || 'N/A'}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Car className="w-5 h-5 text-gray-400" />
-                    <span className="text-sm text-gray-600">{groupData.carInfo.name}</span>
+                    <span className="text-sm text-gray-600">{groupData.carInfo?.name || groupData.vehicleName || 'Xe'}</span>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                   <div className="text-center p-4 bg-blue-50 rounded-xl">
-                    <div className="text-2xl font-bold text-blue-600">{groupData.totalMembers}</div>
+                    <div className="text-2xl font-bold text-blue-600">{groupData.totalMembers || groupData.members?.length || 0}</div>
                     <div className="text-sm text-blue-600">Thành viên</div>
                   </div>
                   <div className="text-center p-4 bg-green-50 rounded-xl">
@@ -308,7 +319,7 @@ export default function GroupManagement() {
                     <div className="text-sm text-green-600">Tỷ lệ sở hữu</div>
                   </div>
                   <div className="text-center p-4 bg-purple-50 rounded-xl">
-                    <div className="text-2xl font-bold text-purple-600">3</div>
+                    <div className="text-2xl font-bold text-purple-600">{groupData.members?.filter(m => m.status === 'active').length || 0}</div>
                     <div className="text-sm text-purple-600">Hoạt động</div>
                   </div>
                 </div>
@@ -317,9 +328,9 @@ export default function GroupManagement() {
                 <div className="border-b border-gray-200 mb-6">
                   <nav className="flex space-x-8">
                     {[
-                      { id: 'members', name: 'Thành viên', count: groupData.members.length },
-                      { id: 'rules', name: 'Quy định', count: groupData.groupRules.length },
-                      { id: 'activities', name: 'Hoạt động', count: groupData.recentActivities.length }
+                      { id: 'members', name: 'Thành viên', count: groupData.members?.length || 0 },
+                      { id: 'rules', name: 'Quy định', count: groupData.groupRules?.length || 0 },
+                      { id: 'activities', name: 'Hoạt động', count: groupData.recentActivities?.length || 0 }
                     ].map((tab) => (
                       <button
                         key={tab.id}
@@ -342,7 +353,7 @@ export default function GroupManagement() {
                 {/* Tab Content */}
                 {activeTab === 'members' && (
                   <div className="space-y-4">
-                    {groupData.members.map((member) => {
+                    {groupData.members?.map((member) => {
                       const RoleIcon = getRoleBadge(member.role).icon;
                       const isPending = member.status === 'pending';
                       
@@ -450,7 +461,7 @@ export default function GroupManagement() {
                       )}
                     </div>
                     <div className="space-y-3">
-                      {groupData.groupRules.map((rule, index) => (
+                      {groupData.groupRules?.map((rule, index) => (
                         <div key={index} className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg">
                           <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-bold mt-0.5">
                             {index + 1}
@@ -464,7 +475,7 @@ export default function GroupManagement() {
 
                 {activeTab === 'activities' && (
                   <div className="space-y-4">
-                    {groupData.recentActivities.map((activity) => (
+                    {groupData.recentActivities?.map((activity) => (
                       <div key={activity.id} className="flex items-start gap-4 p-3 border border-gray-200 rounded-lg">
                         <div className="w-8 h-8 bg-green-100 text-green-600 rounded-full flex items-center justify-center">
                           <Users className="w-4 h-4" />
