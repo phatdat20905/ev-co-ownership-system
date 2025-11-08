@@ -4,6 +4,8 @@ import { ArrowLeft, Download, Filter, Plus, TrendingUp, TrendingDown, DollarSign
 import { Link } from "react-router-dom";
 import Header from "../../../../components/layout/Header";
 import Footer from "../../../../components/layout/Footer";
+import { costService } from "../../../../services";
+import { showSuccessToast, showErrorToast } from "../../../../utils/toast";
 
 export default function ExpenseTracking() {
   const [expenseData, setExpenseData] = useState(null);
@@ -12,41 +14,45 @@ export default function ExpenseTracking() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   useEffect(() => {
-    // Mock data fetch - trong thực tế sẽ gọi API
-    const fetchExpenseData = async () => {
-      setTimeout(() => {
-        setExpenseData({
-          totalExpenses: 12500000,
-          monthlyAverage: 1041667,
-          yoyGrowth: 12.5,
-          categories: [
-            { name: "Bảo dưỡng", amount: 4500000, percentage: 36, color: "bg-blue-500" },
-            { name: "Bảo hiểm", amount: 3000000, percentage: 24, color: "bg-green-500" },
-            { name: "Sạc điện", amount: 2500000, percentage: 20, color: "bg-yellow-500" },
-            { name: "Phí đỗ xe", amount: 1500000, percentage: 12, color: "bg-purple-500" },
-            { name: "Khác", amount: 1000000, percentage: 8, color: "bg-gray-500" }
-          ],
-          monthlyData: [
-            { month: "Tháng 1", amount: 1200000, usage: 15 },
-            { month: "Tháng 2", amount: 1100000, usage: 12 },
-            { month: "Tháng 3", amount: 1300000, usage: 18 },
-            { month: "Tháng 4", amount: 1250000, usage: 16 },
-            { month: "Tháng 5", amount: 1400000, usage: 20 },
-            { month: "Tháng 6", amount: 1350000, usage: 19 }
-          ],
-          recentTransactions: [
-            { id: 1, date: "2024-01-15", description: "Bảo dưỡng định kỳ", amount: 1500000, category: "maintenance", status: "completed" },
-            { id: 2, date: "2024-01-10", description: "Phí bảo hiểm tháng", amount: 250000, category: "insurance", status: "completed" },
-            { id: 3, date: "2024-01-05", description: "Sạc điện trạm VinFast", amount: 320000, category: "charging", status: "completed" },
-            { id: 4, date: "2024-01-02", description: "Phí đỗ xe tháng", amount: 500000, category: "parking", status: "pending" }
-          ]
-        });
-        setLoading(false);
-      }, 1500);
-    };
-
     fetchExpenseData();
-  }, []);
+  }, [selectedYear]);
+
+  const fetchExpenseData = async () => {
+    setLoading(true);
+    try {
+      // Get start and end of selected year
+      const startDate = new Date(selectedYear, 0, 1).toISOString();
+      const endDate = new Date(selectedYear, 11, 31).toISOString();
+
+      const [costsResponse, paymentsResponse] = await Promise.all([
+        costService.getCostsByGroup(null, { startDate, endDate }), // null = user's default group
+        costService.getUserPayments({ startDate, endDate })
+      ]);
+
+      if (costsResponse.success && paymentsResponse.success) {
+        // Transform API data to component format
+        const costs = costsResponse.data;
+        const payments = paymentsResponse.data;
+        
+        const totalExpenses = costs.reduce((sum, cost) => sum + (cost.amount || 0), 0);
+        const monthlyAverage = totalExpenses / 12;
+
+        setExpenseData({
+          totalExpenses,
+          monthlyAverage,
+          yoyGrowth: 0, // Can calculate if we have previous year data
+          categories: costs, // Raw categories from API
+          monthlyData: [], // Can calculate from costs
+          recentTransactions: payments.slice(0, 10) // Latest 10 payments
+        });
+      }
+    } catch (error) {
+      showErrorToast('Không thể tải dữ liệu chi phí');
+      console.error('Failed to fetch expense data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const safeToLocaleString = (value) => {
     return (value || 0).toLocaleString('vi-VN');

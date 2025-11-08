@@ -1,72 +1,68 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, DollarSign, Calendar, CheckCircle, Clock, AlertCircle, Download, Filter, Search, Receipt } from "lucide-react";
 import Header from '../../../../components/layout/Header';
 import Footer from '../../../../components/layout/Footer';
+import { costService } from '../../../../services';
+import { showSuccessToast, showErrorToast } from '../../../../utils/toast';
 
 export default function PaymentHistory() {
   const [filter, setFilter] = useState('all');
   const [timeRange, setTimeRange] = useState('3months'); 
+  const [paymentHistory, setPaymentHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const paymentHistory = [
-    {
-      id: 1,
-      description: 'Chi phí sạc điện tháng 12',
-      amount: 1250000,
-      date: '2024-01-05',
-      status: 'completed',
-      type: 'charging',
-      method: 'VNPay',
-      invoice: 'INV-2024-001'
-    },
-    {
-      id: 2,
-      description: 'Bảo dưỡng định kỳ',
-      amount: 850000,
-      date: '2024-01-03',
-      status: 'completed',
-      type: 'maintenance',
-      method: 'Momo',
-      invoice: 'INV-2024-002'
-    },
-    {
-      id: 3,
-      description: 'Phí bảo hiểm năm 2024',
-      amount: 750000,
-      date: '2024-01-01',
-      status: 'pending',
-      type: 'insurance',
-      method: 'Banking',
-      invoice: 'INV-2024-003'
-    },
-    {
-      id: 4,
-      description: 'Phí đăng kiểm',
-      amount: 450000,
-      date: '2023-12-28',
-      status: 'completed',
-      type: 'registration',
-      method: 'VNPay',
-      invoice: 'INV-2023-045'
-    },
-    {
-      id: 5,
-      description: 'Vệ sinh & chăm sóc',
-      amount: 300000,
-      date: '2023-12-25',
-      status: 'completed',
-      type: 'cleaning',
-      method: 'Momo',
-      invoice: 'INV-2023-044'
+  useEffect(() => {
+    fetchPayments();
+  }, [timeRange]);
+
+  const fetchPayments = async () => {
+    setLoading(true);
+    try {
+      // Calculate date range based on timeRange
+      const endDate = new Date();
+      const startDate = new Date();
+      
+      switch(timeRange) {
+        case '1month':
+          startDate.setMonth(startDate.getMonth() - 1);
+          break;
+        case '3months':
+          startDate.setMonth(startDate.getMonth() - 3);
+          break;
+        case '6months':
+          startDate.setMonth(startDate.getMonth() - 6);
+          break;
+        case '1year':
+          startDate.setFullYear(startDate.getFullYear() - 1);
+          break;
+        default:
+          startDate.setMonth(startDate.getMonth() - 3);
+      }
+
+      const response = await costService.getUserPayments({
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString()
+      });
+
+      if (response.success) {
+        setPaymentHistory(response.data);
+      }
+    } catch (error) {
+      showErrorToast('Không thể tải lịch sử thanh toán');
+      console.error('Failed to fetch payment history:', error);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   const stats = {
-    totalPaid: 2850000,
-    pendingAmount: 750000,
-    completedPayments: 4,
-    failedPayments: 0
+    totalPaid: paymentHistory.filter(p => p.status === 'completed').reduce((sum, p) => sum + (p.amount || 0), 0),
+    pendingAmount: paymentHistory.filter(p => p.status === 'pending').reduce((sum, p) => sum + (p.amount || 0), 0),
+    transactionCount: paymentHistory.length,
+    completedPayments: paymentHistory.filter(p => p.status === 'completed').length,
+    failedPayments: paymentHistory.filter(p => p.status === 'failed').length
   };
 
   const getStatusColor = (status) => {
