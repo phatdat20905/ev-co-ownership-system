@@ -24,6 +24,8 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import { adminService } from "../../services";
+import { showSuccessToast, showErrorToast } from "../../utils/toast";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -33,33 +35,46 @@ const AdminDashboard = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [notifications, setNotifications] = useState([]);
 
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      title: "Bảo dưỡng định kỳ",
-      message: "Xe VF e34 cần bảo dưỡng tháng 11",
-      time: "2 giờ trước",
-      type: "warning",
-      read: false,
-    },
-    {
-      id: 2,
-      title: "Thanh toán thành công",
-      message: "Co-owner Minh Nguyễn đã thanh toán tháng 10",
-      time: "5 giờ trước",
-      type: "success",
-      read: true,
-    },
-    {
-      id: 3,
-      title: "Đặt lịch mới",
-      message: "Co-owner Lan Phương đặt lịch sử dụng 15/11",
-      time: "1 ngày trước",
-      type: "info",
-      read: true,
-    },
-  ]);
+  // Fetch dashboard data
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    try {
+      const [statsResponse, activitiesResponse] = await Promise.all([
+        adminService.getDashboardStats(),
+        adminService.getRecentActivities(10)
+      ]);
+
+      if (statsResponse.success) {
+        setDashboardStats(statsResponse.data);
+      }
+
+      if (activitiesResponse.success) {
+        // Convert activities to notifications format
+        const formattedNotifications = activitiesResponse.data.map(activity => ({
+          id: activity.id,
+          title: activity.title || activity.type,
+          message: activity.description || activity.message,
+          time: activity.createdAt || activity.time,
+          type: activity.type || 'info',
+          read: activity.read || false
+        }));
+        setNotifications(formattedNotifications);
+      }
+    } catch (error) {
+      showErrorToast('Không thể tải dữ liệu dashboard');
+      console.error('Failed to fetch dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Cập nhật thời gian mỗi phút
   useEffect(() => {
@@ -87,57 +102,28 @@ const AdminDashboard = () => {
     navigate("/");
   };
 
-  const stats = {
-    totalUsers: 156,
-    totalCars: 24,
-    activeContracts: 89,
-    monthlyRevenue: 184500000,
-    utilizationRate: 76,
-    pendingIssues: 3,
-    staffMembers: 8,
-    activeDisputes: 2,
-    todayBookings: 12,
-    maintenanceDue: 4,
-    totalRevenue: 452300000,
+  // Use dashboard stats from API or fallback to defaults
+  const stats = dashboardStats || {
+    totalUsers: 0,
+    totalCars: 0,
+    activeContracts: 0,
+    monthlyRevenue: 0,
+    utilizationRate: 0,
+    pendingIssues: 0,
+    staffMembers: 0,
+    activeDisputes: 0,
+    todayBookings: 0,
+    maintenanceDue: 0,
+    totalRevenue: 0,
   };
 
-  const recentActivities = [
-    {
-      id: 1,
-      user: "Minh Nguyễn",
-      action: "Check-in xe VF e34",
-      time: "10 phút trước",
-      type: "success",
-    },
-    {
-      id: 2,
-      user: "Lan Phương",
-      action: "Thanh toán thành công",
-      time: "30 phút trước",
-      type: "success",
-    },
-    {
-      id: 3,
-      user: "Tuấn Anh",
-      action: "Yêu cầu bảo dưỡng",
-      time: "1 giờ trước",
-      type: "warning",
-    },
-    {
-      id: 4,
-      user: "Hồng Nhung",
-      action: "Tranh chấp lịch sử dụng",
-      time: "2 giờ trước",
-      type: "error",
-    },
-    {
-      id: 5,
-      user: "Văn Nam",
-      action: "Đăng ký thành viên mới",
-      time: "3 giờ trước",
-      type: "info",
-    },
-  ];
+  const recentActivities = notifications.slice(0, 5).map(notif => ({
+    id: notif.id,
+    user: notif.title,
+    action: notif.message,
+    time: notif.time,
+    type: notif.type
+  }));
 
   const carGroups = [
     {
