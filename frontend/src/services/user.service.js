@@ -137,6 +137,29 @@ class UserService {
     return response;
   }
 
+  /**
+   * Update member role in group
+   * PUT /user/groups/:groupId/members/:userId/role
+   */
+  async updateGroupMemberRole(groupId, userId, role) {
+    const response = await apiClient.put(
+      `/user/groups/${groupId}/members/${userId}/role`,
+      { role }
+    );
+    return response;
+  }
+
+  /**
+   * Approve pending group member
+   * POST /user/groups/:groupId/members/:userId/approve
+   */
+  async approveGroupMember(groupId, userId) {
+    const response = await apiClient.post(
+      `/user/groups/${groupId}/members/${userId}/approve`
+    );
+    return response;
+  }
+
   // ==================== VOTING ====================
 
   /**
