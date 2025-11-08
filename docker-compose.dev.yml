@@ -211,6 +211,85 @@ services:
       timeout: 5s
       retries: 3
 
+  # Apache NiFi - Data Flow Orchestration & ETL
+  nifi:
+    image: apache/nifi:2.0.0
+    container_name: ev_nifi
+    ports:
+      - "8443:8443"  # HTTPS UI
+      - "8080:8080"  # HTTP UI (dev mode)
+    environment:
+      # Single User Authentication (dev mode)
+      SINGLE_USER_CREDENTIALS_USERNAME: admin
+      SINGLE_USER_CREDENTIALS_PASSWORD: nifiAdminPassword123
+      NIFI_WEB_HTTP_PORT: 8080
+      NIFI_WEB_HTTPS_PORT: 8443
+      NIFI_JVM_HEAP_INIT: 1g
+      NIFI_JVM_HEAP_MAX: 2g
+      # Database connection parameters for processors
+      POSTGRES_AUTH_URL: jdbc:postgresql://postgres-auth:5432/auth_db
+      POSTGRES_USER_URL: jdbc:postgresql://postgres-user:5432/user_db
+      POSTGRES_BOOKING_URL: jdbc:postgresql://postgres-booking:5432/booking_db
+      POSTGRES_COST_URL: jdbc:postgresql://postgres-cost:5432/cost_db
+      POSTGRES_VEHICLE_URL: jdbc:postgresql://postgres-vehicle:5432/vehicle_db
+      POSTGRES_CONTRACT_URL: jdbc:postgresql://postgres-contract:5432/contract_db
+      POSTGRES_ADMIN_URL: jdbc:postgresql://postgres-admin:5432/admin_db
+      POSTGRES_NOTIFICATION_URL: jdbc:postgresql://postgres-notification:5432/notification_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+      # MongoDB connection
+      MONGODB_URI: mongodb://admin:admin123@mongodb:27017
+      # RabbitMQ connection
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: admin
+      RABBITMQ_PASSWORD: admin123
+      # Redis connection
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis123
+    volumes:
+      - nifi_data:/opt/nifi/nifi-current/conf
+      - nifi_database_repository:/opt/nifi/nifi-current/database_repository
+      - nifi_flowfile_repository:/opt/nifi/nifi-current/flowfile_repository
+      - nifi_content_repository:/opt/nifi/nifi-current/content_repository
+      - nifi_provenance_repository:/opt/nifi/nifi-current/provenance_repository
+      - nifi_state:/opt/nifi/nifi-current/state
+      - nifi_logs:/opt/nifi/nifi-current/logs
+      - ./infrastructure/nifi/templates:/opt/nifi/nifi-current/templates
+      - ./infrastructure/nifi/drivers:/opt/nifi/nifi-current/lib/drivers
+    networks:
+      - ev_network
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+      postgres-user:
+        condition: service_healthy
+      postgres-booking:
+        condition: service_healthy
+      postgres-cost:
+        condition: service_healthy
+      postgres-vehicle:
+        condition: service_healthy
+      postgres-contract:
+        condition: service_healthy
+      postgres-admin:
+        condition: service_healthy
+      postgres-notification:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/nifi-api/system-diagnostics || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
   # ========== DEVELOPMENT SERVICES WITH PROFILES ==========
   
   # API Gateway - Development
@@ -597,3 +676,10 @@ volumes:
   mongodb_data:
   redis_data:
   rabbitmq_data:
+  nifi_data:
+  nifi_database_repository:
+  nifi_flowfile_repository:
+  nifi_content_repository:
+  nifi_provenance_repository:
+  nifi_state:
+  nifi_logs:
