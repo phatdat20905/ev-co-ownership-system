@@ -1,66 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Calendar, Clock, MapPin, Car, Users, Plus, Filter, Search, ChevronLeft, ChevronRight, Battery, Zap } from 'lucide-react';
 import Header from '../../../../components/layout/Header';
 import Footer from '../../../../components/layout/Footer';
+import { bookingService, vehicleService } from '../../../../services';
+import { showSuccessToast, showErrorToast } from '../../../../utils/toast';
 
 export default function BookingCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [view, setView] = useState('month'); 
+  const [bookings, setBookings] = useState([]);
+  const [cars, setCars] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data - lịch đặt xe
-  const bookings = [
-    {
-      id: 1,
-      car: 'Tesla Model 3',
-      start: new Date(2024, 0, 15, 9, 0),
-      end: new Date(2024, 0, 15, 12, 0),
-      user: 'Nguyễn Văn A',
-      status: 'confirmed',
-      type: 'business'
-    },
-    {
-      id: 2,
-      car: 'VinFast VF e34',
-      start: new Date(2024, 0, 16, 14, 0),
-      end: new Date(2024, 0, 16, 18, 0),
-      user: 'Trần Thị B',
-      status: 'confirmed',
-      type: 'personal'
-    },
-    {
-      id: 3,
-      car: 'Tesla Model 3',
-      start: new Date(2024, 0, 18, 10, 0),
-      end: new Date(2024, 0, 18, 15, 0),
-      user: 'Lê Văn C',
-      status: 'pending',
-      type: 'family'
-    }
-  ];
+  // Fetch bookings and vehicles data
+  useEffect(() => {
+    fetchData();
+  }, [currentDate]);
 
-  const cars = [
-    {
-      id: 1,
-      name: 'Tesla Model 3',
-      model: '2023 Long Range',
-      battery: 85,
-      range: '420 km',
-      status: 'available',
-      location: 'Q.1, TP.HCM'
-    },
-    {
-      id: 2,
-      name: 'VinFast VF e34',
-      model: '2023 Premium',
-      battery: 90,
-      range: '320 km',
-      status: 'available',
-      location: 'Q.7, TP.HCM'
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      // Get start and end of current month
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+      const startDate = new Date(year, month, 1).toISOString();
+      const endDate = new Date(year, month + 1, 0).toISOString();
+
+      const [bookingsResponse, vehiclesResponse] = await Promise.all([
+        bookingService.getUserBookings({ startDate, endDate }),
+        vehicleService.getVehicles({ status: 'available' })
+      ]);
+
+      if (bookingsResponse.success) {
+        // Convert ISO dates to Date objects
+        const formattedBookings = bookingsResponse.data.map(booking => ({
+          ...booking,
+          start: new Date(booking.startTime),
+          end: new Date(booking.endTime),
+        }));
+        setBookings(formattedBookings);
+      }
+
+      if (vehiclesResponse.success) {
+        setCars(vehiclesResponse.data);
+      }
+    } catch (error) {
+      showErrorToast('Không thể tải dữ liệu lịch đặt xe');
+      console.error('Failed to fetch booking data:', error);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -114,6 +107,26 @@ export default function BookingCalendar() {
       booking.start.toDateString() === date.toDateString()
     );
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50">
+        <Header />
+        <div className="pt-20">
+          <div className="max-w-7xl mx-auto px-6 py-8">
+            <div className="animate-pulse">
+              <div className="h-12 bg-gray-200 rounded w-1/3 mb-6"></div>
+              <div className="grid grid-cols-7 gap-4">
+                {[...Array(35)].map((_, i) => (
+                  <div key={i} className="h-24 bg-gray-200 rounded"></div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50">

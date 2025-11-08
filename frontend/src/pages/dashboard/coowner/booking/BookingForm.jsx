@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, Car, MapPin, Users, FileText, Zap, Battery, CheckCircle } from 'lucide-react';
 import Header from '../../../../components/layout/Header';
 import Footer from '../../../../components/layout/Footer';
+import { bookingService, vehicleService } from '../../../../services';
+import { showSuccessToast, showErrorToast } from '../../../../utils/toast';
 
 export default function BookingForm() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    car: '',
+    vehicleId: '',
     startDate: '',
     startTime: '',
     endDate: '',
@@ -17,29 +19,30 @@ export default function BookingForm() {
     passengers: 1,
     notes: ''
   });
+  const [cars, setCars] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
-  const cars = [
-    {
-      id: 1,
-      name: 'Tesla Model 3',
-      model: '2023 Long Range',
-      battery: 85,
-      range: '420 km',
-      location: 'Q.1, TP.HCM',
-      image: '/api/placeholder/300/200',
-      efficiency: '6.2 km/kWh'
-    },
-    {
-      id: 2,
-      name: 'VinFast VF e34',
-      model: '2023 Premium',
-      battery: 90,
-      range: '320 km',
-      location: 'Q.7, TP.HCM',
-      image: '/api/placeholder/300/200',
-      efficiency: '5.8 km/kWh'
-    }
-  ];
+  // Fetch available vehicles
+  useEffect(() => {
+    const fetchVehicles = async () => {
+      setLoading(true);
+      try {
+        const response = await vehicleService.getVehicles({ status: 'available' });
+        
+        if (response.success) {
+          setCars(response.data);
+        }
+      } catch (error) {
+        showErrorToast('Không thể tải danh sách xe');
+        console.error('Failed to fetch vehicles:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchVehicles();
+  }, []);
 
   const purposes = [
     { value: 'business', label: 'Công việc', icon: FileText },
@@ -48,12 +51,43 @@ export default function BookingForm() {
     { value: 'travel', label: 'Du lịch', icon: MapPin }
   ];
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Xử lý đặt lịch
-    setTimeout(() => {
-      navigate('/dashboard/coowner/booking');
-    }, 1500);
+    
+    // Validate form
+    if (!formData.vehicleId || !formData.startDate || !formData.startTime || !formData.endDate || !formData.endTime) {
+      showErrorToast('Vui lòng điền đầy đủ thông tin');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      // Combine date and time into ISO strings
+      const startDateTime = new Date(`${formData.startDate}T${formData.startTime}`).toISOString();
+      const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`).toISOString();
+
+      const bookingData = {
+        vehicleId: formData.vehicleId,
+        startTime: startDateTime,
+        endTime: endDateTime,
+        purpose: formData.purpose,
+        passengerCount: parseInt(formData.passengers),
+        notes: formData.notes
+      };
+
+      const response = await bookingService.createBooking(bookingData);
+      
+      if (response.success) {
+        showSuccessToast('Đặt lịch thành công!');
+        setTimeout(() => {
+          navigate('/dashboard/coowner/booking');
+        }, 1500);
+      }
+    } catch (error) {
+      showErrorToast(error.response?.data?.message || 'Đặt lịch thất bại. Vui lòng thử lại.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleInputChange = (field, value) => {
@@ -63,7 +97,34 @@ export default function BookingForm() {
     }));
   };
 
-  const selectedCar = cars.find(car => car.id === parseInt(formData.car));
+  const selectedCar = cars.find(car => car.id === formData.vehicleId);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50">
+        <Header />
+        <div className="pt-20">
+          <div className="max-w-6xl mx-auto px-6 py-8">
+            <div className="animate-pulse">
+              <div className="h-8 bg-gray-200 rounded w-1/3 mb-6"></div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 bg-white rounded-2xl p-6">
+                  <div className="space-y-4">
+                    {[...Array(6)].map((_, i) => (
+                      <div key={i} className="h-16 bg-gray-200 rounded"></div>
+                    ))}
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl p-6">
+                  <div className="h-64 bg-gray-200 rounded"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50">
@@ -116,9 +177,9 @@ export default function BookingForm() {
                       <motion.div
                         key={car.id}
                         whileHover={{ scale: 1.02 }}
-                        onClick={() => handleInputChange('car', car.id)}
+                        onClick={() => handleInputChange('vehicleId', car.id)}
                         className={`p-6 rounded-2xl border-2 cursor-pointer transition-all ${
-                          formData.car === car.id.toString()
+                          formData.vehicleId === car.id
                             ? 'border-sky-500 bg-sky-50'
                             : 'border-gray-200 hover:border-gray-300 bg-white'
                         }`}
