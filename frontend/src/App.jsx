@@ -9,6 +9,7 @@ import DisputeManagement from "./pages/admin/DisputeManagement";
 import FinancialReports from "./pages/admin/FinancialReports";
 import StaffManagement from "./pages/admin/StaffManagement";
 import AdminProfile from "./pages/admin/AdminProfile";
+import KYCVerification from "./pages/admin/KYCVerification";
 
 // Shared Pages (dùng chung cho admin và staff)
 import CarManagement from "./pages/shared/CarManagement";
@@ -88,6 +89,7 @@ export default function App() {
         <Route path="/admin/profile" element={<AdminProfile />} />
         <Route path="/admin/disputes" element={<DisputeManagement />} />
         <Route path="/admin/financial-reports" element={<FinancialReports />} />
+        <Route path="/admin/kyc" element={<KYCVerification />} />
 
         {/* Shared Management Routes - Dùng chung cho Admin và Staff */}
         <Route path="/admin/cars" element={<CarManagement />} />
