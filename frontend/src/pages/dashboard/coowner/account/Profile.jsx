@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { User, Mail, Phone, MapPin, Calendar, Shield, Bell, CreditCard, FileText, Camera, Save, Edit, CheckCircle, X, Eye, EyeOff } from "lucide-react";
+import { User, Mail, Phone, MapPin, Calendar, Shield, Bell, CreditCard, FileText, Camera, Save, Edit, CheckCircle, X, Eye, EyeOff, Upload, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { motion } from "framer-motion";
 import Header from "../../../../components/layout/Header";
 import Footer from "../../../../components/layout/Footer";
@@ -26,6 +26,24 @@ export default function Profile() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // KYC state
+  const [showKYCForm, setShowKYCForm] = useState(false);
+  const [kycStatus, setKycStatus] = useState(null);
+  const [kycData, setKycData] = useState({
+    idCardNumber: '',
+    driverLicenseNumber: '',
+    idCardFront: null,
+    idCardBack: null,
+    selfie: null,
+    driverLicense: null
+  });
+  const [kycPreviews, setKycPreviews] = useState({
+    idCardFront: null,
+    idCardBack: null,
+    selfie: null,
+    driverLicense: null
+  });
+
   // Fetch user data from API
   useEffect(() => {
     const fetchUserData = async () => {
@@ -46,6 +64,23 @@ export default function Profile() {
     };
 
     fetchUserData();
+  }, []);
+
+  // Fetch KYC status
+  useEffect(() => {
+    const fetchKYCStatus = async () => {
+      try {
+        const response = await authService.getKYCStatus();
+        if (response.success) {
+          setKycStatus(response.data);
+        }
+      } catch (error) {
+        // KYC not submitted yet - not an error
+        console.log('No KYC submission found');
+      }
+    };
+
+    fetchKYCStatus();
   }, []);
 
   // Hàm xử lý chọn ảnh
@@ -171,6 +206,129 @@ export default function Profile() {
       showErrorToast(error.response?.data?.message || 'Đổi mật khẩu thất bại');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // KYC Handlers
+  const handleKYCFileChange = (field, event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      showErrorToast('Chỉ chấp nhận file ảnh');
+      return;
+    }
+
+    // Validate file size (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      showErrorToast('Kích thước file không được vượt quá 10MB');
+      return;
+    }
+
+    // Update file in state
+    setKycData(prev => ({ ...prev, [field]: file }));
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setKycPreviews(prev => ({ ...prev, [field]: reader.result }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleKYCSubmit = async () => {
+    // Validation
+    if (!kycData.idCardNumber) {
+      showErrorToast('Vui lòng nhập số CCCD/CMT');
+      return;
+    }
+
+    if (!kycData.idCardFront || !kycData.idCardBack || !kycData.selfie) {
+      showErrorToast('Vui lòng upload đầy đủ: CCCD mặt trước, mặt sau và ảnh chân dung');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Create FormData
+      const formData = new FormData();
+      formData.append('idCardNumber', kycData.idCardNumber);
+      if (kycData.driverLicenseNumber) {
+        formData.append('driverLicenseNumber', kycData.driverLicenseNumber);
+      }
+      formData.append('idCardFront', kycData.idCardFront);
+      formData.append('idCardBack', kycData.idCardBack);
+      formData.append('selfie', kycData.selfie);
+      if (kycData.driverLicense) {
+        formData.append('driverLicense', kycData.driverLicense);
+      }
+
+      const response = await authService.submitKYC(formData);
+
+      if (response.success) {
+        showSuccessToast('Nộp hồ sơ xác thực thành công! Vui lòng chờ admin duyệt.');
+        setShowKYCForm(false);
+        
+        // Reload KYC status
+        const statusResponse = await authService.getKYCStatus();
+        if (statusResponse.success) {
+          setKycStatus(statusResponse.data);
+        }
+
+        // Reset form
+        setKycData({
+          idCardNumber: '',
+          driverLicenseNumber: '',
+          idCardFront: null,
+          idCardBack: null,
+          selfie: null,
+          driverLicense: null
+        });
+        setKycPreviews({
+          idCardFront: null,
+          idCardBack: null,
+          selfie: null,
+          driverLicense: null
+        });
+      }
+    } catch (error) {
+      showErrorToast(error.response?.data?.message || 'Nộp hồ sơ thất bại');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getKYCStatusBadge = () => {
+    if (!kycStatus) {
+      return <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm">Chưa xác thực</span>;
+    }
+
+    switch (kycStatus.verificationStatus) {
+      case 'pending':
+        return (
+          <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm flex items-center gap-1">
+            <Clock className="h-4 w-4" />
+            Đang chờ duyệt
+          </span>
+        );
+      case 'approved':
+        return (
+          <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm flex items-center gap-1">
+            <CheckCircle2 className="h-4 w-4" />
+            Đã xác thực
+          </span>
+        );
+      case 'rejected':
+        return (
+          <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm flex items-center gap-1">
+            <XCircle className="h-4 w-4" />
+            Bị từ chối
+          </span>
+        );
+      default:
+        return <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm">Chưa xác thực</span>;
     }
   };
 
@@ -635,6 +793,226 @@ export default function Profile() {
                         </div>
                       </div>
                     )}
+
+                    {/* KYC Verification Section */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 border border-gray-200 rounded-xl">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h4 className="font-medium text-gray-900">Xác thực danh tính (KYC)</h4>
+                            {getKYCStatusBadge()}
+                          </div>
+                          <p className="text-sm text-gray-600">
+                            {kycStatus?.verificationStatus === 'approved' 
+                              ? 'Tài khoản của bạn đã được xác thực'
+                              : kycStatus?.verificationStatus === 'pending'
+                              ? 'Hồ sơ của bạn đang được xem xét'
+                              : kycStatus?.verificationStatus === 'rejected'
+                              ? `Bị từ chối: ${kycStatus.rejectionReason || 'Vui lòng nộp lại'}`
+                              : 'Xác thực để sử dụng đầy đủ tính năng'}
+                          </p>
+                        </div>
+                        {kycStatus?.verificationStatus !== 'approved' && kycStatus?.verificationStatus !== 'pending' && (
+                          <button 
+                            onClick={() => setShowKYCForm(!showKYCForm)}
+                            className="px-4 py-2 bg-sky-600 text-white rounded-xl hover:bg-sky-700 transition-colors"
+                          >
+                            {showKYCForm ? 'Đóng' : 'Xác thực ngay'}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* KYC Form */}
+                      {showKYCForm && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="border border-gray-200 rounded-xl p-6 space-y-6"
+                        >
+                          <h4 className="font-semibold text-gray-900">Nộp hồ sơ xác thực</h4>
+
+                          {/* ID Card Number */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Số CCCD/CMT <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={kycData.idCardNumber}
+                              onChange={(e) => setKycData(prev => ({ ...prev, idCardNumber: e.target.value }))}
+                              placeholder="Nhập số CCCD/CMT (9-12 chữ số)"
+                              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                            />
+                          </div>
+
+                          {/* Driver License Number */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Số Bằng lái xe (Không bắt buộc)
+                            </label>
+                            <input
+                              type="text"
+                              value={kycData.driverLicenseNumber}
+                              onChange={(e) => setKycData(prev => ({ ...prev, driverLicenseNumber: e.target.value }))}
+                              placeholder="Nhập số bằng lái (nếu có)"
+                              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                            />
+                          </div>
+
+                          {/* File Uploads */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* ID Card Front */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                CCCD mặt trước <span className="text-red-500">*</span>
+                              </label>
+                              <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 hover:border-sky-500 transition-colors cursor-pointer">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => handleKYCFileChange('idCardFront', e)}
+                                  className="hidden"
+                                  id="idCardFront"
+                                />
+                                <label htmlFor="idCardFront" className="cursor-pointer">
+                                  {kycPreviews.idCardFront ? (
+                                    <img src={kycPreviews.idCardFront} alt="CCCD mặt trước" className="w-full h-32 object-cover rounded" />
+                                  ) : (
+                                    <div className="flex flex-col items-center justify-center h-32">
+                                      <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                                      <span className="text-sm text-gray-500">Tải lên ảnh</span>
+                                    </div>
+                                  )}
+                                </label>
+                              </div>
+                            </div>
+
+                            {/* ID Card Back */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                CCCD mặt sau <span className="text-red-500">*</span>
+                              </label>
+                              <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 hover:border-sky-500 transition-colors cursor-pointer">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => handleKYCFileChange('idCardBack', e)}
+                                  className="hidden"
+                                  id="idCardBack"
+                                />
+                                <label htmlFor="idCardBack" className="cursor-pointer">
+                                  {kycPreviews.idCardBack ? (
+                                    <img src={kycPreviews.idCardBack} alt="CCCD mặt sau" className="w-full h-32 object-cover rounded" />
+                                  ) : (
+                                    <div className="flex flex-col items-center justify-center h-32">
+                                      <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                                      <span className="text-sm text-gray-500">Tải lên ảnh</span>
+                                    </div>
+                                  )}
+                                </label>
+                              </div>
+                            </div>
+
+                            {/* Selfie */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Ảnh chân dung <span className="text-red-500">*</span>
+                              </label>
+                              <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 hover:border-sky-500 transition-colors cursor-pointer">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => handleKYCFileChange('selfie', e)}
+                                  className="hidden"
+                                  id="selfie"
+                                />
+                                <label htmlFor="selfie" className="cursor-pointer">
+                                  {kycPreviews.selfie ? (
+                                    <img src={kycPreviews.selfie} alt="Ảnh chân dung" className="w-full h-32 object-cover rounded" />
+                                  ) : (
+                                    <div className="flex flex-col items-center justify-center h-32">
+                                      <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                                      <span className="text-sm text-gray-500">Tải lên ảnh</span>
+                                    </div>
+                                  )}
+                                </label>
+                              </div>
+                            </div>
+
+                            {/* Driver License */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Bằng lái xe (Không bắt buộc)
+                              </label>
+                              <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 hover:border-sky-500 transition-colors cursor-pointer">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => handleKYCFileChange('driverLicense', e)}
+                                  className="hidden"
+                                  id="driverLicense"
+                                />
+                                <label htmlFor="driverLicense" className="cursor-pointer">
+                                  {kycPreviews.driverLicense ? (
+                                    <img src={kycPreviews.driverLicense} alt="Bằng lái" className="w-full h-32 object-cover rounded" />
+                                  ) : (
+                                    <div className="flex flex-col items-center justify-center h-32">
+                                      <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                                      <span className="text-sm text-gray-500">Tải lên ảnh</span>
+                                    </div>
+                                  )}
+                                </label>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Info Note */}
+                          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                            <h5 className="font-medium text-blue-900 mb-2">Lưu ý:</h5>
+                            <ul className="text-sm text-blue-700 space-y-1 list-disc list-inside">
+                              <li>File ảnh phải rõ nét, đầy đủ thông tin</li>
+                              <li>Kích thước tối đa: 10MB mỗi file</li>
+                              <li>Định dạng: JPG, PNG, GIF, WEBP</li>
+                              <li>Hồ sơ sẽ được xem xét trong vòng 1-3 ngày làm việc</li>
+                            </ul>
+                          </div>
+
+                          {/* Submit Buttons */}
+                          <div className="flex gap-3 justify-end">
+                            <button
+                              onClick={() => {
+                                setShowKYCForm(false);
+                                setKycData({
+                                  idCardNumber: '',
+                                  driverLicenseNumber: '',
+                                  idCardFront: null,
+                                  idCardBack: null,
+                                  selfie: null,
+                                  driverLicense: null
+                                });
+                                setKycPreviews({
+                                  idCardFront: null,
+                                  idCardBack: null,
+                                  selfie: null,
+                                  driverLicense: null
+                                });
+                              }}
+                              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
+                            >
+                              Hủy
+                            </button>
+                            <button
+                              onClick={handleKYCSubmit}
+                              disabled={loading}
+                              className="px-6 py-3 bg-sky-600 text-white rounded-xl hover:bg-sky-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {loading ? 'Đang xử lý...' : 'Nộp hồ sơ'}
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </div>
 
                     <div className="space-y-4">
                       <div className="flex items-center justify-between p-4 border border-gray-200 rounded-xl">
