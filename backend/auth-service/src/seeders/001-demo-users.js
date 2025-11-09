@@ -8,7 +8,7 @@ export default {
       {
         id: '11111111-1111-1111-1111-111111111111',
         email: 'admin@evcoownership.com',
-        phone: '+84123456789',
+        phone: '0123456789',
         password_hash: hashedPassword,
         role: 'admin',
         is_verified: true,
@@ -19,7 +19,7 @@ export default {
       {
         id: '22222222-2222-2222-2222-222222222222',
         email: 'staff@evcoownership.com',
-        phone: '+84123456780',
+        phone: '0123456780',
         password_hash: hashedPassword,
         role: 'staff',
         is_verified: true,
@@ -30,7 +30,7 @@ export default {
       {
         id: '33333333-3333-3333-3333-333333333333',
         email: 'coowner1@example.com',
-        phone: '+84123456781',
+        phone: '0123456781',
         password_hash: hashedPassword,
         role: 'co_owner',
         is_verified: true,
@@ -41,7 +41,7 @@ export default {
       {
         id: '44444444-4444-4444-4444-444444444444',
         email: 'coowner2@example.com',
-        phone: '+84123456782',
+        phone: '0123456782',
         password_hash: hashedPassword,
         role: 'co_owner',
         is_verified: false,

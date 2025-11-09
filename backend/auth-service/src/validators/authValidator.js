@@ -16,8 +16,11 @@ export const registerValidator = Joi.object({
 });
 
 export const loginValidator = Joi.object({
-  email: Joi.string().email().required(),
+  email: Joi.string().email().optional(),
+  phone: Joi.string().pattern(/^\+?[0-9]{10,15}$/).optional(),
   password: Joi.string().required()
+}).or('email', 'phone').messages({
+  'object.missing': 'Either email or phone is required'
 });
 
 export const refreshTokenValidator = Joi.object({

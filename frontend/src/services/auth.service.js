@@ -24,9 +24,16 @@ class AuthService {
     
     // Store auth data if login successful
     if (response.success && response.data) {
-      const { token, user } = response.data;
-      localStorage.setItem('authToken', token);
+      const { accessToken, token, refreshToken, user } = response.data;
+      // Support both accessToken (backend) and token (legacy)
+      const authToken = accessToken || token;
+      
+      localStorage.setItem('authToken', authToken);
       localStorage.setItem('userData', JSON.stringify(user));
+      
+      if (refreshToken) {
+        localStorage.setItem('refreshToken', refreshToken);
+      }
       
       // Set expiry (7 days from now)
       const expiryDate = new Date();

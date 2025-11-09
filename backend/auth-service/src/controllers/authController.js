@@ -29,15 +29,21 @@ export class AuthController {
 
   async login(req, res, next) {
     try {
-      const { email, password } = req.body;
+      // Support both email and phone
+      const { email, phone, password } = req.body;
+      const identifier = email || phone;
 
-      const result = await authService.login(email, password);
+      if (!identifier) {
+        throw new AppError('Email or phone is required', 400, 'MISSING_CREDENTIALS');
+      }
 
-      logger.info('User login successful', { email });
+      const result = await authService.login(identifier, password);
+
+      logger.info('User login successful', { identifier: identifier.includes('@') ? 'email' : 'phone' });
 
       return successResponse(res, 'Login successful', result);
     } catch (error) {
-      logger.warn('User login failed', { error: error.message, email: req.body.email });
+      logger.warn('User login failed', { error: error.message });
       next(error);
     }
   }

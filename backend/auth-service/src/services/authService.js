@@ -76,15 +76,21 @@ export class AuthService {
     }
   }
 
-  async login(email, password) {
+  async login(identifier, password) {
     try {
-      const user = await db.User.findOne({ where: { email } });
+      // Support both email and phone login
+      const isEmail = identifier.includes('@');
+      const whereClause = isEmail 
+        ? { email: identifier }
+        : { phone: identifier };
 
-      if (!user) throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
+      const user = await db.User.findOne({ where: whereClause });
+
+      if (!user) throw new AppError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
       if (!user.isActive) throw new AppError('Account is disabled', 401, 'ACCOUNT_DISABLED');
 
       const isValidPassword = await user.validatePassword(password);
-      if (!isValidPassword) throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
+      if (!isValidPassword) throw new AppError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
 
       await user.update({ lastLoginAt: new Date() });
 
@@ -104,11 +110,11 @@ export class AuthService {
         loginTime: new Date().toISOString()
       }).catch(error => logger.error('Failed to publish user logged in event', { error: error.message, userId: user.id }));
 
-      logger.info('User logged in successfully', { userId: user.id, email: user.email });
+      logger.info('User logged in successfully', { userId: user.id, identifier: isEmail ? 'email' : 'phone' });
 
       return { user: user.toJSON(), accessToken, refreshToken };
     } catch (error) {
-      logger.error('User login failed', { error: error.message, email });
+      logger.error('User login failed', { error: error.message, identifier });
       throw error;
     }
   }
