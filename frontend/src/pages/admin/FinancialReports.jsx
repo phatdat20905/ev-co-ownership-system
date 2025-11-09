@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { BarChart3, Download, Filter, Calendar, DollarSign, Users, Car, QrCode, TrendingUp, TrendingDown, Eye, FileText, PieChart, CreditCard, Wallet, ChevronDown, X, MoreVertical, Bell, User, LogOut, Menu, AlertTriangle, Wrench } from "lucide-react";
+import adminService from "../../services/admin.service";
+import { toast } from "../../utils/toast";
 
 const FinancialReports = () => {
   const navigate = useNavigate();
@@ -12,6 +14,12 @@ const FinancialReports = () => {
   const [selectedReport, setSelectedReport] = useState(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
+  // API State
+  const [financialData, setFinancialData] = useState(null);
+  const [userAnalytics, setUserAnalytics] = useState(null);
+  const [bookingAnalytics, setBookingAnalytics] = useState(null);
+  const [loading, setLoading] = useState(true);
+
   // Thêm state cho dropdown menus
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -19,6 +27,79 @@ const FinancialReports = () => {
   // Refs để detect click outside
   const userMenuRef = useRef(null);
   const notificationsRef = useRef(null);
+
+  // Fetch data when dateRange changes
+  useEffect(() => {
+    fetchAnalyticsData();
+  }, [dateRange]);
+
+  const fetchAnalyticsData = async () => {
+    try {
+      setLoading(true);
+      const { startDate, endDate } = getDateRangeValues(dateRange);
+      
+      const [financial, users, bookings] = await Promise.all([
+        adminService.getFinancialAnalytics(startDate, endDate),
+        adminService.getUserAnalytics(startDate, endDate),
+        adminService.getBookingAnalytics(startDate, endDate)
+      ]);
+
+      setFinancialData(financial.data);
+      setUserAnalytics(users.data);
+      setBookingAnalytics(bookings.data);
+    } catch (error) {
+      console.error("Error fetching analytics:", error);
+      toast.error("Không thể tải dữ liệu báo cáo");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getDateRangeValues = (range) => {
+    const now = new Date();
+    let startDate, endDate = now.toISOString();
+
+    switch (range) {
+      case "week":
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        break;
+      case "month":
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        break;
+      case "quarter":
+        const quarter = Math.floor(now.getMonth() / 3);
+        startDate = new Date(now.getFullYear(), quarter * 3, 1).toISOString();
+        break;
+      case "year":
+        startDate = new Date(now.getFullYear(), 0, 1).toISOString();
+        break;
+      default:
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    }
+
+    return { startDate, endDate };
+  };
+
+  const handleExportReport = async (reportType) => {
+    try {
+      const { startDate, endDate } = getDateRangeValues(dateRange);
+      const response = await adminService.exportAnalytics(reportType, startDate, endDate);
+      
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `report_${reportType}_${dateRange}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+      toast.success("Đã xuất báo cáo thành công");
+    } catch (error) {
+      console.error("Error exporting report:", error);
+      toast.error("Không thể xuất báo cáo");
+    }
+  };
 
   // Notifications data
   const [notifications, setNotifications] = useState([
@@ -74,92 +155,19 @@ const FinancialReports = () => {
 
   const activeTab = getActiveTab();
 
-  const financialData = {
-    revenue: {
-      current: 184500000,
-      previous: 156200000,
-      growth: 18.1
-    },
-    expenses: {
-      current: 89200000,
-      previous: 78450000,
-      growth: 13.7
-    },
-    profit: {
-      current: 95300000,
-      previous: 77750000,
-      growth: 22.6
-    },
-    utilization: {
-      current: 76,
-      previous: 72,
-      growth: 5.6
-    }
+  const unreadNotifications = notifications.filter(n => !n.read).length;
+
+  // Extract data từ API responses với safe defaults
+  const safeFinancialData = financialData || {
+    revenue: { current: 0, previous: 0, growth: 0 },
+    expenses: { current: 0, previous: 0, growth: 0 },
+    profit: { current: 0, previous: 0, growth: 0 },
+    utilization: { current: 0, previous: 0, growth: 0 }
   };
 
-  const revenueBreakdown = [
-    { category: "Thuê bao cơ bản", amount: 65400000, percentage: 35.4, trend: "up" },
-    { category: "Phí sử dụng", amount: 48300000, percentage: 26.2, trend: "up" },
-    { category: "Phí bảo dưỡng", amount: 31200000, percentage: 16.9, trend: "down" },
-    { category: "Phí bảo hiểm", amount: 25600000, percentage: 13.9, trend: "up" },
-    { category: "Khác", amount: 14000000, percentage: 7.6, trend: "up" }
-  ];
-
-  const expenseBreakdown = [
-    { category: "Sạc điện", amount: 32400000, percentage: 36.3, trend: "up" },
-    { category: "Bảo dưỡng", amount: 22800000, percentage: 25.6, trend: "down" },
-    { category: "Bảo hiểm", amount: 15600000, percentage: 17.5, trend: "stable" },
-    { category: "Nhân sự", amount: 11200000, percentage: 12.6, trend: "stable" },
-    { category: "Khác", amount: 7200000, percentage: 8.1, trend: "up" }
-  ];
-
-  const reports = [
-    {
-      id: 1,
-      title: "Báo cáo doanh thu tháng 11/2024",
-      type: "Doanh thu",
-      period: "01/11/2024 - 30/11/2024",
-      generatedDate: "01/12/2024",
-      size: "2.4 MB",
-      status: "completed"
-    },
-    {
-      id: 2,
-      title: "Báo cáo chi phí vận hành",
-      type: "Chi phí",
-      period: "01/10/2024 - 31/10/2024",
-      generatedDate: "01/11/2024",
-      size: "1.8 MB",
-      status: "completed"
-    },
-    {
-      id: 3,
-      title: "Báo cáo tài chính quý 4/2024",
-      type: "Tổng hợp",
-      period: "01/10/2024 - 31/12/2024",
-      generatedDate: "Đang xử lý",
-      size: "-",
-      status: "processing"
-    },
-    {
-      id: 4,
-      title: "Phân tích hiệu quả đầu tư",
-      type: "Phân tích",
-      period: "01/01/2024 - 30/11/2024",
-      generatedDate: "25/11/2024",
-      size: "3.1 MB",
-      status: "completed"
-    }
-  ];
-
-  const carPerformance = [
-    { name: "VF e34", revenue: 18450000, utilization: 78, cost: 4200000, profit: 14250000 },
-    { name: "VF 8", revenue: 15680000, utilization: 65, cost: 3800000, profit: 11880000 },
-    { name: "VF 9", revenue: 21450000, utilization: 82, cost: 5200000, profit: 16250000 },
-    { name: "VF e34", revenue: 17230000, utilization: 71, cost: 4100000, profit: 13130000 }
-  ];
-
-  const unreadNotifications = notifications.filter(n => !n.read).length;
+  const revenueBreakdown = financialData?.revenueBreakdown || [];
+  const expenseBreakdown = financialData?.expenseBreakdown || [];
+  const carPerformance = bookingAnalytics?.carPerformance || [];
 
   const StatCard = ({ title, value, change, icon, color }) => (
     <motion.div
@@ -434,6 +442,7 @@ const FinancialReports = () => {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
+                onClick={() => handleExportReport('financial')}
                 className="bg-blue-600 text-white px-4 lg:px-6 py-2 lg:py-3 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors shadow-sm text-sm lg:text-base"
               >
                 <Download className="w-4 h-4 lg:w-5 lg:h-5" />
@@ -508,33 +517,43 @@ const FinancialReports = () => {
             )}
           </AnimatePresence>
 
+          {/* Loading State */}
+          {loading && (
+            <div className="text-center py-12">
+              <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+              <p className="text-gray-600">Đang tải dữ liệu báo cáo...</p>
+            </div>
+          )}
+
           {/* Financial Overview */}
+          {!loading && (
+          <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-6 lg:mb-8">
             <StatCard
               title="Tổng doanh thu"
-              value={financialData.revenue.current}
-              change={financialData.revenue.growth}
+              value={safeFinancialData.revenue.current}
+              change={safeFinancialData.revenue.growth}
               icon={<DollarSign className="w-4 h-4 lg:w-6 lg:h-6" />}
               color="bg-green-500"
             />
             <StatCard
               title="Tổng chi phí"
-              value={financialData.expenses.current}
-              change={financialData.expenses.growth}
+              value={safeFinancialData.expenses.current}
+              change={safeFinancialData.expenses.growth}
               icon={<CreditCard className="w-4 h-4 lg:w-6 lg:h-6" />}
               color="bg-red-500"
             />
             <StatCard
               title="Lợi nhuận"
-              value={financialData.profit.current}
-              change={financialData.profit.growth}
+              value={safeFinancialData.profit.current}
+              change={safeFinancialData.profit.growth}
               icon={<TrendingUp className="w-4 h-4 lg:w-6 lg:h-6" />}
               color="bg-blue-500"
             />
             <StatCard
               title="Tỷ lệ sử dụng"
-              value={financialData.utilization.current + '%'}
-              change={financialData.utilization.growth}
+              value={safeFinancialData.utilization.current + '%'}
+              change={safeFinancialData.utilization.growth}
               icon={<BarChart3 className="w-4 h-4 lg:w-6 lg:h-6" />}
               color="bg-purple-500"
             />
@@ -745,6 +764,8 @@ const FinancialReports = () => {
               </table>
             </div>
           </div>
+          </>
+          )}
         </main>
       </div>
 
