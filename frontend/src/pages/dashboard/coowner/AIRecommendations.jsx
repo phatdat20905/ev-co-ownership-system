@@ -16,8 +16,8 @@ import {
   Users,
   RefreshCw,
 } from "lucide-react";
-import aiService from "../../../../services/ai.service";
-import { toast } from "../../../../utils/toast";
+import aiService from "../../../services/ai.service";
+import { toast } from "../../../utils/toast";
 
 const AIRecommendations = () => {
   const navigate = useNavigate();
