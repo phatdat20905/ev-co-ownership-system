@@ -12,6 +12,7 @@ const router = express.Router();
 
 router.use(authenticate);
 
+router.post('/profile', validate(userValidators.updateProfile), userController.createProfile);
 router.get('/profile', userController.getProfile);
 router.put('/profile', validate(userValidators.updateProfile), userController.updateProfile);
 router.post('/avatar', uploadAvatar, handleUploadError, userController.uploadAvatar);

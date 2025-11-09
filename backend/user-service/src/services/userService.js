@@ -27,6 +27,45 @@ export class UserService {
     }
   }
 
+  async createUserProfile(userId, profileData) {
+    const transaction = await db.sequelize.transaction();
+
+    try {
+      // Check if profile already exists
+      const existingProfile = await db.UserProfile.findOne({
+        where: { userId },
+        transaction
+      });
+
+      if (existingProfile) {
+        await transaction.rollback();
+        throw new AppError('Profile already exists', 409, 'PROFILE_EXISTS');
+      }
+
+      // Create new profile
+      const profile = await db.UserProfile.create({
+        userId,
+        ...profileData,
+        isProfileComplete: true
+      }, { transaction });
+
+      // Publish event
+      eventService.publishUserProfileCreated({
+        userId,
+        profile: profile.getPublicProfile()
+      }).catch(error => logger.error('Failed to publish profile created event', { error: error.message, userId }));
+
+      await transaction.commit();
+      logger.info('User profile created successfully', { userId });
+
+      return profile.getPublicProfile();
+    } catch (error) {
+      await transaction.rollback();
+      logger.error('Failed to create user profile', { error: error.message, userId });
+      throw error;
+    }
+  }
+
   async updateUserProfile(userId, updateData) {
     const transaction = await db.sequelize.transaction();
 

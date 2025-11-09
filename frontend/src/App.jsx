@@ -44,6 +44,7 @@ import VotingSystem from "./pages/dashboard/coowner/group/VotingSystem";
 import VotingManagement from "./pages/dashboard/coowner/group/VotingManagement";
 import CommonFund from "./pages/dashboard/coowner/group/CommonFund";
 import Profile from "./pages/dashboard/coowner/account/Profile";
+import KYCStatus from "./pages/profile/KYCStatus";
 
 // Staff Pages
 import StaffDashboard from "./pages/staff/StaffDashboard";
@@ -162,6 +163,14 @@ export default function App() {
         <Route
           path="/dashboard/coowner/account/profile"
           element={<Profile />}
+        />
+        <Route
+          path="/dashboard/coowner/account/kyc"
+          element={<KYCStatus />}
+        />
+        <Route
+          path="/kyc-status"
+          element={<KYCStatus />}
         />
         <Route
           path="/dashboard/coowner/ai-recommendations"

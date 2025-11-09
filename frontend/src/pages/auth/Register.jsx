@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   CheckCircle,
   Circle,
@@ -10,9 +10,6 @@ import {
   Phone,
   Calendar,
   MapPin,
-  IdCard,
-  Car,
-  Users,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -21,31 +18,52 @@ import Header from "../../components/layout/Header";
 import { authService } from "../../services";
 import { showSuccessToast, showErrorToast } from "../../utils/toast";
 
+// Form Input Component
+const FormInput = ({ icon, label, name, type = "text", value, onChange, placeholder, requiredField }) => (
+  <div>
+    <label className="block text-gray-700 font-medium mb-1">
+      {label} {requiredField && <span className="text-red-500">*</span>}
+    </label>
+    <div className="flex items-center border border-gray-200 rounded-xl px-3 py-2 bg-white/80 focus-within:ring-2 focus-within:ring-sky-400">
+      {icon && <div className="text-sky-500 mr-2">{icon}</div>}
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onChange={onChange}
+        required={requiredField}
+        placeholder={placeholder}
+        className="w-full bg-transparent outline-none text-gray-700"
+      />
+    </div>
+  </div>
+);
+
 export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Form data matching backend models
+  // Form data
   const [formData, setFormData] = useState({
-    // Auth fields
+    fullName: "",
     email: "",
     phone: "",
-    // User Profile fields
-    fullName: "",
     dateOfBirth: "",
-    gender: "",
     address: "",
-    city: "",
-    // Additional info (stored in preferences)
-    idCardNumber: "",
-    driverLicenseNumber: "",
-    emergencyContact: "",
-    emergencyPhone: "",
+    gender: "",
   });
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
 
   const conditions = [
     { id: 1, label: "Tối thiểu 8 ký tự", valid: password.length >= 8 },
@@ -68,246 +86,201 @@ export default function Register() {
       ? "bg-green-500"
       : "bg-gray-200";
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate password strength
+    // Validation
+    if (password !== confirmPassword) {
+      showErrorToast("Mật khẩu xác nhận không khớp");
+      return;
+    }
+
     if (strength < 3) {
-      showErrorToast("Mật khẩu chưa đủ mạnh. Vui lòng kiểm tra lại.");
+      showErrorToast("Mật khẩu chưa đủ mạnh");
+      return;
+    }
+
+    const age = new Date().getFullYear() - new Date(formData.dateOfBirth).getFullYear();
+    if (age < 18) {
+      showErrorToast("Bạn phải từ 18 tuổi trở lên");
+      return;
+    }
+
+    if (!formData.gender) {
+      showErrorToast("Vui lòng chọn giới tính");
       return;
     }
 
     setLoading(true);
-
     try {
-      // Register with auth service
-      const response = await authService.register({
+      // Register user
+      const registerData = {
         email: formData.email,
         phone: formData.phone,
         password: password,
         role: "co_owner",
-      });
+      };
 
-      if (response.success) {
-        // Show success popup
-        setShowSuccess(true);
-        showSuccessToast("Đăng ký thành công! Vui lòng kiểm tra email để xác thực tài khoản.");
+      const authResponse = await authService.register(registerData);
+      
+      if (authResponse.success) {
+        // Store profile data for after verification
+        localStorage.setItem("pendingProfile", JSON.stringify({
+          fullName: formData.fullName,
+          dateOfBirth: formData.dateOfBirth,
+          gender: formData.gender,
+          address: formData.address,
+        }));
 
-        // Note: UserProfile will be auto-created by RabbitMQ event listener
-        // Additional profile data will be collected in onboarding after email verification
-
-        setTimeout(() => {
-          setShowSuccess(false);
-          navigate("/login", {
-            state: {
-              message: "Đăng ký thành công! Vui lòng xác thực email trước khi đăng nhập.",
-            },
-          });
-        }, 2000);
+        showSuccessToast("Đăng ký thành công! Vui lòng kiểm tra email để xác thực.");
+        navigate("/verify-email", { state: { email: formData.email } });
       }
     } catch (error) {
-      showErrorToast(
-        error.response?.data?.message || "Đăng ký thất bại. Vui lòng thử lại."
-      );
+      showErrorToast(error.message || "Đăng ký thất bại. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-sky-50 via-white to-sky-100">
+    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-cyan-50 flex flex-col">
       <Header />
 
-      <main className="flex-grow flex items-center justify-center px-4 py-20">
+      <main className="flex-1 flex items-center justify-center px-4 py-12">
         <motion.div
-          initial={{ opacity: 0, y: 40 }}
+          className="w-full max-w-2xl"
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          className="relative w-full max-w-2xl bg-white/70 backdrop-blur-xl border border-sky-100 rounded-3xl shadow-[0_8px_30px_rgba(0,0,0,0.08)] p-10"
+          transition={{ duration: 0.5 }}
         >
-          <div className="absolute inset-0 bg-gradient-to-tr from-sky-100/50 via-transparent to-sky-200/40 rounded-3xl blur-2xl -z-10" />
-
-          <h2 className="text-3xl font-bold text-center text-sky-700 mb-2">
-            Đăng ký tài khoản
-          </h2>
-          <p className="text-center text-gray-500 mb-8">
-            Tham gia hệ thống đồng sở hữu xe điện
-          </p>
-
-          {/* 🔹 Thanh tiến trình động */}
-          <div className="relative flex justify-between items-center mb-10">
-            <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-200 rounded-full -translate-y-1/2" />
-            <motion.div
-              className="absolute top-1/2 left-0 h-1 bg-sky-500 rounded-full -translate-y-1/2"
-              initial={{ width: "0%" }}
-              animate={{ width: "25%" }} 
-              transition={{ duration: 0.6, ease: "easeInOut" }}
-            />
-
-            {["Thông tin cơ bản", "Giấy tờ tùy thân", "Xác thực OTP", "Hoàn thành"].map(
-              (step, index) => (
-                <div key={index} className="relative z-10 flex flex-col items-center w-1/4">
-                  <div
-                    className={`w-9 h-9 flex items-center justify-center rounded-full border-2 transition-all duration-300 ${
-                      index === 0
-                        ? "border-sky-500 bg-sky-500 text-white shadow-md"
-                        : "border-gray-300 bg-white text-gray-400"
-                    }`}
-                  >
-                    {index + 1}
-                  </div>
-                  <p
-                    className={`text-xs mt-2 transition-colors duration-300 ${
-                      index === 0 ? "text-sky-600 font-semibold" : "text-gray-400"
-                    }`}
-                  >
-                    {step}
-                  </p>
-                </div>
-              )
-            )}
-          </div>
-
-          {/* 🔸 Form */}
-          <form
-            className="grid grid-cols-1 md:grid-cols-2 gap-6"
-            onSubmit={handleSubmit}
-          >
-            <FormInput 
-              icon={<User />} 
-              label="Họ và tên" 
-              name="fullName"
-              value={formData.fullName}
-              onChange={handleChange}
-              placeholder="Nguyễn Văn A" 
-              requiredField 
-            />
-            <FormInput
-              icon={<Mail />}
-              label="Email"
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="example@email.com"
-              requiredField
-            />
-            <FormInput
-              icon={<Phone />}
-              label="Số điện thoại"
-              name="phone"
-              type="tel"
-              value={formData.phone}
-              onChange={handleChange}
-              placeholder="090xxxxxxx"
-              requiredField
-            />
-            <FormInput 
-              icon={<Calendar />} 
-              label="Ngày sinh" 
-              name="dateOfBirth"
-              type="date" 
-              value={formData.dateOfBirth}
-              onChange={handleChange}
-              requiredField 
-            />
-
-            <div>
-              <label className="block text-gray-700 font-medium mb-1">
-                Giới tính <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="gender"
-                value={formData.gender}
-                onChange={handleChange}
-                required
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 bg-white/80 text-gray-700 focus:ring-2 focus:ring-sky-400 outline-none"
-              >
-                <option value="">Chọn giới tính</option>
-                <option value="male">Nam</option>
-                <option value="female">Nữ</option>
-                <option value="other">Khác</option>
-              </select>
+          {/* Card container */}
+          <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 md:p-12 border border-gray-100">
+            {/* Header */}
+            <div className="text-center mb-8">
+              <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-sky-500 to-cyan-500 mb-2">
+                Đăng ký tài khoản
+              </h1>
+              <p className="text-gray-600">
+                Tạo tài khoản để trải nghiệm dịch vụ sở hữu xe điện
+              </p>
             </div>
 
-            <FormInput
-              icon={<MapPin />}
-              label="Địa chỉ"
-              name="address"
-              value={formData.address}
-              onChange={handleChange}
-              placeholder="123 Lê Lợi, Quận 1, TP.HCM"
-              requiredField
-            />
-            <FormInput 
-              icon={<IdCard />} 
-              label="Số CMND/CCCD" 
-              name="idCardNumber"
-              value={formData.idCardNumber}
-              onChange={handleChange}
-              placeholder="0123456789" 
-              requiredField 
-            />
-            <FormInput 
-              icon={<Car />} 
-              label="Số GPLX" 
-              name="driverLicenseNumber"
-              value={formData.driverLicenseNumber}
-              onChange={handleChange}
-              placeholder="123456789" 
-              requiredField 
-            />
+            {/* Form */}
+            <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={handleSubmit}>
+              <FormInput
+                icon={<User />}
+                label="Họ và tên"
+                name="fullName"
+                value={formData.fullName}
+                onChange={handleInputChange}
+                placeholder="Nguyễn Văn A"
+                requiredField
+              />
+              
+              <FormInput
+                icon={<Mail />}
+                label="Email"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                placeholder="example@email.com"
+                requiredField
+              />
+              
+              <FormInput
+                icon={<Phone />}
+                label="Số điện thoại"
+                name="phone"
+                type="tel"
+                value={formData.phone}
+                onChange={handleInputChange}
+                placeholder="090xxxxxxx"
+                requiredField
+              />
+              
+              <FormInput
+                icon={<Calendar />}
+                label="Ngày sinh"
+                name="dateOfBirth"
+                type="date"
+                value={formData.dateOfBirth}
+                onChange={handleInputChange}
+                requiredField
+              />
 
-            {/* Mật khẩu */}
-            <div className="col-span-2">
-              <label className="block text-gray-700 font-medium mb-1">
-                Mật khẩu <span className="text-red-500">*</span>
-              </label>
-              <div className="flex items-center border border-gray-200 rounded-xl px-3 py-2 bg-white/80">
-                <Lock className="h-5 w-5 text-sky-500 mr-2" />
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onFocus={() => setIsPasswordFocused(true)}
-                  onBlur={() => !password && setIsPasswordFocused(false)}
-                  required
-                  placeholder="Nhập mật khẩu"
-                  className="w-full bg-transparent outline-none text-gray-700"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="ml-2 text-gray-400 hover:text-sky-500 transition"
-                >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
+              <div>
+                <label className="block text-gray-700 font-medium mb-1">
+                  Giới tính <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center border border-gray-200 rounded-xl px-3 py-2 bg-white/80 focus-within:ring-2 focus-within:ring-sky-400">
+                  <User className="h-5 w-5 text-sky-500 mr-2" />
+                  <select
+                    name="gender"
+                    value={formData.gender}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full bg-transparent outline-none text-gray-700"
+                  >
+                    <option value="">Chọn giới tính</option>
+                    <option value="male">Nam</option>
+                    <option value="female">Nữ</option>
+                    <option value="other">Khác</option>
+                  </select>
+                </div>
               </div>
 
-              <AnimatePresence>
+              <FormInput
+                icon={<MapPin />}
+                label="Địa chỉ"
+                name="address"
+                value={formData.address}
+                onChange={handleInputChange}
+                placeholder="123 Lê Lợi, Quận 1, TP.HCM"
+                requiredField
+              />
+
+              {/* Mật khẩu */}
+              <div className="col-span-1 md:col-span-2">
+                <label className="block text-gray-700 font-medium mb-1">
+                  Mật khẩu <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center border border-gray-200 rounded-xl px-3 py-2 bg-white/80 focus-within:ring-2 focus-within:ring-sky-400">
+                  <Lock className="h-5 w-5 text-sky-500 mr-2" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onFocus={() => setIsPasswordFocused(true)}
+                    onBlur={() => !password && setIsPasswordFocused(false)}
+                    required
+                    placeholder="Nhập mật khẩu"
+                    className="w-full bg-transparent outline-none text-gray-700"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="ml-2 text-gray-400 hover:text-sky-500 transition"
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+
+                {/* Password Strength Meter */}
                 {isPasswordFocused && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.4 }}
-                    className="overflow-hidden"
+                    className="mt-3"
                   >
-                    <div className="w-full h-2 bg-gray-200 rounded-full mt-3 overflow-hidden">
+                    <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
                         className={`h-2 rounded-full transition-all duration-300 ${progressColor}`}
                         style={{ width: progressWidth }}
                       />
                     </div>
-                    <ul className="mt-3 space-y-1 text-sm">
+                    <ul className="mt-2 space-y-1 text-sm">
                       {conditions.map((c) => (
                         <li
                           key={c.id}
@@ -326,97 +299,48 @@ export default function Register() {
                     </ul>
                   </motion.div>
                 )}
-              </AnimatePresence>
-            </div>
+              </div>
 
-            <FormInput
-              icon={<Users />}
-              label="Người liên hệ khẩn cấp"
-              name="emergencyContact"
-              value={formData.emergencyContact}
-              onChange={handleChange}
-              placeholder="Nguyễn Thị B"
-              requiredField
-            />
-            <FormInput
-              icon={<Phone />}
-              label="SĐT người liên hệ"
-              name="emergencyPhone"
-              type="tel"
-              value={formData.emergencyPhone}
-              onChange={handleChange}
-              placeholder="090xxxxxxx"
-              requiredField
-            />
+              {/* Xác nhận mật khẩu */}
+              <div className="col-span-1 md:col-span-2">
+                <label className="block text-gray-700 font-medium mb-1">
+                  Xác nhận mật khẩu <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center border border-gray-200 rounded-xl px-3 py-2 bg-white/80 focus-within:ring-2 focus-within:ring-sky-400">
+                  <Lock className="h-5 w-5 text-sky-500 mr-2" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    placeholder="Nhập lại mật khẩu"
+                    className="w-full bg-transparent outline-none text-gray-700"
+                  />
+                </div>
+              </div>
 
-            <div className="col-span-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-sky-500 to-sky-600 text-white hover:from-sky-600 hover:to-sky-700 transition-all shadow-md mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? "Đang xử lý..." : "Đăng ký tài khoản"}
-              </button>
-              <p className="text-sm text-center text-gray-500 mt-4">
-                Đã có tài khoản?{" "}
-                <Link to="/login" className="text-sky-600 hover:underline font-medium">
-                  Đăng nhập ngay
-                </Link>
-              </p>
-            </div>
-          </form>
+              {/* Submit Button */}
+              <div className="col-span-1 md:col-span-2">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-sky-500 to-sky-600 text-white hover:from-sky-600 hover:to-sky-700 transition-all shadow-md mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? "Đang xử lý..." : "Đăng ký"}
+                </button>
+                <p className="text-sm text-center text-gray-500 mt-4">
+                  Đã có tài khoản?{" "}
+                  <Link to="/login" className="text-sky-600 hover:underline font-medium">
+                    Đăng nhập ngay
+                  </Link>
+                </p>
+              </div>
+            </form>
+          </div>
         </motion.div>
       </main>
 
-      {/* Popup đăng ký thành công */}
-      <AnimatePresence>
-        {showSuccess && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-          >
-            <motion.div className="bg-white/90 backdrop-blur-xl border border-sky-100 rounded-2xl p-8 flex flex-col items-center shadow-lg">
-              <CheckCircle className="w-12 h-12 text-green-500 mb-4" />
-              <h3 className="text-xl font-semibold text-sky-700 mb-2">
-                Đăng ký thành công!
-              </h3>
-              <p className="text-gray-600 text-center">
-                Vui lòng kiểm tra email để xác thực tài khoản.
-              </p>
-              <p className="text-gray-500 text-sm text-center mt-2">
-                Đang chuyển đến trang đăng nhập...
-              </p>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <Footer />
-    </div>
-  );
-}
-
-/* ==== COMPONENT INPUT TÁI SỬ DỤNG ==== */
-function FormInput({ icon, label, name, type = "text", value, onChange, placeholder, requiredField = false }) {
-  return (
-    <div>
-      <label className="block text-gray-700 font-medium mb-1">
-        {label} {requiredField && <span className="text-red-500">*</span>}
-      </label>
-      <div className="flex items-center border border-gray-200 rounded-xl px-3 py-2 bg-white/80 focus-within:ring-2 focus-within:ring-sky-400 transition">
-        <span className="text-sky-500 mr-2">{icon}</span>
-        <input
-          type={type}
-          name={name}
-          value={value}
-          onChange={onChange}
-          required={requiredField}
-          placeholder={placeholder}
-          className="w-full bg-transparent outline-none text-gray-700 placeholder-gray-400"
-        />
-      </div>
     </div>
   );
 }

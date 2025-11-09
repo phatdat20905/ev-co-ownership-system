@@ -151,8 +151,39 @@ class AuthService {
   /**
    * Submit KYC documents
    * POST /auth/kyc/submit
+   * @param {Object} kycData - KYC data object
+   * @param {string} kycData.idCardNumber - ID card number
+   * @param {string} kycData.driverLicenseNumber - Driver license number (optional)
+   * @param {File} kycData.idCardFront - ID card front image
+   * @param {File} kycData.idCardBack - ID card back image
+   * @param {File} kycData.driverLicense - Driver license image (optional)
+   * @param {File} kycData.selfie - Selfie image
    */
-  async submitKYC(formData) {
+  async submitKYC(kycData) {
+    const formData = new FormData();
+    
+    // Add text fields
+    if (kycData.idCardNumber) {
+      formData.append('idCardNumber', kycData.idCardNumber);
+    }
+    if (kycData.driverLicenseNumber) {
+      formData.append('driverLicenseNumber', kycData.driverLicenseNumber);
+    }
+    
+    // Add file fields
+    if (kycData.idCardFront) {
+      formData.append('idCardFront', kycData.idCardFront);
+    }
+    if (kycData.idCardBack) {
+      formData.append('idCardBack', kycData.idCardBack);
+    }
+    if (kycData.driverLicense) {
+      formData.append('driverLicense', kycData.driverLicense);
+    }
+    if (kycData.selfie) {
+      formData.append('selfie', kycData.selfie);
+    }
+    
     const response = await apiClient.post('/auth/kyc/submit', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'

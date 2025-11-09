@@ -7,6 +7,24 @@ import apiClient from './api/interceptors.js';
  */
 class UserService {
   /**
+   * Create user profile (for registration)
+   * POST /user/profile
+   */
+  async createProfile(profileData) {
+    const response = await apiClient.post('/user/profile', profileData);
+    
+    // Update localStorage
+    if (response.success && response.data) {
+      const currentUser = JSON.parse(localStorage.getItem('userData') || '{}');
+      const updatedUser = { ...currentUser, ...response.data };
+      localStorage.setItem('userData', JSON.stringify(updatedUser));
+      window.dispatchEvent(new Event('storage'));
+    }
+    
+    return response;
+  }
+
+  /**
    * Get current user profile
    * GET /user/profile
    */

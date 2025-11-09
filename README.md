@@ -9,6 +9,31 @@ Hệ thống quản lý đồng sở hữu và chia sẻ chi phí xe điện
 - **Infrastructure**: Docker + Redis + RabbitMQ + Apache NiFi
 - **Data Flow**: Apache NiFi for ETL and event stream processing
 
+## ✨ Recent Updates
+
+### Registration System (Nov 9, 2025)
+- ✅ **Multi-step Registration Wizard** (4 steps)
+  - Step 1: Basic information (name, email, phone, password)
+  - Step 2: Documents (address, ID card, driver license, emergency contact)
+  - Step 3: Email verification
+  - Step 4: Success and redirect to login
+- ✅ **Backend API Enhancement**
+  - New `POST /user/profile` endpoint for profile creation
+  - Dual database saves (auth-service + user-service)
+  - Event-driven profile creation
+- ✅ **UI/UX Improvements**
+  - Password strength meter
+  - Real-time validation
+  - Animated progress bar
+  - Toast notifications
+  - Responsive design
+
+**📚 Documentation:**
+- [Registration Summary](./REGISTRATION_SUMMARY.md) - Complete feature overview
+- [Testing Guide](./TESTING_GUIDE.md) - How to test registration flow
+- [Architecture](./ARCHITECTURE.md) - System diagrams and flows
+- [Checklist](./CHECKLIST.md) - Implementation checklist
+
 ## 🚀 Quick Start
 
 ### Development
@@ -39,6 +64,36 @@ cd infrastructure/nifi
 # On Linux/Mac:
 chmod +x setup.sh && ./setup.sh
 cd ../..
+```
+
+### Manual Start (without Docker)
+
+**Terminal 1 - Auth Service:**
+```bash
+cd backend/auth-service
+npm install
+npm run dev
+```
+
+**Terminal 2 - User Service:**
+```bash
+cd backend/user-service
+npm install
+npm run dev
+```
+
+**Terminal 3 - API Gateway:**
+```bash
+cd backend/api-gateway
+npm install
+npm run dev
+```
+
+**Terminal 4 - Frontend:**
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
 ### Access Services

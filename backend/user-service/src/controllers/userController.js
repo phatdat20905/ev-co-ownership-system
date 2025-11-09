@@ -6,6 +6,25 @@ import {
 } from '@ev-coownership/shared';
 
 export class UserController {
+  async createProfile(req, res, next) {
+    try {
+      const userId = req.user.id;
+      const profileData = req.body;
+
+      const profile = await userService.createUserProfile(userId, profileData);
+
+      logger.info('User profile created successfully', { userId });
+
+      return successResponse(res, 'Profile created successfully', profile, 201);
+    } catch (error) {
+      logger.error('Failed to create user profile', { 
+        error: error.message, 
+        userId: req.user?.id 
+      });
+      next(error);
+    }
+  }
+
   async getProfile(req, res, next) {
     try {
       const userId = req.user.id;

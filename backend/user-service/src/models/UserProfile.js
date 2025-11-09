@@ -28,6 +28,10 @@ export default (sequelize, DataTypes) => {
         isDate: true
       }
     },
+    gender: {
+      type: DataTypes.ENUM('male', 'female', 'other'),
+      allowNull: true
+    },
     address: {
       type: DataTypes.TEXT,
       validate: {
