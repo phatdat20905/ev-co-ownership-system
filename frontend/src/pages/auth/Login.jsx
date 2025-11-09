@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Footer from "../../components/layout/Footer";
 import Header from "../../components/layout/Header";
-import { authService, userService } from "../../services";
+import { authService } from "../../services";
 import { showSuccessToast, showErrorToast } from "../../utils/toast";
 
 export default function Login() {
@@ -61,20 +61,7 @@ export default function Login() {
         } else if (role === 'staff') {
           navigate('/staff');
         } else {
-          // Check if profile is complete for co-owner
-          try {
-            const profileResponse = await userService.getProfile();
-            if (profileResponse.success && profileResponse.data) {
-              if (profileResponse.data.isProfileComplete === false) {
-                // Redirect to onboarding
-                navigate('/onboarding');
-                return;
-              }
-            }
-          } catch (error) {
-            console.error('Failed to check profile completion:', error);
-          }
-          
+          // Co-owner goes directly to dashboard (no onboarding needed)
           navigate('/dashboard/coowner');
         }
       }
