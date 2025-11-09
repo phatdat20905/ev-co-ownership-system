@@ -43,6 +43,7 @@ import UsageHistory from "./pages/dashboard/coowner/history/UsageHistory";
 import UsageAnalytics from "./pages/dashboard/coowner/history/UsageAnalytics";
 import GroupManagement from "./pages/dashboard/coowner/group/GroupManagement";
 import VotingSystem from "./pages/dashboard/coowner/group/VotingSystem";
+import VotingManagement from "./pages/dashboard/coowner/group/VotingManagement";
 import CommonFund from "./pages/dashboard/coowner/group/CommonFund";
 import Profile from "./pages/dashboard/coowner/account/Profile";
 
@@ -157,6 +158,10 @@ export default function App() {
         <Route
           path="/dashboard/coowner/group/voting"
           element={<VotingSystem />}
+        />
+        <Route
+          path="/dashboard/coowner/group/voting-management"
+          element={<VotingManagement />}
         />
         <Route path="/dashboard/coowner/group/fund" element={<CommonFund />} />
         <Route
