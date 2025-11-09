@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { User, Mail, Phone, MapPin, Calendar, Shield, Bell, CreditCard, FileText, Camera, Save, Edit, CheckCircle, X } from "lucide-react";
+import { User, Mail, Phone, MapPin, Calendar, Shield, Bell, CreditCard, FileText, Camera, Save, Edit, CheckCircle, X, Eye, EyeOff } from "lucide-react";
 import { motion } from "framer-motion";
 import Header from "../../../../components/layout/Header";
 import Footer from "../../../../components/layout/Footer";
-import { userService } from "../../../../services";
+import { userService, authService } from "../../../../services";
 import { showSuccessToast, showErrorToast } from "../../../../utils/toast";
 
 export default function Profile() {
@@ -14,6 +14,17 @@ export default function Profile() {
   const [formData, setFormData] = useState({});
   const [activeTab, setActiveTab] = useState("personal");
   const fileInputRef = useRef(null);
+  
+  // Change password state
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Fetch user data from API
   useEffect(() => {
@@ -45,30 +56,37 @@ export default function Profile() {
   };
 
   // Hàm xử lý thay đổi ảnh
-  const handleAvatarChange = (event) => {
+  const handleAvatarChange = async (event) => {
     const file = event.target.files[0];
-    if (file) {
-      // Kiểm tra kích thước file (tối đa 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        alert("Kích thước ảnh không được vượt quá 5MB");
-        return;
-      }
+    if (!file) return;
 
-      // Kiểm tra loại file
-      if (!file.type.startsWith('image/')) {
-        alert("Vui lòng chọn file ảnh");
-        return;
-      }
+    // Kiểm tra kích thước file (tối đa 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      showErrorToast("Kích thước ảnh không được vượt quá 5MB");
+      return;
+    }
 
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const newAvatarUrl = e.target.result;
-        setFormData(prev => ({
-          ...prev,
-          avatar: newAvatarUrl
-        }));
-      };
-      reader.readAsDataURL(file);
+    // Kiểm tra loại file
+    if (!file.type.startsWith('image/')) {
+      showErrorToast("Vui lòng chọn file ảnh");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Upload avatar to server
+      const response = await userService.uploadAvatar(file);
+      
+      if (response.success) {
+        setUserData(response.data);
+        setFormData(response.data);
+        showSuccessToast('Cập nhật ảnh đại diện thành công!');
+      }
+    } catch (error) {
+      showErrorToast(error.response?.data?.message || 'Upload ảnh thất bại. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -117,6 +135,43 @@ export default function Profile() {
         [preference]: value
       }
     }));
+  };
+
+  const handleChangePassword = async () => {
+    const { currentPassword, newPassword, confirmPassword } = passwordData;
+
+    // Validation
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      showErrorToast('Vui lòng điền đầy đủ thông tin');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      showErrorToast('Mật khẩu mới không khớp');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      showErrorToast('Mật khẩu mới phải có ít nhất 6 ký tự');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await authService.changePassword(currentPassword, newPassword);
+      
+      showSuccessToast('Đổi mật khẩu thành công!');
+      setShowChangePassword(false);
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+    } catch (error) {
+      showErrorToast(error.response?.data?.message || 'Đổi mật khẩu thất bại');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const tabs = [
@@ -441,27 +496,147 @@ export default function Profile() {
                       </p>
                     </div>
 
+                    {!showChangePassword ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between p-4 border border-gray-200 rounded-xl">
+                          <div>
+                            <h4 className="font-medium text-gray-900">Đổi mật khẩu</h4>
+                            <p className="text-sm text-gray-600">Cập nhật mật khẩu định kỳ</p>
+                          </div>
+                          <button 
+                            onClick={() => setShowChangePassword(true)}
+                            className="px-4 py-2 bg-sky-600 text-white rounded-xl hover:bg-sky-700 transition-colors"
+                          >
+                            Đổi mật khẩu
+                          </button>
+                        </div>
+
+                        <div className="flex items-center justify-between p-4 border border-gray-200 rounded-xl">
+                          <div>
+                            <h4 className="font-medium text-gray-900">Xác thực 2 yếu tố</h4>
+                            <p className="text-sm text-gray-600">Bảo vệ tài khoản tốt hơn</p>
+                          </div>
+                          <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors">
+                            Sắp có
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-semibold text-gray-900">Đổi mật khẩu</h3>
+                          <button
+                            onClick={() => {
+                              setShowChangePassword(false);
+                              setPasswordData({
+                                currentPassword: '',
+                                newPassword: '',
+                                confirmPassword: ''
+                              });
+                            }}
+                            className="text-gray-500 hover:text-gray-700"
+                          >
+                            <X className="h-5 w-5" />
+                          </button>
+                        </div>
+
+                        <div className="space-y-4">
+                          {/* Current Password */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Mật khẩu hiện tại
+                            </label>
+                            <div className="relative">
+                              <input
+                                type={showCurrentPassword ? "text" : "password"}
+                                value={passwordData.currentPassword}
+                                onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                                placeholder="Nhập mật khẩu hiện tại"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                              >
+                                {showCurrentPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* New Password */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Mật khẩu mới
+                            </label>
+                            <div className="relative">
+                              <input
+                                type={showNewPassword ? "text" : "password"}
+                                value={passwordData.newPassword}
+                                onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                                placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowNewPassword(!showNewPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                              >
+                                {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Confirm Password */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Xác nhận mật khẩu mới
+                            </label>
+                            <div className="relative">
+                              <input
+                                type={showConfirmPassword ? "text" : "password"}
+                                value={passwordData.confirmPassword}
+                                onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                                placeholder="Nhập lại mật khẩu mới"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                              >
+                                {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-3 pt-4">
+                            <button
+                              onClick={handleChangePassword}
+                              disabled={loading}
+                              className="flex-1 px-6 py-3 bg-sky-600 text-white rounded-xl hover:bg-sky-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {loading ? 'Đang xử lý...' : 'Xác nhận đổi mật khẩu'}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setShowChangePassword(false);
+                                setPasswordData({
+                                  currentPassword: '',
+                                  newPassword: '',
+                                  confirmPassword: ''
+                                });
+                              }}
+                              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
+                            >
+                              Hủy
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between p-4 border border-gray-200 rounded-xl">
-                        <div>
-                          <h4 className="font-medium text-gray-900">Đổi mật khẩu</h4>
-                          <p className="text-sm text-gray-600">Cập nhật mật khẩu định kỳ</p>
-                        </div>
-                        <button className="px-4 py-2 bg-sky-600 text-white rounded-xl hover:bg-sky-700 transition-colors">
-                          Đổi mật khẩu
-                        </button>
-                      </div>
-
-                      <div className="flex items-center justify-between p-4 border border-gray-200 rounded-xl">
-                        <div>
-                          <h4 className="font-medium text-gray-900">Xác thực 2 yếu tố</h4>
-                          <p className="text-sm text-gray-600">Bảo vệ tài khoản tốt hơn</p>
-                        </div>
-                        <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors">
-                          Kích hoạt
-                        </button>
-                      </div>
-
                       <div className="flex items-center justify-between p-4 border border-gray-200 rounded-xl">
                         <div>
                           <h4 className="font-medium text-gray-900">Thiết bị đang đăng nhập</h4>

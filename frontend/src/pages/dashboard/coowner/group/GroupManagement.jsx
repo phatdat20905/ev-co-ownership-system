@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Users, UserPlus, Settings, Mail, Phone, Calendar, Car, MoreVertical, Edit, Trash2, Shield, Crown, Check, X, Send, UserCheck, UserX } from "lucide-react";
+import { ArrowLeft, Users, UserPlus, Settings, Mail, Phone, Calendar, Car, MoreVertical, Edit, Trash2, Shield, Crown, Check, X, Send, UserCheck, UserX, Search } from "lucide-react";
 import { Link } from "react-router-dom";
 import Header from "../../../../components/layout/Header";
 import Footer from "../../../../components/layout/Footer";
@@ -18,6 +18,10 @@ export default function GroupManagement() {
   const [editingMember, setEditingMember] = useState(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [memberToDelete, setMemberToDelete] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [searching, setSearching] = useState(false);
 
   // Fetch user's groups
   useEffect(() => {
@@ -69,23 +73,48 @@ export default function GroupManagement() {
   };
 
   // CÁC HÀM QUẢN LÝ THÀNH VIÊN
+  const handleSearchUsers = async (query) => {
+    if (!query || query.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    try {
+      setSearching(true);
+      const response = await userService.searchUsers(query);
+      
+      if (response.success) {
+        setSearchResults(response.data || []);
+      }
+    } catch (error) {
+      console.error('Failed to search users:', error);
+    } finally {
+      setSearching(false);
+    }
+  };
+
   const handleInviteMember = async () => {
-    if (!inviteEmail || !selectedGroup) return;
+    if (!selectedUser && !inviteEmail) return;
+    if (!selectedGroup) return;
     
     try {
       const response = await userService.addGroupMember(selectedGroup, {
+        userId: selectedUser?.userId,
         email: inviteEmail,
       });
 
       if (response.success) {
-        showSuccessToast('Đã gửi lời mời thành công');
+        showSuccessToast('Đã thêm thành viên thành công');
         setInviteEmail("");
+        setSelectedUser(null);
+        setSearchQuery("");
+        setSearchResults([]);
         setShowInviteModal(false);
         // Reload group details to reflect changes
         loadGroupDetails(selectedGroup);
       }
     } catch (error) {
-      showErrorToast('Không thể gửi lời mời');
+      showErrorToast('Không thể thêm thành viên');
       console.error('Failed to invite member:', error);
     }
   };
@@ -577,8 +606,75 @@ export default function GroupManagement() {
               exit={{ opacity: 0, scale: 0.9 }}
               className="bg-white rounded-2xl p-6 w-full max-w-md"
             >
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Mời thành viên</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Thêm thành viên</h3>
               <div className="space-y-4">
+                {/* User Search */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tìm kiếm người dùng
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        handleSearchUsers(e.target.value);
+                      }}
+                      placeholder="Tìm theo tên hoặc ID..."
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  {/* Search Results */}
+                  {searchResults.length > 0 && (
+                    <div className="mt-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
+                      {searchResults.map((user) => (
+                        <button
+                          key={user.userId}
+                          onClick={() => {
+                            setSelectedUser(user);
+                            setSearchQuery(user.fullName);
+                            setSearchResults([]);
+                          }}
+                          className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors"
+                        >
+                          {user.avatarUrl ? (
+                            <img
+                              src={user.avatarUrl}
+                              alt={user.fullName}
+                              className="w-10 h-10 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                              <Users className="h-5 w-5 text-blue-600" />
+                            </div>
+                          )}
+                          <div className="flex-1 text-left">
+                            <p className="font-medium text-gray-900">{user.fullName}</p>
+                            <p className="text-sm text-gray-500">ID: {user.userId}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {searching && (
+                    <p className="text-sm text-gray-500 mt-2">Đang tìm kiếm...</p>
+                  )}
+                </div>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-300"></div>
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-white text-gray-500">Hoặc</span>
+                  </div>
+                </div>
+
+                {/* Email Input */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Email thành viên
@@ -591,20 +687,27 @@ export default function GroupManagement() {
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
+
                 <div className="flex gap-3 justify-end">
                   <button
-                    onClick={() => setShowInviteModal(false)}
+                    onClick={() => {
+                      setShowInviteModal(false);
+                      setSearchQuery("");
+                      setSearchResults([]);
+                      setSelectedUser(null);
+                      setInviteEmail("");
+                    }}
                     className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
                   >
                     Huỷ
                   </button>
                   <button
                     onClick={handleInviteMember}
-                    disabled={!inviteEmail}
+                    disabled={!selectedUser && !inviteEmail}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
                   >
-                    <Send className="w-4 h-4 inline mr-2" />
-                    Gửi lời mời
+                    <UserPlus className="w-4 h-4 inline mr-2" />
+                    Thêm thành viên
                   </button>
                 </div>
               </div>
