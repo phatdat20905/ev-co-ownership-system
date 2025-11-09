@@ -23,8 +23,6 @@ import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import ResetPassword from "./pages/auth/ResetPassword";
 import VerifyEmail from "./pages/auth/VerifyEmail";
-import VerifyIdentity from "./pages/auth/VerifyIdentity";
-import VerifySuccess from "./pages/auth/VerifySuccess";
 
 // Dashboard & Co-owner Pages
 import Home from "./pages/dashboard/Dashboard";
@@ -65,9 +63,7 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/verify-identity" element={<VerifyIdentity />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/verify-success" element={<VerifySuccess />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
 
