@@ -85,6 +85,28 @@ export class UserService {
       throw error;
     }
   }
+
+  async searchUsers(query) {
+    try {
+      const profiles = await db.UserProfile.findAll({
+        where: {
+          [db.Sequelize.Op.or]: [
+            { fullName: { [db.Sequelize.Op.iLike]: `%${query}%` } },
+            { userId: { [db.Sequelize.Op.iLike]: `%${query}%` } }
+          ]
+        },
+        attributes: ['id', 'userId', 'fullName', 'avatarUrl'],
+        limit: 10
+      });
+
+      logger.debug('User search completed', { query, results: profiles.length });
+
+      return profiles;
+    } catch (error) {
+      logger.error('Failed to search users', { error: error.message, query });
+      throw error;
+    }
+  }
 }
 
 export default new UserService();

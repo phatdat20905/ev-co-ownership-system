@@ -66,4 +66,10 @@ router.post('/send-verification-email',
   authController.sendVerificationEmail
 );
 
+router.post('/change-password',
+  generalRateLimiter,
+  authenticate,
+  authController.changePassword
+);
+
 export default router;

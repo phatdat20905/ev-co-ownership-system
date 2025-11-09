@@ -300,6 +300,49 @@ export class AuthService {
       throw error;
     }
   }
+
+  async changePassword(userId, currentPassword, newPassword) {
+    const transaction = await db.sequelize.transaction();
+    
+    try {
+      const user = await db.User.findByPk(userId, { transaction });
+      
+      if (!user) {
+        throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+      }
+
+      // Verify current password
+      const isValidPassword = await user.validatePassword(currentPassword);
+      if (!isValidPassword) {
+        throw new AppError('Current password is incorrect', 401, 'INVALID_PASSWORD');
+      }
+
+      // Update password
+      await user.update({ passwordHash: newPassword }, { transaction });
+
+      // Revoke all refresh tokens (logout from all devices)
+      await db.RefreshToken.update(
+        { isRevoked: true },
+        { where: { userId: user.id }, transaction }
+      );
+
+      await transaction.commit();
+
+      eventService.publishPasswordChanged(user.id)
+        .catch(err => logger.error('Failed to publish password changed event', { 
+          error: err.message, 
+          userId: user.id 
+        }));
+
+      logger.info('Password changed successfully', { userId: user.id });
+
+      return { message: 'Password changed successfully. Please login again.' };
+    } catch (error) {
+      await transaction.rollback();
+      logger.error('Password change failed', { error: error.message, userId });
+      throw error;
+    }
+  }
 }
 
 export default new AuthService();

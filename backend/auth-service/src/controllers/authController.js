@@ -153,6 +153,25 @@ export class AuthController {
       next(error);
     }
   }
+
+  async changePassword(req, res, next) {
+    try {
+      const userId = req.user.id;
+      const { currentPassword, newPassword } = req.body;
+
+      const result = await authService.changePassword(userId, currentPassword, newPassword);
+
+      logger.info('Password changed successfully', { userId });
+
+      return successResponse(res, result.message);
+    } catch (error) {
+      logger.error('Password change failed', { 
+        error: error.message, 
+        userId: req.user?.id 
+      });
+      next(error);
+    }
+  }
 }
 
 export default new AuthController();

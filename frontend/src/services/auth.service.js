@@ -137,6 +137,18 @@ class AuthService {
   }
 
   /**
+   * Change password (authenticated user)
+   * POST /auth/change-password
+   */
+  async changePassword(currentPassword, newPassword) {
+    const response = await apiClient.post('/auth/change-password', {
+      currentPassword,
+      newPassword
+    });
+    return response;
+  }
+
+  /**
    * Check if user is authenticated
    */
   isAuthenticated() {

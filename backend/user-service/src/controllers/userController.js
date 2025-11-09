@@ -1,7 +1,8 @@
 import userService from '../services/userService.js';
 import { 
   successResponse, 
-  logger 
+  logger,
+  AppError
 } from '@ev-coownership/shared';
 
 export class UserController {
@@ -53,6 +54,53 @@ export class UserController {
       logger.error('Failed to get user by ID', { 
         error: error.message, 
         userId: req.params.userId 
+      });
+      next(error);
+    }
+  }
+
+  async uploadAvatar(req, res, next) {
+    try {
+      const userId = req.user.id;
+      
+      if (!req.file) {
+        throw new AppError('No file uploaded', 400, 'NO_FILE');
+      }
+
+      // Generate avatar URL
+      const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+      
+      const updatedProfile = await userService.updateUserProfile(userId, { avatarUrl });
+
+      logger.info('Avatar uploaded successfully', { userId, filename: req.file.filename });
+
+      return successResponse(res, 'Avatar uploaded successfully', updatedProfile);
+    } catch (error) {
+      logger.error('Failed to upload avatar', { 
+        error: error.message, 
+        userId: req.user?.id 
+      });
+      next(error);
+    }
+  }
+
+  async searchUsers(req, res, next) {
+    try {
+      const { q } = req.query;
+      
+      if (!q || q.length < 2) {
+        throw new AppError('Search query must be at least 2 characters', 400, 'INVALID_QUERY');
+      }
+
+      const users = await userService.searchUsers(q);
+
+      logger.info('User search completed', { query: q, results: users.length });
+
+      return successResponse(res, 'Search completed', users);
+    } catch (error) {
+      logger.error('Failed to search users', { 
+        error: error.message, 
+        query: req.query.q 
       });
       next(error);
     }

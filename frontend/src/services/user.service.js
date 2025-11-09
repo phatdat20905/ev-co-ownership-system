@@ -41,6 +41,40 @@ class UserService {
   }
 
   /**
+   * Upload user avatar
+   * POST /user/avatar
+   */
+  async uploadAvatar(file) {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    
+    const response = await apiClient.post('/user/avatar', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    
+    // Update localStorage
+    if (response.success && response.data) {
+      localStorage.setItem('userData', JSON.stringify(response.data));
+      window.dispatchEvent(new Event('storage'));
+    }
+    
+    return response;
+  }
+
+  /**
+   * Search users by name or email
+   * GET /user/search?q=keyword
+   */
+  async searchUsers(query) {
+    const response = await apiClient.get('/user/search', { 
+      params: { q: query } 
+    });
+    return response;
+  }
+
+  /**
    * Get user by ID
    * GET /user/:userId
    */

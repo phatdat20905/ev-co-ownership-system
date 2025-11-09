@@ -1,5 +1,7 @@
 import express from 'express';
 import helmet from 'helmet';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { config } from 'dotenv';
 import { createCorsMiddleware } from '@ev-coownership/shared';
 import { createHealthRoute } from '@ev-coownership/shared';
@@ -13,6 +15,10 @@ import {
 } from '@ev-coownership/shared';
 
 import routes from './routes/index.js';
+
+// Get __dirname in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load .env file
 config();
@@ -49,7 +55,10 @@ app.get('/health', createHealthRoute({
   cache: 'healthy'
 }));
 
-// 📍 API routes
+// � Static files - Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// �📍 API routes
 app.use('/api/v1', routes);
 
 // 🚫 404 và xử lý lỗi tổng quát
