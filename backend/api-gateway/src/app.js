@@ -12,8 +12,11 @@ const app = express();
 
 app.use(helmet());
 app.use(createCorsMiddleware());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+
+// ⚠️ IMPORTANT: Do NOT parse body here for proxy routes
+// Body parsing will break http-proxy-middleware
+// app.use(express.json({ limit: '10mb' }));
+// app.use(express.urlencoded({ extended: true }));
 
 // global rate limiter
 app.use(generalRateLimiter);

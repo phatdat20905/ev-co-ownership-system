@@ -2,7 +2,7 @@ import { hashPassword } from '../utils/bcrypt.js';
 
 export default {
   async up(queryInterface, Sequelize) {
-    const hashedPassword = await hashPassword('password123');
+    const hashedPassword = await hashPassword('123456');
     
     const users = [
       {

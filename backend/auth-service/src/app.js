@@ -27,8 +27,8 @@ app.use(createCorsMiddleware());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// 🚦 Rate limiting
-app.use(generalRateLimiter);
+// 🚦 Rate limiting is applied at route level (see authRoutes.js)
+// app.use(generalRateLimiter); // Removed to avoid double-counting
 
 // 🧾 Request logger
 app.use((req, res, next) => {

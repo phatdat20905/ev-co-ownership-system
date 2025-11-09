@@ -78,7 +78,7 @@ export const fileUploadRateLimiter = createRateLimiter({
 
 export const loginRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 100, // Increased for development testing
   skipSuccessfulRequests: true,
   serviceName: 'login'
 });

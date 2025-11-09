@@ -13,8 +13,8 @@ export const createServiceProxy = (serviceName, target, opts = {}) => {
   const defaultOpts = {
     changeOrigin: true,
     secure: false,
-    timeout: 15000,
-    proxyTimeout: 15000,
+    timeout: 30000,
+    proxyTimeout: 30000,
     selfHandleResponse: false,
   };
 
@@ -25,12 +25,11 @@ export const createServiceProxy = (serviceName, target, opts = {}) => {
     ...options,
     target,
     pathRewrite: (path, req) => {
-      // ✅ Xóa prefix /api/v1/<serviceName>
-      const prefix = `/api/v1/${serviceName}`;
-      if (path.startsWith(prefix)) {
-        return path.slice(prefix.length) || '/';
-      }
-      return path;
+      // Express router strips: /api/v1 + /<serviceName>
+      // So proxy receives only: /login, /register, etc.
+      // We need to reconstruct: /api/v1/<serviceName><path>
+      
+      return `/api/v1/${serviceName}${path}`;
     },
     onProxyReq(proxyReq, req, res) {
       // ✅ Gắn requestId & user info vào header
@@ -39,6 +38,8 @@ export const createServiceProxy = (serviceName, target, opts = {}) => {
         proxyReq.setHeader('x-user-id', req.user.id || '');
         proxyReq.setHeader('x-user-role', req.user.role || '');
       }
+      
+      // Body will be forwarded automatically since we removed express.json()
     },
     onError(err, req, res) {
       logger.error(`❌ Proxy error [${serviceName}]`, { error: err.message, path: req.originalUrl });

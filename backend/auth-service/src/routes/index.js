@@ -5,9 +5,10 @@ import tokenRoutes from './tokenRoutes.js';
 
 const router = Router();
 
-router.use('/', authRoutes);
-router.use('/kyc', kycRoutes);
-router.use('/tokens', tokenRoutes);
+// Mount auth routes under /auth prefix
+router.use('/auth', authRoutes);
+router.use('/auth/kyc', kycRoutes);
+router.use('/auth/tokens', tokenRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {
