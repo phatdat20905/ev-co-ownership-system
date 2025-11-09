@@ -37,6 +37,8 @@ import {
   Map,
   Key,
 } from "lucide-react";
+import contractService from "../../services/contract.service";
+import { toast } from "../../utils/toast";
 
 const ContractManagement = () => {
   const navigate = useNavigate();
@@ -51,6 +53,16 @@ const ContractManagement = () => {
   const [selectedContract, setSelectedContract] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+
+  // API State
+  const [contracts, setContracts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    total: 0,
+    active: 0,
+    pending: 0,
+    expired: 0,
+  });
 
   // State cho user data
   const [userRole, setUserRole] = useState("staff");
@@ -81,7 +93,61 @@ const ContractManagement = () => {
       });
       setUserRole("staff");
     }
+    
+    // Load contracts
+    fetchContracts();
   }, []);
+
+  const fetchContracts = async () => {
+    try {
+      setLoading(true);
+      const response = await contractService.getContracts();
+      setContracts(response.data || []);
+      
+      // Calculate stats
+      const data = response.data || [];
+      setStats({
+        total: data.length,
+        active: data.filter(c => c.status === 'active').length,
+        pending: data.filter(c => c.status === 'pending').length,
+        expired: data.filter(c => c.status === 'expired').length,
+      });
+    } catch (error) {
+      console.error("Error fetching contracts:", error);
+      toast.error("Không thể tải danh sách hợp đồng");
+      setContracts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignContract = async (contractId) => {
+    try {
+      await contractService.signContract(contractId);
+      toast.success("Ký hợp đồng thành công");
+      fetchContracts(); // Reload
+    } catch (error) {
+      console.error("Error signing contract:", error);
+      toast.error(error.response?.data?.message || "Không thể ký hợp đồng");
+    }
+  };
+
+  const handleDownloadContract = async (contractId, contractNumber) => {
+    try {
+      const response = await contractService.downloadContractPDF(contractId);
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${contractNumber}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success("Tải hợp đồng thành công");
+    } catch (error) {
+      console.error("Error downloading contract:", error);
+      toast.error("Không thể tải hợp đồng");
+    }
+  };
 
   // Menu items cho Admin
   const adminMenuItems = [
@@ -200,92 +266,6 @@ const ContractManagement = () => {
     },
   ]);
 
-  const contracts = [
-    {
-      id: 1,
-      contractNumber: "HD-2024-001",
-      type: "Đồng sở hữu",
-      parties: ["Minh Nguyễn", "Lan Phương", "Tuấn Anh"],
-      car: "VF e34 - 29A-123.45",
-      startDate: "01/11/2024",
-      endDate: "01/11/2025",
-      status: "active",
-      value: 450000000,
-      signedDate: "25/10/2024",
-      documents: ["Hợp đồng chính", "Phụ lục A", "Biên bản bàn giao"],
-    },
-    {
-      id: 2,
-      contractNumber: "HD-2024-002",
-      type: "Đồng sở hữu",
-      parties: ["Hồng Nhung", "Văn Nam", "Thùy Linh"],
-      car: "VinFast VF 8 - 29A-678.90",
-      startDate: "05/11/2024",
-      endDate: "05/11/2025",
-      status: "pending",
-      value: 680000000,
-      signedDate: "30/10/2024",
-      documents: ["Hợp đồng chính", "Phụ lục B"],
-    },
-    {
-      id: 3,
-      contractNumber: "HD-2024-003",
-      type: "Đồng sở hữu",
-      parties: ["Quang Hải", "Mai Phương", "Đức Anh", "Thu Hà"],
-      car: "VF 9 - 29B-123.45",
-      startDate: "10/11/2024",
-      endDate: "10/11/2025",
-      status: "expired",
-      value: 820000000,
-      signedDate: "05/11/2024",
-      documents: [
-        "Hợp đồng chính",
-        "Phụ lục A",
-        "Phụ lục C",
-        "Biên bản bàn giao",
-      ],
-    },
-    {
-      id: 4,
-      contractNumber: "HD-2024-004",
-      type: "Đồng sở hữu",
-      parties: ["Thanh Tùng", "Ngọc Anh"],
-      car: "VF e34 - 30A-543.21",
-      startDate: "15/11/2024",
-      endDate: "15/11/2025",
-      status: "active",
-      value: 380000000,
-      signedDate: "10/11/2024",
-      documents: ["Hợp đồng chính"],
-    },
-    {
-      id: 5,
-      contractNumber: "HD-2024-005",
-      type: "Thuê bao",
-      parties: ["Công ty ABC"],
-      car: "VF 8 Eco - 30B-987.65",
-      startDate: "20/11/2024",
-      endDate: "20/11/2025",
-      status: "active",
-      value: 250000000,
-      signedDate: "15/11/2024",
-      documents: ["Hợp đồng thuê bao", "Phụ lục dịch vụ"],
-    },
-    {
-      id: 6,
-      contractNumber: "HD-2024-006",
-      type: "Bảo hiểm",
-      parties: ["Bảo hiểm PVI"],
-      car: "VF e34 Plus - 29C-111.22",
-      startDate: "25/11/2024",
-      endDate: "25/11/2025",
-      status: "pending",
-      value: 15000000,
-      signedDate: "20/11/2024",
-      documents: ["Hợp đồng bảo hiểm"],
-    },
-  ];
-
   const statusOptions = [
     { value: "all", label: "Tất cả trạng thái", color: "gray" },
     { value: "active", label: "Đang hoạt động", color: "green" },
@@ -299,21 +279,21 @@ const ContractManagement = () => {
       contract.contractNumber
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
-      contract.parties.some((party) =>
+      contract.parties?.some((party) =>
         party.toLowerCase().includes(searchTerm.toLowerCase())
       ) ||
-      contract.car.toLowerCase().includes(searchTerm.toLowerCase());
+      contract.car?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus =
       statusFilter === "all" || contract.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  const stats = {
+  const contractStats = {
     totalContracts: contracts.length,
-    activeContracts: contracts.filter((c) => c.status === "active").length,
-    pendingContracts: contracts.filter((c) => c.status === "pending").length,
-    expiredContracts: contracts.filter((c) => c.status === "expired").length,
-    totalValue: contracts.reduce((sum, contract) => sum + contract.value, 0),
+    activeContracts: stats.active,
+    pendingContracts: stats.pending,
+    expiredContracts: stats.expired,
+    totalValue: contracts.reduce((sum, contract) => sum + (contract.value || 0), 0),
   };
 
   const getStatusIcon = (status) => {
@@ -742,7 +722,7 @@ const ContractManagement = () => {
                     Tổng hợp đồng
                   </p>
                   <p className="text-lg lg:text-2xl font-bold text-gray-900">
-                    {stats.totalContracts}
+                    {contractStats.totalContracts}
                   </p>
                 </div>
                 <div className="p-2 lg:p-3 bg-blue-500 rounded-lg text-white shadow-sm">
@@ -758,7 +738,7 @@ const ContractManagement = () => {
                     Đang hoạt động
                   </p>
                   <p className="text-lg lg:text-2xl font-bold text-gray-900">
-                    {stats.activeContracts}
+                    {contractStats.activeContracts}
                   </p>
                 </div>
                 <div className="p-2 lg:p-3 bg-green-500 rounded-lg text-white shadow-sm">
@@ -774,7 +754,7 @@ const ContractManagement = () => {
                     Chờ ký
                   </p>
                   <p className="text-lg lg:text-2xl font-bold text-gray-900">
-                    {stats.pendingContracts}
+                    {contractStats.pendingContracts}
                   </p>
                 </div>
                 <div className="p-2 lg:p-3 bg-amber-500 rounded-lg text-white shadow-sm">
@@ -790,7 +770,7 @@ const ContractManagement = () => {
                     Hết hạn
                   </p>
                   <p className="text-lg lg:text-2xl font-bold text-gray-900">
-                    {stats.expiredContracts}
+                    {contractStats.expiredContracts}
                   </p>
                 </div>
                 <div className="p-2 lg:p-3 bg-red-500 rounded-lg text-white shadow-sm">
@@ -807,7 +787,7 @@ const ContractManagement = () => {
                       Tổng giá trị
                     </p>
                     <p className="text-lg lg:text-2xl font-bold text-gray-900">
-                      {(stats.totalValue / 1000000000).toFixed(1)}B
+                      {(contractStats.totalValue / 1000000000).toFixed(1)}B
                     </p>
                   </div>
                   <div className="p-2 lg:p-3 bg-purple-500 rounded-lg text-white shadow-sm">
@@ -829,6 +809,7 @@ const ContractManagement = () => {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 lg:py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm lg:text-base bg-gray-50 focus:bg-white transition-colors"
+                  disabled={loading}
                 />
               </div>
               <div className="flex gap-2 lg:gap-3">
@@ -837,6 +818,7 @@ const ContractManagement = () => {
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
                     className="w-full px-3 lg:px-4 py-2 lg:py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm lg:text-base bg-gray-50 focus:bg-white appearance-none"
+                    disabled={loading}
                   >
                     {statusOptions.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -865,7 +847,16 @@ const ContractManagement = () => {
             </div>
           </div>
 
+          {/* Loading State */}
+          {loading && (
+            <div className="text-center py-12">
+              <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              <p className="mt-4 text-gray-600">Đang tải hợp đồng...</p>
+            </div>
+          )}
+
           {/* Mobile Filters Modal */}
+          {!loading && (
           <AnimatePresence>
             {mobileFiltersOpen && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end lg:hidden z-40">
@@ -925,9 +916,10 @@ const ContractManagement = () => {
               </div>
             )}
           </AnimatePresence>
+          )}
 
           {/* Add Contract Button for Mobile */}
-          {canAddContract && (
+          {!loading && canAddContract && (
             <div className="lg:hidden mb-6">
               <motion.button
                 whileHover={{ scale: 1.02 }}
@@ -942,6 +934,7 @@ const ContractManagement = () => {
           )}
 
           {/* Contracts Table */}
+          {!loading && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -1098,6 +1091,7 @@ const ContractManagement = () => {
               </motion.div>
             )}
           </div>
+          )}
         </div>
 
         {/* Contract Detail Modal */}
@@ -1221,7 +1215,10 @@ const ContractManagement = () => {
                               {doc}
                             </span>
                           </div>
-                          <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+                          <button 
+                            onClick={() => handleDownloadContract(selectedContract.id, selectedContract.contractNumber)}
+                            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                          >
                             Tải xuống
                           </button>
                         </div>
@@ -1231,7 +1228,10 @@ const ContractManagement = () => {
 
                   {/* Action Buttons */}
                   <div className="flex flex-col lg:flex-row space-y-3 lg:space-y-0 lg:space-x-3 pt-6 border-t border-gray-200">
-                    <button className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 text-sm lg:text-base">
+                    <button 
+                      onClick={() => handleDownloadContract(selectedContract.id, selectedContract.contractNumber)}
+                      className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 text-sm lg:text-base"
+                    >
                       <Download className="w-4 h-4 lg:w-5 lg:h-5" />
                       <span>Tải hợp đồng</span>
                     </button>
@@ -1241,9 +1241,17 @@ const ContractManagement = () => {
                         <span>Chỉnh sửa</span>
                       </button>
                     )}
-                    <button className="flex-1 bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center space-x-2 text-sm lg:text-base">
+                    <button 
+                      onClick={() => handleSignContract(selectedContract.id)}
+                      disabled={selectedContract.status !== 'pending'}
+                      className={`flex-1 py-3 rounded-lg transition-colors flex items-center justify-center space-x-2 text-sm lg:text-base ${
+                        selectedContract.status === 'pending'
+                          ? 'bg-purple-600 text-white hover:bg-purple-700'
+                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      }`}
+                    >
                       <Shield className="w-4 h-4 lg:w-5 lg:h-5" />
-                      <span>Xác thực chữ ký</span>
+                      <span>{selectedContract.status === 'pending' ? 'Ký hợp đồng' : 'Đã ký'}</span>
                     </button>
                   </div>
                 </div>
