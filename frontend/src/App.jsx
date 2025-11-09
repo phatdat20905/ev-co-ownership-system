@@ -30,6 +30,7 @@ import VerifySuccess from "./pages/auth/VerifySuccess";
 // Dashboard & Co-owner Pages
 import Home from "./pages/dashboard/Dashboard";
 import CoownerDashboard from "./pages/dashboard/coowner/CoownerDashboard";
+import AIRecommendations from "./pages/dashboard/coowner/AIRecommendations";
 import OwnershipManagement from "./pages/dashboard/coowner/ownership/OwnershipManagement";
 import ContractViewer from "./pages/dashboard/coowner/ownership/ContractViewer";
 import DocumentUpload from "./pages/dashboard/coowner/ownership/DocumentUpload";
@@ -167,6 +168,10 @@ export default function App() {
         <Route
           path="/dashboard/coowner/account/profile"
           element={<Profile />}
+        />
+        <Route
+          path="/dashboard/coowner/ai-recommendations"
+          element={<AIRecommendations />}
         />
 
         {/* Fallback Route */}
