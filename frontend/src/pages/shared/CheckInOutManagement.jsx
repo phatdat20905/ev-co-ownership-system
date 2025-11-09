@@ -8,6 +8,8 @@ import {
   FileText, Users, Wrench, AlertCircle, PieChart, Scan, Key,
   Battery, Zap, Wifi, Camera, Shield
 } from "lucide-react";
+import bookingService from "../../services/booking.service";
+import { toast } from "../../utils/toast";
 
 const CheckInOutManagement = () => {
   const navigate = useNavigate();
@@ -24,6 +26,14 @@ const CheckInOutManagement = () => {
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [currentAction, setCurrentAction] = useState(""); // "checkin" or "checkout"
   const [signature, setSignature] = useState("");
+
+  // API State
+  const [checkInOutRecords, setCheckInOutRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedBooking, setSelectedBooking] = useState(null);
+  const [photos, setPhotos] = useState([]);
+  const [notes, setNotes] = useState("");
+  const [mileage, setMileage] = useState("");
 
   // State cho user data - Có thể là admin hoặc staff
   const [userData, setUserData] = useState({
@@ -42,7 +52,146 @@ const CheckInOutManagement = () => {
         console.error("Lỗi khi parse userData:", error);
       }
     }
+    
+    // Load check-in/out records
+    fetchCheckInOutRecords();
   }, []);
+
+  const fetchCheckInOutRecords = async () => {
+    try {
+      setLoading(true);
+      const response = await bookingService.getUserBookings();
+      // Filter bookings that have check-in or check-out data
+      const records = (response.data || []).filter(
+        (booking) => booking.checkedIn || booking.checkedOut
+      );
+      setCheckInOutRecords(records);
+    } catch (error) {
+      console.error("Error fetching check-in/out records:", error);
+      toast.error("Không thể tải lịch sử check-in/out");
+      setCheckInOutRecords([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCheckIn = async (bookingId) => {
+    setSelectedBooking(bookingId);
+    setCurrentAction("checkin");
+    setShowQRScanner(true);
+  };
+
+  const handleCheckOut = async (bookingId) => {
+    setSelectedBooking(bookingId);
+    setCurrentAction("checkout");
+    setShowQRScanner(true);
+  };
+
+  const submitCheckIn = async () => {
+    if (!signature) {
+      toast.error("Vui lòng ký tên");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Upload photos first if any
+      const formData = new FormData();
+      photos.forEach((photo) => {
+        formData.append("photos", photo);
+      });
+      formData.append("bookingId", selectedBooking);
+      formData.append("type", "checkin");
+
+      let photoUrls = [];
+      if (photos.length > 0) {
+        const uploadResponse = await bookingService.uploadCheckInOutPhotos(
+          selectedBooking,
+          formData
+        );
+        photoUrls = uploadResponse.data?.urls || [];
+      }
+
+      // Submit check-in
+      await bookingService.checkIn(selectedBooking, {
+        signature: signature,
+        photos: photoUrls,
+        notes: notes,
+        mileage: parseInt(mileage) || 0,
+      });
+
+      toast.success("Check-in thành công");
+      resetForm();
+      fetchCheckInOutRecords();
+    } catch (error) {
+      console.error("Error checking in:", error);
+      toast.error(error.response?.data?.message || "Không thể check-in");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitCheckOut = async () => {
+    if (!signature) {
+      toast.error("Vui lòng ký tên");
+      return;
+    }
+
+    if (!mileage) {
+      toast.error("Vui lòng nhập số km");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Upload photos first if any
+      const formData = new FormData();
+      photos.forEach((photo) => {
+        formData.append("photos", photo);
+      });
+      formData.append("bookingId", selectedBooking);
+      formData.append("type", "checkout");
+
+      let photoUrls = [];
+      if (photos.length > 0) {
+        const uploadResponse = await bookingService.uploadCheckInOutPhotos(
+          selectedBooking,
+          formData
+        );
+        photoUrls = uploadResponse.data?.urls || [];
+      }
+
+      // Submit check-out
+      await bookingService.checkOut(selectedBooking, {
+        signature: signature,
+        photos: photoUrls,
+        notes: notes,
+        mileage: parseInt(mileage),
+      });
+
+      toast.success("Check-out thành công");
+      resetForm();
+      fetchCheckInOutRecords();
+    } catch (error) {
+      console.error("Error checking out:", error);
+      toast.error(error.response?.data?.message || "Không thể check-out");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetForm = () => {
+    setSelectedBooking(null);
+    setCurrentAction("");
+    setShowQRScanner(false);
+    setShowSignatureModal(false);
+    setSignature("");
+    setPhotos([]);
+    setNotes("");
+    setMileage("");
+  };
 
   // Menu items cho Admin
   const adminMenuItems = [
@@ -154,95 +303,6 @@ const CheckInOutManagement = () => {
     }
   ]);
 
-  // Dữ liệu mẫu cho check-in/out records
-  const checkRecords = [
-    {
-      id: 1,
-      type: "checkin",
-      user: "Minh Nguyễn",
-      car: "VF e34 - 29A-123.45",
-      scheduledDate: "15/11/2024",
-      scheduledTime: "08:00 - 18:00",
-      actualTime: "15/11/2024 08:15",
-      status: "completed",
-      location: "Q.1, TP.HCM",
-      odometer: 12540,
-      battery: 85,
-      signature: true,
-      notes: "Xe sạch sẽ, đầy đủ phụ kiện",
-      qrCode: "VF34-20241115-001",
-      staff: "Nguyễn Văn B"
-    },
-    {
-      id: 2,
-      type: "checkout",
-      user: "Lan Phương",
-      car: "VinFast VF 8 - 29A-678.90",
-      scheduledDate: "15/11/2024",
-      scheduledTime: "09:00 - 17:00",
-      actualTime: "15/11/2024 17:30",
-      status: "pending",
-      location: "Q.3, TP.HCM",
-      odometer: 18760,
-      battery: 72,
-      signature: false,
-      notes: "",
-      qrCode: "VF8-20241115-002",
-      staff: "Trần Thị C"
-    },
-    {
-      id: 3,
-      type: "checkin",
-      user: "Tuấn Anh",
-      car: "VF 9 - 29B-123.45",
-      scheduledDate: "14/11/2024",
-      scheduledTime: "10:00 - 20:00",
-      actualTime: "14/11/2024 10:05",
-      status: "completed",
-      location: "Q.7, TP.HCM",
-      odometer: 8920,
-      battery: 91,
-      signature: true,
-      notes: "Đã kiểm tra nội thất",
-      qrCode: "VF9-20241114-003",
-      staff: "Nguyễn Văn B"
-    },
-    {
-      id: 4,
-      type: "checkout",
-      user: "Hồng Nhung",
-      car: "VF e34 - 30A-543.21",
-      scheduledDate: "14/11/2024",
-      scheduledTime: "08:30 - 16:30",
-      actualTime: "14/11/2024 16:45",
-      status: "completed",
-      location: "Q.2, TP.HCM",
-      odometer: 15680,
-      battery: 68,
-      signature: true,
-      notes: "Vệ sinh xe trước khi trả",
-      qrCode: "VF34-20241114-004",
-      staff: "Lê Văn D"
-    },
-    {
-      id: 5,
-      type: "checkin",
-      user: "Văn Nam",
-      car: "VF 8 Eco - 30B-987.65",
-      scheduledDate: "16/11/2024",
-      scheduledTime: "07:00 - 19:00",
-      actualTime: "",
-      status: "scheduled",
-      location: "Q.1, TP.HCM",
-      odometer: 0,
-      battery: 0,
-      signature: false,
-      notes: "",
-      qrCode: "VF8E-20241116-005",
-      staff: ""
-    }
-  ];
-
   const statusOptions = [
     { value: "all", label: "Tất cả trạng thái", color: "gray" },
     { value: "completed", label: "Đã hoàn thành", color: "green" },
@@ -258,10 +318,10 @@ const CheckInOutManagement = () => {
   ];
 
   // Lọc records dựa trên role
-  const filteredRecords = checkRecords.filter(record => {
-    const matchesSearch = record.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         record.car.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         record.location.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredRecords = checkInOutRecords.filter(record => {
+    const matchesSearch = record.user?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         record.vehicleName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         record.location?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || record.status === statusFilter;
     
     // Nếu là staff, chỉ hiển thị records do chính họ xử lý hoặc chưa có staff
@@ -275,11 +335,11 @@ const CheckInOutManagement = () => {
   });
 
   const stats = {
-    totalRecords: userData.role === "admin" ? checkRecords.length : filteredRecords.length,
-    checkinRecords: filteredRecords.filter(r => r.type === 'checkin').length,
-    checkoutRecords: filteredRecords.filter(r => r.type === 'checkout').length,
-    completedRecords: filteredRecords.filter(r => r.status === 'completed').length,
-    pendingRecords: filteredRecords.filter(r => r.status === 'pending').length
+    totalRecords: userData.role === "admin" ? checkInOutRecords.length : filteredRecords.length,
+    checkinRecords: filteredRecords.filter(r => r.checkedIn).length,
+    checkoutRecords: filteredRecords.filter(r => r.checkedOut).length,
+    completedRecords: filteredRecords.filter(r => r.checkedIn && r.checkedOut).length,
+    pendingRecords: filteredRecords.filter(r => r.checkedIn && !r.checkedOut).length
   };
 
   const getStatusIcon = (status) => {
@@ -771,6 +831,14 @@ const CheckInOutManagement = () => {
 
           {/* Records Table */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            {loading && (
+              <div className="text-center py-12">
+                <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p className="text-gray-600">Đang tải dữ liệu...</p>
+              </div>
+            )}
+            
+            {!loading && (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
@@ -853,8 +921,9 @@ const CheckInOutManagement = () => {
                 </tbody>
               </table>
             </div>
+            )}
 
-            {filteredRecords.length === 0 && (
+            {!loading && filteredRecords.length === 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
