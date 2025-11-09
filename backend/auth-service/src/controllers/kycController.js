@@ -48,6 +48,23 @@ export class KYCController {
 
       const result = await kycService.getKYCStatus(userId);
 
+      // Handle null result (KYC not submitted yet)
+      if (!result) {
+        return successResponse(res, 'KYC not submitted yet', {
+          status: 'not_submitted',
+          verificationStatus: null,
+          idCardNumber: null,
+          driverLicenseNumber: null,
+          idCardFrontUrl: null,
+          idCardBackUrl: null,
+          driverLicenseUrl: null,
+          selfieUrl: null,
+          rejectionReason: null,
+          submittedAt: null,
+          reviewedAt: null
+        });
+      }
+
       return successResponse(res, 'KYC status retrieved successfully', result);
     } catch (error) {
       next(error);

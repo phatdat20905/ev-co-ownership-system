@@ -62,7 +62,9 @@ export class KYCService {
       });
 
       if (!kyc) {
-        throw new AppError('KYC verification not found', 404, 'KYC_NOT_FOUND');
+        // Return null instead of throwing error - user hasn't submitted KYC yet
+        logger.debug('KYC verification not found, returning null', { userId });
+        return null;
       }
 
       logger.debug('KYC status retrieved', { 

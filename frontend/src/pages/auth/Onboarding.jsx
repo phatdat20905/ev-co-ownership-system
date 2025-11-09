@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { User, Mail, Phone, MapPin, Calendar, ArrowRight, ArrowLeft, Check, Upload } from "lucide-react";
-import { userService } from "../../../../services";
-import { showSuccessToast, showErrorToast } from "../../../../utils/toast";
+import { userService } from "../../services";
+import { showSuccessToast, showErrorToast } from "../../utils/toast";
 
 export default function Onboarding() {
   const navigate = useNavigate();

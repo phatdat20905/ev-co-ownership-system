@@ -57,10 +57,11 @@ export class AuthService {
       emailService.sendVerificationEmail(user.email, verificationToken)
         .catch(error => logger.error('Failed to send verification email', { error: error.message, userId: user.id }));
 
-      // Publish safe payload
+      // Publish safe payload with phone
       eventService.publishUserRegistered({
         userId: user.id,
         email: user.email,
+        phone: user.phone,
         role: user.role,
         isVerified: user.isVerified,
         registeredAt: user.createdAt

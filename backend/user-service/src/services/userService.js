@@ -8,17 +8,19 @@ import eventService from './eventService.js';
 export class UserService {
   async getUserProfile(userId) {
     try {
-      const profile = await db.UserProfile.findOne({
+      let profile = await db.UserProfile.findOne({
         where: { userId }
       });
 
       if (!profile) {
-        throw new AppError('User profile not found', 404, 'USER_PROFILE_NOT_FOUND');
+        // Auto-create profile if it doesn't exist (fallback)
+        logger.warn('User profile not found, auto-creating', { userId });
+        profile = await this.ensureProfileExists(userId);
       }
 
       logger.debug('User profile retrieved', { userId });
 
-      return profile.getPublicProfile();
+      return profile.getPublicProfile ? profile.getPublicProfile() : profile;
     } catch (error) {
       logger.error('Failed to get user profile', { error: error.message, userId });
       throw error;
@@ -104,6 +106,35 @@ export class UserService {
       return profiles;
     } catch (error) {
       logger.error('Failed to search users', { error: error.message, query });
+      throw error;
+    }
+  }
+
+  async ensureProfileExists(userId, email = null, phone = null) {
+    try {
+      // Check if profile exists
+      let profile = await db.UserProfile.findOne({ where: { userId } });
+
+      if (!profile) {
+        // Create profile if it doesn't exist
+        profile = await db.UserProfile.create({
+          userId,
+          email,
+          phone,
+          fullName: '',
+          dateOfBirth: null,
+          gender: null,
+          address: null,
+          avatarUrl: null,
+          isProfileComplete: false
+        });
+
+        logger.info('Profile created via ensureProfileExists', { userId });
+      }
+
+      return profile;
+    } catch (error) {
+      logger.error('Failed to ensure profile exists', { error: error.message, userId });
       throw error;
     }
   }
