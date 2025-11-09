@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Users, UserPlus, Search, Filter, Edit, Trash2, Shield, Mail, Phone, Calendar, ArrowLeft, BarChart3, Car, FileText, QrCode, Wrench, Download, CheckCircle, XCircle, Eye, X, Menu, Bell, User, LogOut, PieChart, AlertTriangle, ChevronDown, MoreVertical } from "lucide-react";
+import adminService from "../../services/admin.service";
+import { toast } from "../../utils/toast";
 
 const StaffManagement = () => {
   const navigate = useNavigate();
@@ -12,11 +14,96 @@ const StaffManagement = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState(null);
 
+  // API State
+  const [staffMembers, setStaffMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    role: "",
+    permissions: []
+  });
+
   // Thêm state cho dropdown menus
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const userMenuRef = useRef(null);
   const notificationsRef = useRef(null);
+
+  // Fetch staff data
+  useEffect(() => {
+    fetchStaffMembers();
+  }, []);
+
+  const fetchStaffMembers = async () => {
+    try {
+      setLoading(true);
+      const response = await adminService.listStaff();
+      setStaffMembers(response.data.staff || []);
+    } catch (error) {
+      console.error("Error fetching staff:", error);
+      toast.error("Không thể tải danh sách nhân viên");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddStaff = async () => {
+    try {
+      if (!formData.name || !formData.email || !formData.phone || !formData.role) {
+        toast.error("Vui lòng điền đầy đủ thông tin");
+        return;
+      }
+
+      await adminService.createStaff(formData);
+      toast.success("Thêm nhân viên thành công");
+      setShowAddForm(false);
+      setFormData({ name: "", email: "", phone: "", role: "", permissions: [] });
+      fetchStaffMembers();
+    } catch (error) {
+      console.error("Error creating staff:", error);
+      toast.error(error.response?.data?.message || "Không thể thêm nhân viên");
+    }
+  };
+
+  const handleUpdateStaff = async () => {
+    try {
+      if (!selectedStaff) return;
+
+      await adminService.updateStaff(selectedStaff._id, selectedStaff);
+      toast.success("Cập nhật nhân viên thành công");
+      setSelectedStaff(null);
+      fetchStaffMembers();
+    } catch (error) {
+      console.error("Error updating staff:", error);
+      toast.error(error.response?.data?.message || "Không thể cập nhật nhân viên");
+    }
+  };
+
+  const handleUpdatePermissions = async (staffId, permissions) => {
+    try {
+      await adminService.updateStaffPermissions(staffId, permissions);
+      toast.success("Cập nhật quyền hạn thành công");
+      fetchStaffMembers();
+    } catch (error) {
+      console.error("Error updating permissions:", error);
+      toast.error(error.response?.data?.message || "Không thể cập nhật quyền hạn");
+    }
+  };
+
+  const handleDeleteStaff = async (staffId) => {
+    if (!confirm("Bạn có chắc chắn muốn xóa nhân viên này?")) return;
+
+    try {
+      await adminService.deactivateStaff(staffId);
+      toast.success("Xóa nhân viên thành công");
+      fetchStaffMembers();
+    } catch (error) {
+      console.error("Error deleting staff:", error);
+      toast.error(error.response?.data?.message || "Không thể xóa nhân viên");
+    }
+  };
 
   // Notifications data
   const [notifications, setNotifications] = useState([
@@ -72,57 +159,6 @@ const StaffManagement = () => {
 
   const activeTab = getActiveTab();
 
-  const staffMembers = [
-    {
-      id: 1,
-      name: "Nguyễn Văn A",
-      email: "a.nguyen@evco.com",
-      phone: "0912345678",
-      role: "Quản lý vận hành",
-      status: "active",
-      joinDate: "15/08/2024",
-      permissions: ["Quản lý xe", "Xử lý đặt lịch", "Báo cáo", "Check-in/out", "Quản lý dịch vụ"],
-      assignedCars: 12,
-      completedTasks: 45
-    },
-    {
-      id: 2,
-      name: "Trần Thị B",
-      email: "b.tran@evco.com",
-      phone: "0923456789",
-      role: "Nhân viên hỗ trợ",
-      status: "active",
-      joinDate: "20/09/2024",
-      permissions: ["Hỗ trợ thành viên", "Xử lý khiếu nại", "Check-in/out"],
-      assignedCars: 8,
-      completedTasks: 32
-    },
-    {
-      id: 3,
-      name: "Lê Văn C",
-      email: "c.le@evco.com",
-      phone: "0934567890",
-      role: "Kỹ thuật viên",
-      status: "inactive",
-      joinDate: "10/07/2024",
-      permissions: ["Bảo dưỡng xe", "Kiểm tra kỹ thuật", "Quản lý dịch vụ"],
-      assignedCars: 6,
-      completedTasks: 28
-    },
-    {
-      id: 4,
-      name: "Phạm Thị D",
-      email: "d.pham@evco.com",
-      phone: "0945678901",
-      role: "Nhân viên Check-in/out",
-      status: "active",
-      joinDate: "05/10/2024",
-      permissions: ["Check-in/out", "Xác minh QR", "Ghi nhận sự cố"],
-      assignedCars: 10,
-      completedTasks: 67
-    }
-  ];
-
   const roles = [
     "Quản lý vận hành",
     "Nhân viên hỗ trợ",
@@ -148,16 +184,16 @@ const StaffManagement = () => {
   ];
 
   const filteredStaff = staffMembers.filter(staff =>
-    staff.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    staff.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    staff.role.toLowerCase().includes(searchTerm.toLowerCase())
+    staff.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    staff.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    staff.role?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const staffStats = {
     total: staffMembers.length,
-    active: staffMembers.filter(s => s.status === 'active').length,
-    assignedCars: staffMembers.reduce((sum, staff) => sum + staff.assignedCars, 0),
-    totalTasks: staffMembers.reduce((sum, staff) => sum + staff.completedTasks, 0)
+    active: staffMembers.filter(s => s.isActive !== false).length,
+    assignedCars: staffMembers.reduce((sum, staff) => sum + (staff.assignedCars || 0), 0),
+    totalTasks: staffMembers.reduce((sum, staff) => sum + (staff.completedTasks || 0), 0)
   };
 
   const unreadNotifications = notifications.filter(n => !n.read).length;
@@ -478,6 +514,22 @@ const StaffManagement = () => {
           </div>
 
           {/* Staff Grid */}
+          {loading && (
+            <div className="text-center py-12">
+              <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+              <p className="text-gray-600">Đang tải danh sách nhân viên...</p>
+            </div>
+          )}
+
+          {!loading && filteredStaff.length === 0 && (
+            <div className="text-center py-12">
+              <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Chưa có nhân viên</h3>
+              <p className="text-gray-600 mb-6">Thêm nhân viên đầu tiên để bắt đầu</p>
+            </div>
+          )}
+
+          {!loading && filteredStaff.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
             {filteredStaff.map((staff) => (
               <motion.div
@@ -567,7 +619,10 @@ const StaffManagement = () => {
                       <Edit className="w-3 h-3 lg:w-4 lg:h-4" />
                       <span>Sửa</span>
                     </button>
-                    <button className="flex-1 bg-red-100 text-red-700 py-2 rounded-lg flex items-center justify-center space-x-1 hover:bg-red-200 transition-colors text-xs lg:text-sm">
+                    <button 
+                      onClick={() => handleDeleteStaff(staff._id)}
+                      className="flex-1 bg-red-100 text-red-700 py-2 rounded-lg flex items-center justify-center space-x-1 hover:bg-red-200 transition-colors text-xs lg:text-sm"
+                    >
                       <Trash2 className="w-3 h-3 lg:w-4 lg:h-4" />
                       <span>Xóa</span>
                     </button>
@@ -576,23 +631,6 @@ const StaffManagement = () => {
               </motion.div>
             ))}
           </div>
-
-          {filteredStaff.length === 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100"
-            >
-              <Users className="w-12 h-12 lg:w-16 lg:h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Không tìm thấy nhân viên</h3>
-              <p className="text-gray-600 max-w-sm mx-auto mb-6">Thử thay đổi điều kiện tìm kiếm hoặc thêm nhân viên mới</p>
-              <button
-                onClick={() => setShowAddForm(true)}
-                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-              >
-                Thêm nhân viên mới
-              </button>
-            </motion.div>
           )}
         </main>
       </div>
@@ -751,19 +789,39 @@ const StaffManagement = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6 mb-6 lg:mb-8">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Họ và tên</label>
-                    <input type="text" className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                    <input 
+                      type="text" 
+                      value={formData.name}
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                    <input type="email" className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                    <input 
+                      type="email" 
+                      value={formData.email}
+                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Số điện thoại</label>
-                    <input type="tel" className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                    <input 
+                      type="tel" 
+                      value={formData.phone}
+                      onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Chức vụ</label>
-                    <select className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <select 
+                      value={formData.role}
+                      onChange={(e) => setFormData({...formData, role: e.target.value})}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Chọn chức vụ</option>
                       {roles.map(role => (
                         <option key={role} value={role}>{role}</option>
                       ))}
@@ -776,7 +834,18 @@ const StaffManagement = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {permissionsList.map(permission => (
                       <label key={permission} className="flex items-center space-x-2">
-                        <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                        <input 
+                          type="checkbox" 
+                          checked={formData.permissions.includes(permission)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormData({...formData, permissions: [...formData.permissions, permission]});
+                            } else {
+                              setFormData({...formData, permissions: formData.permissions.filter(p => p !== permission)});
+                            }
+                          }}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
+                        />
                         <span className="text-sm text-gray-700">{permission}</span>
                       </label>
                     ))}
@@ -790,7 +859,10 @@ const StaffManagement = () => {
                   >
                     Hủy
                   </button>
-                  <button className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm lg:text-base">
+                  <button 
+                    onClick={handleAddStaff}
+                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm lg:text-base"
+                  >
                     Thêm nhân viên
                   </button>
                 </div>
