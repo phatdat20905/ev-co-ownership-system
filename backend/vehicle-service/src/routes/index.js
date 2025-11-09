@@ -9,11 +9,12 @@ import adminRoutes from './adminRoutes.js';
 
 const router = express.Router();
 
-router.use('/', vehicleRoutes);
-router.use('/maintenance', maintenanceRoutes);
-router.use('/insurance', insuranceRoutes);
-router.use('/charging', chargingRoutes);
-router.use('/analytics', analyticsRoutes);
-router.use('/admin', adminRoutes);
+// Mount routes with /vehicles prefix
+router.use('/vehicles', vehicleRoutes);
+router.use('/vehicles/maintenance', maintenanceRoutes);
+router.use('/vehicles/insurance', insuranceRoutes);
+router.use('/vehicles/charging', chargingRoutes);
+router.use('/vehicles/analytics', analyticsRoutes);
+router.use('/vehicles/admin', adminRoutes);
 
 export default router;

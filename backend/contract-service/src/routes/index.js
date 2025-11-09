@@ -8,14 +8,14 @@ import templateRoutes from './templateRoutes.js';
 
 const router = express.Router();
 
-// Mount all route modules
-router.use('/', contractRoutes);
-router.use('/signatures', signatureRoutes);
-router.use('/parties', partyRoutes);
-router.use('/documents', documentRoutes);
-router.use('/amendments', amendmentRoutes);
+// Mount routes with /contracts prefix
+router.use('/contracts', contractRoutes);
+router.use('/contracts/signatures', signatureRoutes);
+router.use('/contracts/parties', partyRoutes);
+router.use('/contracts/documents', documentRoutes);
+router.use('/contracts/amendments', amendmentRoutes);
 
-// ✅ Templates route là module riêng
-router.use('/templates', templateRoutes);
+// Templates route là module riêng
+router.use('/contracts/templates', templateRoutes);
 
 export default router;

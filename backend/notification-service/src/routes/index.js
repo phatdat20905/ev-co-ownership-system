@@ -16,9 +16,9 @@ router.get('/health', (req, res) => {
   });
 });
 
-// API routes
-router.use('/', notificationRoutes);
-router.use('/templates', templateRoutes);
-router.use('/preferences', preferenceRoutes);
+// Mount routes with /notifications prefix
+router.use('/notifications', notificationRoutes);
+router.use('/notifications/templates', templateRoutes);
+router.use('/notifications/preferences', preferenceRoutes);
 
 export default router;

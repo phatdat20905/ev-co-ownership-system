@@ -19,12 +19,12 @@ router.get('/health', (req, res) => {
   });
 });
 
-// API routes
-router.use('/dashboard', dashboardRoutes);
-router.use('/staff', staffManagementRoutes);
-router.use('/disputes', disputeRoutes);
-router.use('/kyc', kycRoutes);
-router.use('/system', systemRoutes);
-router.use('/analytics', analyticsRoutes);
+// Mount routes with /admin prefix
+router.use('/admin/dashboard', dashboardRoutes);
+router.use('/admin/staff', staffManagementRoutes);
+router.use('/admin/disputes', disputeRoutes);
+router.use('/admin/kyc', kycRoutes);
+router.use('/admin/system', systemRoutes);
+router.use('/admin/analytics', analyticsRoutes);
 
 export default router;

@@ -10,12 +10,13 @@ import reportRoutes from './reportRoutes.js';
 
 const router = express.Router();
 
-router.use('/', costRoutes);
-router.use('/payments', paymentRoutes);
-router.use('/wallets', walletRoutes);
-router.use('/group-wallets', groupWalletRoutes);
-router.use('/splits', splitRoutes);
-router.use('/invoices', invoiceRoutes);
-router.use('/reports', reportRoutes);
+// Mount routes with /costs prefix
+router.use('/costs', costRoutes);
+router.use('/costs/payments', paymentRoutes);
+router.use('/costs/wallets', walletRoutes);
+router.use('/costs/group-wallets', groupWalletRoutes);
+router.use('/costs/splits', splitRoutes);
+router.use('/costs/invoices', invoiceRoutes);
+router.use('/costs/reports', reportRoutes);
 
 export default router;

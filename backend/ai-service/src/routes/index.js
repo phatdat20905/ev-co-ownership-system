@@ -18,11 +18,11 @@ router.get('/health', (req, res) => {
   });
 });
 
-// Mount feature routes
-router.use('/schedule', scheduleRoutes);
-router.use('/cost', costRoutes);
-router.use('/dispute', disputeRoutes);
-router.use('/analytics', analyticsRoutes);
-router.use('/feedback', feedbackRoutes);
+// Mount routes with /ai prefix
+router.use('/ai/schedule', scheduleRoutes);
+router.use('/ai/cost', costRoutes);
+router.use('/ai/dispute', disputeRoutes);
+router.use('/ai/analytics', analyticsRoutes);
+router.use('/ai/feedback', feedbackRoutes);
 
 export default router;

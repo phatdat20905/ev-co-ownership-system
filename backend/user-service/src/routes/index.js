@@ -7,9 +7,10 @@ import fundRoutes from './fundRoutes.js';
 
 const router = express.Router();
 
-router.use('/', userRoutes);
-router.use('/groups', groupRoutes);
-router.use('/votes', voteRoutes);
-router.use('/fund', fundRoutes);
+// Mount routes with /user prefix
+router.use('/user', userRoutes);
+router.use('/user/groups', groupRoutes);
+router.use('/user/votes', voteRoutes);
+router.use('/user/fund', fundRoutes);
 
 export default router;
