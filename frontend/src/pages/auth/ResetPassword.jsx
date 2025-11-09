@@ -1,19 +1,33 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle, Circle, Eye, EyeOff, Loader2, Lock } from "lucide-react";
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Footer from "../../components/layout/Footer";
 import Header from "../../components/layout/Header";
-
+import authService from "../../services/auth.service";
+import { showSuccessToast, showErrorToast } from "../../utils/toast";
 
 export default function ResetPassword() {
+  const [searchParams] = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isFocused, setIsFocused] = useState(false);
+  const [token, setToken] = useState("");
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const resetToken = searchParams.get('token');
+    if (!resetToken) {
+      showErrorToast('Token không hợp lệ');
+      navigate('/forgot-password');
+    } else {
+      setToken(resetToken);
+    }
+  }, [searchParams, navigate]);
 
   // Các điều kiện mật khẩu
   const conditions = [
@@ -41,16 +55,31 @@ export default function ResetPassword() {
       ? "bg-green-500"
       : "bg-gray-200";
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (password !== confirmPassword) {
+      showErrorToast('Mật khẩu xác nhận không khớp');
+      return;
+    }
+
+    if (!conditions.every(c => c.valid)) {
+      showErrorToast('Mật khẩu không đáp ứng yêu cầu');
+      return;
+    }
+
     setLoading(true);
 
-    // Giả lập API đặt lại mật khẩu
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await authService.resetPassword(token, password);
       setSuccess(true);
-      setTimeout(() => navigate("/login"), 1000);
-    }, 1500);
+      showSuccessToast('Đặt lại mật khẩu thành công!');
+      setTimeout(() => navigate("/login"), 2000);
+    } catch (error) {
+      showErrorToast(error.message || 'Đặt lại mật khẩu thất bại');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -156,6 +185,8 @@ export default function ResetPassword() {
                     <Lock className="h-5 w-5 text-sky-500 mr-2" />
                     <input
                       type={showConfirm ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
                       required
                       placeholder="Nhập lại mật khẩu mới"
                       className="w-full bg-transparent outline-none text-gray-700 placeholder-gray-400"

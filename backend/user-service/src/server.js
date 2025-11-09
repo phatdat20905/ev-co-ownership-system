@@ -26,7 +26,7 @@ async function startServer() {
 
     // 🚀 Start Express app
     app.listen(PORT, () => {
-      logger.info(`🚀 Auth Service running on port ${PORT} [${process.env.NODE_ENV}]`);
+      logger.info(`🚀 User Service running on port ${PORT} [${process.env.NODE_ENV}]`);
     });
   } catch (error) {
     logger.error('❌ Server failed to start', { error: error.message });
