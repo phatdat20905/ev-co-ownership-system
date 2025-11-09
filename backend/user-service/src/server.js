@@ -7,7 +7,7 @@ import {
   rabbitMQClient
 } from '@ev-coownership/shared';
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002; // User Service port
 
 async function startServer() {
   try {

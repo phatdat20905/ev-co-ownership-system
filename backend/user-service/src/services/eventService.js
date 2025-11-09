@@ -3,6 +3,7 @@ import {
   eventTypes,
   logger 
 } from '@ev-coownership/shared';
+import authEventHandler from '../events/authEventHandler.js';
 
 class EventService {
   constructor() {
@@ -201,8 +202,11 @@ class EventService {
     }
 
     try {
+      // Listen to Auth Service events
+      await this.eventBus.subscribe(eventTypes.USER_REGISTERED, this.handleUserRegistered.bind(this));
       await this.eventBus.subscribe(eventTypes.USER_CREATED, this.handleUserCreated.bind(this));
       await this.eventBus.subscribe(eventTypes.USER_DELETED, this.handleUserDeleted.bind(this));
+      await this.eventBus.subscribe(eventTypes.KYC_VERIFIED, this.handleKYCVerified.bind(this));
 
       logger.info('User service event consumers started successfully');
     } catch (error) {
@@ -210,12 +214,37 @@ class EventService {
     }
   }
 
+  async handleUserRegistered(userData) {
+    try {
+      logger.info('🔔 UserRegistered event received', { userId: userData.userId });
+      await authEventHandler.handleUserRegistered(userData);
+    } catch (error) {
+      logger.error('❌ Error handling UserRegistered event', { 
+        error: error.message, 
+        userId: userData.userId 
+      });
+    }
+  }
+
   async handleUserCreated(userData) {
     try {
       logger.info('User created event received', { userId: userData.userId });
-      // Auto-create user profile when user is created in auth service
+      // Alias for UserRegistered, also auto-create profile
+      await authEventHandler.handleUserRegistered(userData);
     } catch (error) {
       logger.error('Error handling user created event', { error: error.message, userId: userData.userId });
+    }
+  }
+
+  async handleKYCVerified(kycData) {
+    try {
+      logger.info('🔔 KYCVerified event received', { userId: kycData.userId });
+      await authEventHandler.handleKYCVerified(kycData);
+    } catch (error) {
+      logger.error('❌ Error handling KYCVerified event', { 
+        error: error.message, 
+        userId: kycData.userId 
+      });
     }
   }
 

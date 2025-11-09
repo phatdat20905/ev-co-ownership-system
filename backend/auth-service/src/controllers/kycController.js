@@ -11,6 +11,22 @@ export class KYCController {
     try {
       const userId = req.user.id;
       const kycData = req.body;
+      
+      // Handle uploaded files
+      if (req.files) {
+        if (req.files.idCardFront) {
+          kycData.idCardFrontUrl = `/uploads/kyc/${req.files.idCardFront[0].filename}`;
+        }
+        if (req.files.idCardBack) {
+          kycData.idCardBackUrl = `/uploads/kyc/${req.files.idCardBack[0].filename}`;
+        }
+        if (req.files.driverLicense) {
+          kycData.driverLicenseUrl = `/uploads/kyc/${req.files.driverLicense[0].filename}`;
+        }
+        if (req.files.selfie) {
+          kycData.selfieUrl = `/uploads/kyc/${req.files.selfie[0].filename}`;
+        }
+      }
 
       const result = await kycService.submitKYC(userId, kycData);
 

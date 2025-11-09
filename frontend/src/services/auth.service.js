@@ -149,6 +149,28 @@ class AuthService {
   }
 
   /**
+   * Submit KYC documents
+   * POST /auth/kyc/submit
+   */
+  async submitKYC(formData) {
+    const response = await apiClient.post('/auth/kyc/submit', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    return response;
+  }
+
+  /**
+   * Get KYC verification status
+   * GET /auth/kyc/status
+   */
+  async getKYCStatus() {
+    const response = await apiClient.get('/auth/kyc/status');
+    return response;
+  }
+
+  /**
    * Check if user is authenticated
    */
   isAuthenticated() {
