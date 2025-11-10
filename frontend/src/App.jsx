@@ -2,6 +2,7 @@ import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import ScrollToTop from "./components/layout/ScrollToTop";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -33,7 +34,13 @@ import ContractViewer from "./pages/dashboard/coowner/ownership/ContractViewer";
 import DocumentUpload from "./pages/dashboard/coowner/ownership/DocumentUpload";
 import BookingCalendar from "./pages/dashboard/coowner/booking/BookingCalendar";
 import BookingForm from "./pages/dashboard/coowner/booking/BookingForm";
+import BookingDetails from "./pages/bookings/BookingDetails";
 import ScheduleView from "./pages/dashboard/coowner/booking/ScheduleView";
+import VehicleList from "./pages/vehicles/VehicleList";
+import VehicleDetails from "./pages/vehicles/VehicleDetails";
+import ContractList from "./pages/contracts/ContractList";
+import ContractDetails from "./pages/contracts/ContractDetails";
+import NotificationSettings from "./pages/notifications/NotificationSettings";
 import CostBreakdown from "./pages/dashboard/coowner/financial/CostBreakdown";
 import PaymentHistory from "./pages/dashboard/coowner/financial/PaymentHistory";
 import ExpenseTracking from "./pages/dashboard/coowner/financial/ExpenseTracking";
@@ -45,6 +52,8 @@ import VotingManagement from "./pages/dashboard/coowner/group/VotingManagement";
 import CommonFund from "./pages/dashboard/coowner/group/CommonFund";
 import Profile from "./pages/dashboard/coowner/account/Profile";
 import KYCStatus from "./pages/profile/KYCStatus";
+import ProfileSettings from "./pages/profile/ProfileSettings";
+import ChangePassword from "./pages/profile/ChangePassword";
 
 // Staff Pages
 import StaffDashboard from "./pages/staff/StaffDashboard";
@@ -57,16 +66,17 @@ import QuyenLoiThanhVien from "./pages/policies/QuyenLoiThanhVien";
 
 export default function App() {
   return (
-    <Router>
-      <ScrollToTop />
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/verify-email" element={<VerifyEmail />} />
+    <ErrorBoundary>
+      <Router>
+        <ScrollToTop />
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
 
         {/* Policy Routes */}
         <Route path="/quy-dinh-hoat-dong" element={<QuyDinhHoatDong />} />
@@ -126,8 +136,28 @@ export default function App() {
           element={<BookingForm />}
         />
         <Route
+          path="/dashboard/coowner/booking/:bookingId"
+          element={<BookingDetails />}
+        />
+        <Route
           path="/dashboard/coowner/booking/schedule"
           element={<ScheduleView />}
+        />
+        <Route
+          path="/dashboard/coowner/vehicles"
+          element={<VehicleList />}
+        />
+        <Route
+          path="/dashboard/coowner/vehicles/:vehicleId"
+          element={<VehicleDetails />}
+        />
+        <Route
+          path="/dashboard/coowner/contracts"
+          element={<ContractList />}
+        />
+        <Route
+          path="/dashboard/coowner/contracts/:contractId"
+          element={<ContractDetails />}
         />
         <Route
           path="/dashboard/coowner/financial"
@@ -169,8 +199,24 @@ export default function App() {
           element={<KYCStatus />}
         />
         <Route
+          path="/dashboard/coowner/settings/notifications"
+          element={<NotificationSettings />}
+        />
+        <Route
           path="/kyc-status"
           element={<KYCStatus />}
+        />
+        <Route
+          path="/profile/kyc-status"
+          element={<KYCStatus />}
+        />
+        <Route
+          path="/profile/settings"
+          element={<ProfileSettings />}
+        />
+        <Route
+          path="/profile/change-password"
+          element={<ChangePassword />}
         />
         <Route
           path="/dashboard/coowner/ai-recommendations"
@@ -182,18 +228,19 @@ export default function App() {
       </Routes>
       
       {/* Toast Notification Container */}
-      <ToastContainer
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="light"
-      />
-    </Router>
+        <ToastContainer
+          position="top-right"
+          autoClose={3000}
+          hideProgressBar={false}
+          newestOnTop
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="light"
+        />
+      </Router>
+    </ErrorBoundary>
   );
 }

@@ -22,6 +22,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import Header from "../../../components/layout/Header";
 import Footer from "../../../components/layout/Footer";
+import AIRecommendations from "../../../components/ai/AIRecommendations";
 
 export default function CoownerDashboard() {
   const [userData, setUserData] = useState(null);
@@ -544,24 +545,10 @@ export default function CoownerDashboard() {
               </div>
 
               {/* AI Recommendations */}
-              <div className="bg-gradient-to-br from-blue-600 to-cyan-600 rounded-2xl p-6 text-white">
-                <div className="flex items-center gap-3 mb-4">
-                  <Zap className="w-6 h-6" />
-                  <h3 className="text-xl font-bold">Đề xuất thông minh</h3>
-                </div>
-                <p className="text-blue-100 mb-4">
-                  Dựa trên lịch sử sử dụng, chúng tôi đề xuất bạn nên đặt lịch
-                  vào cuối tuần này để tối ưu chi phí.
-                </p>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="w-full bg-white text-blue-600 font-semibold py-3 rounded-xl hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 group"
-                >
-                  <Play className="w-4 h-4" />
-                  <span>Xem đề xuất chi tiết</span>
-                </motion.button>
-              </div>
+              <AIRecommendations 
+                userId={userData?.id || 'user-123'} 
+                context="dashboard" 
+              />
             </motion.div>
           </div>
         </div>

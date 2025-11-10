@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Search, Bell, Menu, X, Car, User, LogOut, Settings, ChevronDown } from "lucide-react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import NotificationCenter from "../notifications/NotificationCenter";
 
 // Hàm cuộn 
 const smoothScrollTo = (targetPosition, duration = 600) => {
@@ -428,12 +429,7 @@ export default function Header() {
             </button>
 
             {/* Notification icon - CHỈ hiển thị khi đã login */}
-            {isLoggedIn && (
-              <button className="relative flex items-center justify-center w-10 h-10 bg-gray-100 rounded-full hover:bg-gray-200 cursor-pointer transition-all duration-300 hover:scale-110">
-                <Bell className="h-5 w-5 text-gray-600" />
-                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
-            )}
+            {isLoggedIn && <NotificationCenter />}
 
             {/* Auth Buttons hoặc User Menu */}
             {isLoggedIn ? (

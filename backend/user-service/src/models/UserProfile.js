@@ -14,11 +14,10 @@ export default (sequelize, DataTypes) => {
     },
     fullName: {
       type: DataTypes.STRING(255),
-      allowNull: false,
+      allowNull: true, // Allow null for auto-created profiles
       field: 'full_name',
       validate: {
-        notEmpty: true,
-        len: [2, 255]
+        len: [0, 255] // Allow empty string, min 0 instead of 2
       }
     },
     dateOfBirth: {
@@ -31,6 +30,18 @@ export default (sequelize, DataTypes) => {
     gender: {
       type: DataTypes.ENUM('male', 'female', 'other'),
       allowNull: true
+    },
+    phoneNumber: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      field: 'phone_number'
+    },
+    email: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      validate: {
+        isEmail: true
+      }
     },
     address: {
       type: DataTypes.TEXT,

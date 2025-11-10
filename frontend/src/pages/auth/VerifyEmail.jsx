@@ -1,10 +1,10 @@
 import { motion } from "framer-motion";
-import { CheckCircle, Loader2, MailCheck, XCircle } from "lucide-react";
+import { CheckCircle, Loader2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import Footer from "../../components/layout/Footer";
 import Header from "../../components/layout/Header";
-import authService from "../../services/auth.service";
+import { authService, userService } from "../../services";
 import { showSuccessToast, showErrorToast } from "../../utils/toast";
 
 export default function VerifyEmail() {
@@ -26,16 +26,71 @@ export default function VerifyEmail() {
       }
 
       try {
-        const response = await authService.verifyEmail(token);
+        console.log('Starting email verification with token:', token);
+        
+        // Step 1: Verify email với auth service
+        const verifyResponse = await authService.verifyEmail(token);
+        console.log('Email verification response:', verifyResponse);
+        
+        if (!verifyResponse.success) {
+          throw new Error(verifyResponse.message || 'Xác thực thất bại');
+        }
+        
+        // Step 2: Lấy pending profile data từ localStorage
+        const pendingProfileData = localStorage.getItem('pendingProfileData');
+        console.log('Pending profile data:', pendingProfileData);
+        
+        if (pendingProfileData) {
+          try {
+            const profileData = JSON.parse(pendingProfileData);
+            console.log('Parsed profile data:', profileData);
+            
+            // Lấy userId từ verifyResponse
+            const userId = verifyResponse.data?.userId || 
+                          verifyResponse.data?.user?.id ||
+                          verifyResponse.data?.id;
+            
+            if (!userId) {
+              console.error('No userId in verify response:', verifyResponse);
+              throw new Error('Không tìm thấy userId sau khi verify');
+            }
+            
+            // Thêm userId vào profileData
+            profileData.userId = userId;
+            
+            console.log('Creating profile with data:', profileData);
+            
+            // Gọi API tạo profile (public endpoint)
+            const createProfileResponse = await userService.createProfile(profileData);
+            
+            if (createProfileResponse.success) {
+              console.log('Profile created successfully:', createProfileResponse.data);
+              localStorage.removeItem('pendingProfileData');
+              showSuccessToast('Email xác thực và hồ sơ tạo thành công!');
+              setMessage('Email đã xác thực và hồ sơ đã được tạo thành công!');
+            } else {
+              throw new Error('Tạo profile thất bại');
+            }
+          } catch (profileError) {
+            console.error('Profile creation error:', profileError);
+            // Vẫn cho verify thành công, chỉ cảnh báo về profile
+            showSuccessToast('Email đã xác thực! Vui lòng cập nhật hồ sơ sau khi đăng nhập.');
+            setMessage('Email đã xác thực thành công! Vui lòng cập nhật hồ sơ trong tài khoản.');
+          }
+        } else {
+          // Không có pending profile data
+          showSuccessToast('Email đã được xác thực thành công!');
+          setMessage('Email đã được xác thực thành công!');
+        }
+        
         setStatus('success');
-        setMessage(response.message || 'Email đã được xác thực thành công!');
-        showSuccessToast('Email đã được xác thực thành công!');
         
         // Redirect to login after 3 seconds
         setTimeout(() => {
           navigate('/login');
         }, 3000);
       } catch (error) {
+        console.error('Email verification error:', error);
         setStatus('error');
         setMessage(error.message || 'Xác thực email thất bại. Token có thể đã hết hạn.');
         showErrorToast(error.message || 'Xác thực email thất bại');

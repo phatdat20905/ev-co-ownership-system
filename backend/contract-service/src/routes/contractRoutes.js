@@ -18,6 +18,10 @@ router.post('/',
   contractController.createContract
 );
 
+router.get('/user/me', 
+  contractController.getUserContracts
+);
+
 router.get('/group/:groupId', 
   validate(contractValidators.getContracts), 
   contractController.getContractsByGroup

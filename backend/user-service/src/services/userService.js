@@ -6,66 +6,113 @@ import {
 import eventService from './eventService.js';
 
 export class UserService {
+  /**
+   * Get user profile by userId
+   * Auto-creates empty profile if not exists
+   */
   async getUserProfile(userId) {
     try {
       let profile = await db.UserProfile.findOne({
         where: { userId }
       });
 
+      // Auto-create empty profile if not exists
       if (!profile) {
-        // Auto-create profile if it doesn't exist (fallback)
-        logger.warn('User profile not found, auto-creating', { userId });
-        profile = await this.ensureProfileExists(userId);
+        logger.info('Profile not found, creating empty profile', { userId });
+        profile = await db.UserProfile.create({
+          userId,
+          fullName: null,
+          dateOfBirth: null,
+          gender: null,
+          phoneNumber: null,
+          email: null,
+          address: null,
+          avatarUrl: null,
+          bio: null,
+          preferences: {}
+        });
+        
+        // Publish event
+        eventService.publishUserProfileCreated({
+          userId,
+          profile: profile.toJSON()
+        }).catch(err => logger.error('Failed to publish event', { error: err.message }));
       }
 
       logger.debug('User profile retrieved', { userId });
-
-      return profile.getPublicProfile ? profile.getPublicProfile() : profile;
+      return profile.toJSON();
     } catch (error) {
       logger.error('Failed to get user profile', { error: error.message, userId });
       throw error;
     }
   }
 
+  /**
+   * Create or update user profile (upsert pattern)
+   * If profile exists, update it. If not, create new.
+   */
   async createUserProfile(userId, profileData) {
     const transaction = await db.sequelize.transaction();
 
     try {
       // Check if profile already exists
-      const existingProfile = await db.UserProfile.findOne({
+      let profile = await db.UserProfile.findOne({
         where: { userId },
         transaction
       });
 
-      if (existingProfile) {
-        await transaction.rollback();
-        throw new AppError('Profile already exists', 409, 'PROFILE_EXISTS');
+      const isUpdate = !!profile;
+
+      // Map both snake_case and camelCase
+      const profileFields = {
+        userId,
+        fullName: profileData.fullName || profileData.full_name || null,
+        dateOfBirth: profileData.dateOfBirth || profileData.date_of_birth || null,
+        gender: profileData.gender || null,
+        phoneNumber: profileData.phoneNumber || profileData.phone_number || profileData.phone || null,
+        email: profileData.email || null,
+        address: profileData.address || null,
+        avatarUrl: profileData.avatarUrl || profileData.avatar_url || null,
+        bio: profileData.bio || null,
+        preferences: profileData.preferences || {}
+      };
+
+      if (isUpdate) {
+        // Update existing profile
+        logger.info('Profile exists, updating', { userId });
+        await profile.update(profileFields, { transaction });
+      } else {
+        // Create new profile
+        logger.info('Creating new user profile', { userId });
+        profile = await db.UserProfile.create(profileFields, { transaction });
       }
 
-      // Create new profile
-      const profile = await db.UserProfile.create({
-        userId,
-        ...profileData,
-        isProfileComplete: true
-      }, { transaction });
-
       // Publish event
-      eventService.publishUserProfileCreated({
+      const publishMethod = isUpdate ? 'publishUserProfileUpdated' : 'publishUserProfileCreated';
+      
+      eventService[publishMethod]({
         userId,
-        profile: profile.getPublicProfile()
-      }).catch(error => logger.error('Failed to publish profile created event', { error: error.message, userId }));
+        profile: profile.toJSON()
+      }).catch(err => logger.error('Failed to publish event', { error: err.message }));
 
       await transaction.commit();
-      logger.info('User profile created successfully', { userId });
+      logger.info('Profile saved successfully', { userId, profileId: profile.id, action: isUpdate ? 'update' : 'create' });
 
-      return profile.getPublicProfile();
+      return profile.toJSON();
     } catch (error) {
-      await transaction.rollback();
-      logger.error('Failed to create user profile', { error: error.message, userId });
+      // Only rollback if transaction hasn't been finished
+      if (!transaction.finished) {
+        await transaction.rollback();
+      }
+      logger.error('Failed to save profile', { error: error.message, userId });
       throw error;
     }
   }
 
+  /**
+   * Update user profile
+   * Auto-creates profile if not exists
+   */
   async updateUserProfile(userId, updateData) {
     const transaction = await db.sequelize.transaction();
 
@@ -75,105 +122,137 @@ export class UserService {
         transaction
       });
 
+      // Auto-create if not exists
       if (!profile) {
+        logger.info('Profile not found during update, creating empty profile first', { userId });
         profile = await db.UserProfile.create({
           userId,
-          ...updateData
+          fullName: null,
+          dateOfBirth: null,
+          gender: null,
+          phoneNumber: null,
+          email: null,
+          address: null,
+          avatarUrl: null,
+          bio: null,
+          preferences: {}
         }, { transaction });
-
-        eventService.publishUserProfileCreated({
-          userId,
-          profile: profile.getPublicProfile()
-        }).catch(error => logger.error('Failed to publish profile created event', { error: error.message, userId }));
-
-        logger.info('User profile created', { userId });
-      } else {
-        await profile.update(updateData, { transaction });
-
-        eventService.publishUserProfileUpdated({
-          userId,
-          profile: profile.getPublicProfile()
-        }).catch(error => logger.error('Failed to publish profile updated event', { error: error.message, userId }));
-
-        logger.info('User profile updated', { userId });
       }
 
+      // Map fields
+      const updateFields = {};
+      
+      if (updateData.fullName !== undefined || updateData.full_name !== undefined) {
+        updateFields.fullName = updateData.fullName || updateData.full_name;
+      }
+      if (updateData.dateOfBirth !== undefined || updateData.date_of_birth !== undefined) {
+        updateFields.dateOfBirth = updateData.dateOfBirth || updateData.date_of_birth;
+      }
+      if (updateData.gender !== undefined) {
+        updateFields.gender = updateData.gender;
+      }
+      if (updateData.phoneNumber !== undefined || updateData.phone_number !== undefined || updateData.phone !== undefined) {
+        updateFields.phoneNumber = updateData.phoneNumber || updateData.phone_number || updateData.phone;
+      }
+      if (updateData.email !== undefined) {
+        updateFields.email = updateData.email;
+      }
+      if (updateData.address !== undefined) {
+        updateFields.address = updateData.address;
+      }
+      if (updateData.avatarUrl !== undefined || updateData.avatar_url !== undefined) {
+        updateFields.avatarUrl = updateData.avatarUrl || updateData.avatar_url;
+      }
+      if (updateData.bio !== undefined) {
+        updateFields.bio = updateData.bio;
+      }
+      if (updateData.preferences !== undefined) {
+        updateFields.preferences = updateData.preferences;
+      }
+
+      await profile.update(updateFields, { transaction });
+
+      // Publish event
+      eventService.publishUserProfileUpdated({
+        userId,
+        profile: profile.toJSON()
+      }).catch(err => logger.error('Failed to publish event', { error: err.message }));
+
       await transaction.commit();
-      return profile.getPublicProfile();
+      logger.info('Profile updated successfully', { userId, fields: Object.keys(updateFields) });
+
+      return profile.toJSON();
     } catch (error) {
-      await transaction.rollback();
-      logger.error('Failed to update user profile', { error: error.message, userId });
+      // Only rollback if transaction hasn't been finished
+      if (!transaction.finished) {
+        await transaction.rollback();
+      }
+      logger.error('Failed to update profile', { error: error.message, userId });
       throw error;
     }
   }
 
+  /**
+   * Update avatar URL
+   */
+  async updateAvatar(userId, avatarUrl) {
+    try {
+      const profile = await db.UserProfile.findOne({
+        where: { userId }
+      });
+
+      if (!profile) {
+        throw new AppError('Profile not found', 404, 'PROFILE_NOT_FOUND');
+      }
+
+      await profile.update({ avatarUrl });
+      logger.info('Avatar updated', { userId });
+      
+      return profile.toJSON();
+    } catch (error) {
+      logger.error('Failed to update avatar', { error: error.message, userId });
+      throw error;
+    }
+  }
+
+  /**
+   * Get user by ID (public profile)
+   */
   async getUserById(userId) {
     try {
       const profile = await db.UserProfile.findOne({
         where: { userId },
-        attributes: { exclude: ['preferences'] }
+        attributes: ['id', 'userId', 'fullName', 'avatarUrl', 'bio', 'createdAt']
       });
 
       if (!profile) {
         throw new AppError('User not found', 404, 'USER_NOT_FOUND');
       }
 
-      logger.debug('User retrieved by ID', { userId });
-
-      return profile;
+      return profile.toJSON();
     } catch (error) {
       logger.error('Failed to get user by ID', { error: error.message, userId });
       throw error;
     }
   }
 
+  /**
+   * Search users
+   */
   async searchUsers(query) {
     try {
       const profiles = await db.UserProfile.findAll({
         where: {
-          [db.Sequelize.Op.or]: [
-            { fullName: { [db.Sequelize.Op.iLike]: `%${query}%` } },
-            { userId: { [db.Sequelize.Op.iLike]: `%${query}%` } }
-          ]
+          fullName: { [db.Sequelize.Op.iLike]: `%${query}%` }
         },
         attributes: ['id', 'userId', 'fullName', 'avatarUrl'],
-        limit: 10
+        limit: 20,
+        order: [['fullName', 'ASC']]
       });
 
-      logger.debug('User search completed', { query, results: profiles.length });
-
-      return profiles;
+      return profiles.map(p => p.toJSON());
     } catch (error) {
       logger.error('Failed to search users', { error: error.message, query });
-      throw error;
-    }
-  }
-
-  async ensureProfileExists(userId, email = null, phone = null) {
-    try {
-      // Check if profile exists
-      let profile = await db.UserProfile.findOne({ where: { userId } });
-
-      if (!profile) {
-        // Create profile if it doesn't exist
-        profile = await db.UserProfile.create({
-          userId,
-          email,
-          phone,
-          fullName: '',
-          dateOfBirth: null,
-          gender: null,
-          address: null,
-          avatarUrl: null,
-          isProfileComplete: false
-        });
-
-        logger.info('Profile created via ensureProfileExists', { userId });
-      }
-
-      return profile;
-    } catch (error) {
-      logger.error('Failed to ensure profile exists', { error: error.message, userId });
       throw error;
     }
   }

@@ -27,6 +27,15 @@ class ContractService {
   }
 
   /**
+   * Get current user's contracts
+   * GET /contracts/user/me
+   */
+  async getUserContracts(params = {}) {
+    const response = await apiClient.get('/contracts/user/me', { params });
+    return response;
+  }
+
+  /**
    * Get contract by ID
    * GET /contracts/:contractId
    */

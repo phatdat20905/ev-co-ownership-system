@@ -124,9 +124,12 @@ export class AuthController {
 
       const result = await authService.verifyEmail(token);
 
-      logger.info('Email verification successful', { token });
+      logger.info('Email verification successful', { userId: result.userId });
 
-      return successResponse(res, result.message);
+      return successResponse(res, result.message, {
+        userId: result.userId,
+        email: result.email
+      });
     } catch (error) {
       logger.error('Email verification failed', { 
         error: error.message, 

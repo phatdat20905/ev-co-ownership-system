@@ -182,6 +182,68 @@ export class ContractService {
     }
   }
 
+  async getContractsByUser(userId, filters = {}) {
+    try {
+      const {
+        status,
+        contractType,
+        page = 1,
+        limit = 20,
+        sortBy = 'created_at',
+        sortOrder = 'DESC'
+      } = filters;
+
+      const cacheKey = `contracts:user:${userId}:${JSON.stringify(filters)}`;
+      const cachedContracts = await redisClient.get(cacheKey);
+      
+      if (cachedContracts) {
+        return JSON.parse(cachedContracts);
+      }
+
+      const where = {};
+      
+      if (status) where.status = status;
+      if (contractType) where.contract_type = contractType;
+
+      const offset = (page - 1) * limit;
+
+      // Get contracts where user is a party
+      const { count, rows: contracts } = await db.Contract.findAndCountAll({
+        where,
+        include: [
+          {
+            model: db.ContractParty,
+            as: 'parties',
+            where: { user_id: userId },
+            attributes: ['user_id', 'party_role', 'has_signed', 'signing_order']
+          }
+        ],
+        order: [[sortBy, sortOrder]],
+        limit,
+        offset,
+        distinct: true
+      });
+
+      const result = {
+        contracts,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: count,
+          totalPages: Math.ceil(count / limit)
+        }
+      };
+
+      // Cache for 2 minutes
+      await redisClient.set(cacheKey, JSON.stringify(result), 120);
+
+      return result;
+    } catch (error) {
+      logger.error('Failed to get contracts by user', { error: error.message, userId });
+      throw error;
+    }
+  }
+
   async updateContract(contractId, updateData, userId) {
     const transaction = await db.sequelize.transaction();
 

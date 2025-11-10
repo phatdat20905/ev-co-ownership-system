@@ -76,6 +76,30 @@ export class ContractController {
     }
   }
 
+  async getUserContracts(req, res, next) {
+    try {
+      const userId = req.user.id;
+      const filters = {
+        status: req.query.status,
+        contractType: req.query.contractType,
+        page: parseInt(req.query.page) || 1,
+        limit: parseInt(req.query.limit) || 20,
+        sortBy: req.query.sortBy || 'created_at',
+        sortOrder: req.query.sortOrder || 'DESC'
+      };
+
+      const result = await contractService.getContractsByUser(userId, filters);
+
+      return successResponse(res, 'User contracts retrieved successfully', result);
+    } catch (error) {
+      logger.error('Failed to get user contracts', { 
+        error: error.message,
+        userId: req.user?.id 
+      });
+      next(error);
+    }
+  }
+
   async updateContract(req, res, next) {
     try {
       const { contractId } = req.params;

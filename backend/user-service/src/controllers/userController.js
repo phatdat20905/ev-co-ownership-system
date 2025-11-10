@@ -8,7 +8,14 @@ import {
 export class UserController {
   async createProfile(req, res, next) {
     try {
-      const userId = req.user.id;
+      // Support both authenticated (has token) and unauthenticated (from verification) requests
+      // userId can come from token or from request body
+      const userId = req.user?.id || req.body.userId;
+      
+      if (!userId) {
+        throw new AppError('User ID is required', 400, 'USER_ID_REQUIRED');
+      }
+
       const profileData = req.body;
 
       const profile = await userService.createUserProfile(userId, profileData);
@@ -19,7 +26,7 @@ export class UserController {
     } catch (error) {
       logger.error('Failed to create user profile', { 
         error: error.message, 
-        userId: req.user?.id 
+        userId: req.user?.id || req.body.userId 
       });
       next(error);
     }

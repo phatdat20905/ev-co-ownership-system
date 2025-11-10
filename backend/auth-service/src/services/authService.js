@@ -240,7 +240,13 @@ export class AuthService {
         .catch(err => logger.error('Failed to publish user verified event', { error: err.message, userId: verification.userId }));
 
       logger.info('Email verified successfully', { userId: verification.userId, verificationId: verification.id });
-      return { message: 'Email verified successfully' };
+      
+      // Return userId so frontend can create profile
+      return { 
+        message: 'Email verified successfully',
+        userId: verification.userId,
+        email: verification.user.email
+      };
     } catch (error) {
       await transaction.rollback();
       logger.error('Email verification failed', { error: error.message });

@@ -7,19 +7,13 @@ import apiClient from './api/interceptors.js';
  */
 class UserService {
   /**
-   * Create user profile (for registration)
-   * POST /user/profile
+   * Create user profile (for registration - public endpoint)
+   * POST /user/profile/create
    */
   async createProfile(profileData) {
-    const response = await apiClient.post('/user/profile', profileData);
+    const response = await apiClient.post('/user/profile/create', profileData);
     
-    // Update localStorage
-    if (response.success && response.data) {
-      const currentUser = JSON.parse(localStorage.getItem('userData') || '{}');
-      const updatedUser = { ...currentUser, ...response.data };
-      localStorage.setItem('userData', JSON.stringify(updatedUser));
-      window.dispatchEvent(new Event('storage'));
-    }
+    // Don't update localStorage here as user is not logged in yet
     
     return response;
   }
