@@ -16,6 +16,7 @@ import {
   Search
 } from 'lucide-react';
 import bookingService from '../../services/booking.service';
+import LoadingSkeleton from '../../components/LoadingSkeleton';
 
 export default function BookingList({ status = 'all', limit = null }) {
   const navigate = useNavigate();
@@ -105,21 +106,7 @@ export default function BookingList({ status = 'all', limit = null }) {
   });
 
   if (loading) {
-    return (
-      <div className="space-y-4">
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="animate-pulse bg-white rounded-xl p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gray-200 rounded-xl"></div>
-              <div className="flex-1">
-                <div className="h-5 bg-gray-200 rounded w-1/3 mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
+    return <LoadingSkeleton.ListSkeleton items={3} />;
   }
 
   if (error) {

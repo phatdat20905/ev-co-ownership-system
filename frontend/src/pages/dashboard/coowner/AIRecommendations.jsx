@@ -16,6 +16,7 @@ import {
   Users,
   RefreshCw,
 } from "lucide-react";
+import LoadingSkeleton from '../../../components/LoadingSkeleton';
 import aiService from "../../../services/ai.service";
 import { toast } from "../../../utils/toast";
 
@@ -72,7 +73,7 @@ const AIRecommendations = () => {
     <div className="min-h-screen bg-gray-50 p-4 lg:p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-6">
+  <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="flex items-center space-x-3 mb-2">
@@ -92,7 +93,11 @@ const AIRecommendations = () => {
               disabled={loading}
               className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 disabled:opacity-50"
             >
-              <RefreshCw className={`w-5 h-5 ${loading ? "animate-spin" : ""}`} />
+              {loading ? (
+                <LoadingSkeleton.Skeleton className="w-5 h-5" variant="circular" />
+              ) : (
+                <RefreshCw className="w-5 h-5" />
+              )}
               <span className="hidden lg:inline">Làm mới</span>
             </button>
           </div>
@@ -120,9 +125,8 @@ const AIRecommendations = () => {
 
         {/* Loading State */}
         {loading && (
-          <div className="text-center py-12">
-            <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-gray-600">Đang phân tích dữ liệu...</p>
+          <div className="py-6">
+            <LoadingSkeleton.ListSkeleton items={4} />
           </div>
         )}
 

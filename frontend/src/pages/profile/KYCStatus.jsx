@@ -14,6 +14,7 @@ import Header from "../../components/layout/Header";
 import Footer from "../../components/layout/Footer";
 import { authService } from "../../services";
 import { showSuccessToast, showErrorToast } from "../../utils/toast";
+import LoadingSkeleton from '../../components/LoadingSkeleton';
 
 export default function KYCStatus() {
   const [kycStatus, setKycStatus] = useState(null);
@@ -166,12 +167,9 @@ export default function KYCStatus() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-cyan-50 flex flex-col">
         <Header />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-sky-500 border-t-transparent mx-auto mb-4"></div>
-            <p className="text-gray-600">Đang tải...</p>
-          </div>
-        </div>
+        <main className="flex-1 container mx-auto px-4 py-12">
+          <LoadingSkeleton.ProfileSkeleton />
+        </main>
         <Footer />
       </div>
     );

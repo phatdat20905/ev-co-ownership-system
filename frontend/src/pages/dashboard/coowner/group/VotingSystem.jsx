@@ -4,95 +4,76 @@ import { ArrowLeft, Vote, Plus, Clock, Users, CheckCircle, XCircle, TrendingUp, 
 import { Link } from "react-router-dom";
 import Header from "../../../../components/layout/Header";
 import Footer from "../../../../components/layout/Footer";
+import votingService from "../../../../services/voting.service";
+import { useVotingStore } from "../../../../stores/useVotingStore";
+import { useGroupStore } from "../../../../stores/useGroupStore";
+import { showSuccessToast, showErrorToast } from "../../../../utils/toast";
 
 export default function VotingSystem() {
   const [votingData, setVotingData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("active");
+  const currentGroup = useGroupStore(state => state.currentGroup);
+  const votes = useVotingStore(state => state.votes);
+  const myVotes = useVotingStore(state => state.myVotes);
 
   useEffect(() => {
-    const fetchVotingData = async () => {
-      setTimeout(() => {
-        setVotingData({
-          activeVotes: [
-            {
-              id: 1,
-              title: "Nâng cấp hệ thống âm thanh",
-              description: "Đề xuất nâng cấp loa và hệ thống âm thanh với chi phí 8.000.000đ",
-              createdBy: "Nguyễn Văn A",
-              createdAt: "2024-01-28",
-              endsAt: "2024-02-04",
-              totalVotes: 3,
-              requiredVotes: 3,
-              options: [
-                { id: 1, text: "Đồng ý", votes: 2, percentage: 67 },
-                { id: 2, text: "Không đồng ý", votes: 1, percentage: 33 }
-              ],
-              status: "active",
-              myVote: 1
-            },
-            {
-              id: 2,
-              title: "Thay lốp mới",
-              description: "Thay thế 4 lốp xe với chi phí 12.000.000đ",
-              createdBy: "Trần Thị B",
-              createdAt: "2024-01-30",
-              endsAt: "2024-02-06",
-              totalVotes: 2,
-              requiredVotes: 3,
-              options: [
-                { id: 1, text: "Đồng ý", votes: 1, percentage: 50 },
-                { id: 2, text: "Không đồng ý", votes: 1, percentage: 50 }
-              ],
-              status: "active",
-              myVote: null
-            }
-          ],
-          completedVotes: [
-            {
-              id: 3,
-              title: "Mua bảo hiểm mới",
-              description: "Chuyển sang gói bảo hiểm cao cấp với chi phí 15.000.000đ/năm",
-              createdBy: "Lê Văn C",
-              createdAt: "2024-01-20",
-              endsAt: "2024-01-27",
-              totalVotes: 4,
-              requiredVotes: 3,
-              options: [
-                { id: 1, text: "Đồng ý", votes: 3, percentage: 75 },
-                { id: 2, text: "Không đồng ý", votes: 1, percentage: 25 }
-              ],
-              status: "passed",
-              result: "Đã thông qua"
-            },
-            {
-              id: 4,
-              title: "Thay đổi lịch bảo dưỡng",
-              description: "Chuyển lịch bảo dưỡng từ 15.000km sang 20.000km",
-              createdBy: "Nguyễn Văn A",
-              createdAt: "2024-01-15",
-              endsAt: "2024-01-22",
-              totalVotes: 4,
-              requiredVotes: 3,
-              options: [
-                { id: 1, text: "Đồng ý", votes: 1, percentage: 25 },
-                { id: 2, text: "Không đồng ý", votes: 3, percentage: 75 }
-              ],
-              status: "rejected",
-              result: "Đã từ chối"
-            }
-          ]
-        });
+    if (currentGroup?.id) {
+      fetchVotingData();
+    }
+  }, [currentGroup]);
+
+  const fetchVotingData = async () => {
+    try {
+      setLoading(true);
+      const groupId = currentGroup?.id || localStorage.getItem('selectedGroupId');
+      
+      if (!groupId) {
+        showErrorToast('Vui lòng chọn nhóm để xem bỏ phiếu');
         setLoading(false);
-      }, 1500);
-    };
+        return;
+      }
 
-    fetchVotingData();
-  }, []);
+      const response = await votingService.getGroupVotes(groupId);
+      
+      if (response.success && response.data) {
+        const allVotes = response.data;
+        
+        // Phân loại votes
+        const activeVotes = allVotes.filter(v => 
+          v.status === 'active' && new Date(v.deadline) > new Date()
+        );
+        const completedVotes = allVotes.filter(v => 
+          v.status === 'closed' || new Date(v.deadline) <= new Date()
+        );
 
-  const handleVote = (voteId, optionId) => {
-    // In real app, this would be an API call
-    console.log(`Voted for option ${optionId} in vote ${voteId}`);
+        setVotingData({
+          activeVotes,
+          completedVotes
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch voting data:', error);
+      showErrorToast(error.message || 'Không thể tải dữ liệu bỏ phiếu');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVote = async (voteId, optionId) => {
+    try {
+      const response = await votingService.castVote(voteId, { optionId });
+      
+      if (response.success) {
+        showSuccessToast('Đã bỏ phiếu thành công');
+        await fetchVotingData(); // Refresh data
+      } else {
+        showErrorToast(response.message || 'Không thể bỏ phiếu');
+      }
+    } catch (error) {
+      console.error('Vote error:', error);
+      showErrorToast(error.message || 'Đã xảy ra lỗi khi bỏ phiếu');
+    }
   };
 
   if (loading) {

@@ -1,10 +1,12 @@
 import { motion } from "framer-motion";
 import { Eye, EyeOff, Loader2, Lock, Mail, Phone } from "lucide-react";
+import LoadingSkeleton from '../../components/LoadingSkeleton';
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Footer from "../../components/layout/Footer";
 import Header from "../../components/layout/Header";
 import { authService } from "../../services";
+import { getRememberedLogin, setRememberedLogin } from '../../utils/storage';
 import { showSuccessToast, showErrorToast } from "../../utils/toast";
 
 export default function Login() {
@@ -19,11 +21,10 @@ export default function Login() {
 
   // Lấy dữ liệu từ localStorage khi load
   useEffect(() => {
-    const saved = localStorage.getItem("rememberedLogin");
+    const saved = getRememberedLogin();
     if (saved) {
-      const data = JSON.parse(saved);
-      setIdentifier(data.identifier);
-      setLoginType(data.type);
+      setIdentifier(saved.identifier);
+      setLoginType(saved.type);
       setRemember(true);
     }
   }, []);
@@ -46,12 +47,9 @@ export default function Login() {
         
         // Lưu remember login nếu được chọn
         if (remember) {
-          localStorage.setItem(
-            "rememberedLogin",
-            JSON.stringify({ identifier, type: loginType })
-          );
+          setRememberedLogin({ identifier, type: loginType });
         } else {
-          localStorage.removeItem("rememberedLogin");
+          setRememberedLogin(null);
         }
         
         // Điều hướng dựa trên role
@@ -200,7 +198,7 @@ export default function Login() {
             >
               {loading ? (
                 <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <LoadingSkeleton.Skeleton className="h-5 w-5" variant="circular" />
                   Đang đăng nhập...
                 </>
               ) : (

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Upload, FileText, CheckCircle, X, Download, Eye, ArrowLeft, AlertCircle } from 'lucide-react';
 import Header from '../../../../components/layout/Header';
 import Footer from '../../../../components/layout/Footer';
+import LoadingSkeleton from '../../../../components/LoadingSkeleton';
 
 export default function DocumentUpload() {
   const [documents, setDocuments] = useState([
@@ -191,7 +192,7 @@ export default function DocumentUpload() {
                 {uploading && (
                   <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
                     <div className="flex items-center gap-3">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                      <LoadingSkeleton.Skeleton variant="circular" className="w-6 h-6 border-b-2 border-blue-600 bg-white" />
                       <p className="text-blue-700">Đang tải lên...</p>
                     </div>
                   </div>

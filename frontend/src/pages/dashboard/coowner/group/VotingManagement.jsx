@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import LoadingSkeleton from '../../../../components/LoadingSkeleton';
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
@@ -319,9 +320,8 @@ const VotingManagement = () => {
 
       {/* Loading State */}
       {loading && (
-        <div className="text-center py-12">
-          <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="mt-4 text-gray-600">Đang tải bỏ phiếu...</p>
+        <div className="py-6">
+          <LoadingSkeleton.ListSkeleton items={4} />
         </div>
       )}
 

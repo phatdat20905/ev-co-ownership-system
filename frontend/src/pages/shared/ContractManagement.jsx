@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import { getUserData, clearAuth } from '../../utils/storage';
+import { useUserStore } from '../../stores/useUserStore';
 import {
   FileText,
   Plus,
@@ -38,6 +40,7 @@ import {
   Key,
 } from "lucide-react";
 import contractService from "../../services/contract.service";
+import LoadingSkeleton from '../../components/LoadingSkeleton';
 import { toast } from "../../utils/toast";
 
 const ContractManagement = () => {
@@ -71,32 +74,22 @@ const ContractManagement = () => {
     role: "staff",
   });
 
+  const currentUser = useUserStore(state => state.user);
+
   useEffect(() => {
-    // Lấy và xử lý thông tin user từ localStorage
-    const storedUserData = localStorage.getItem("userData");
+    // Prefer the zustand user store; fallback to storage helper for legacy
+    const storedUserData = currentUser || getUserData();
     if (storedUserData) {
-      try {
-        const parsedData = JSON.parse(storedUserData);
-        setUserData(parsedData);
-        // Đảm bảo role không có khoảng trắng thừa và chuyển về chữ thường
-        const cleanRole = (parsedData.role || "staff").trim().toLowerCase();
-        setUserRole(cleanRole);
-      } catch (error) {
-        console.error("Lỗi khi parse userData:", error);
-        setUserRole("staff");
-      }
+      setUserData(storedUserData);
+      setUserRole((storedUserData.role || 'staff').trim().toLowerCase());
     } else {
-      // Fallback data nếu không có trong localStorage
-      setUserData({
-        name: "Nguyễn Văn B",
-        role: "staff",
-      });
-      setUserRole("staff");
+      setUserData({ name: 'Nguyễn Văn B', role: 'staff' });
+      setUserRole('staff');
     }
-    
+
     // Load contracts
     fetchContracts();
-  }, []);
+  }, [currentUser]);
 
   const fetchContracts = async () => {
     try {
@@ -338,12 +331,10 @@ const ContractManagement = () => {
 
   // Hàm xử lý logout
   const handleLogout = () => {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("userData");
-    localStorage.removeItem("authExpires");
-    localStorage.removeItem("rememberedLogin");
-    window.dispatchEvent(new Event("storage"));
-    navigate("/");
+    // Use central clearAuth helper (clears zustand + localStorage)
+    clearAuth();
+    window.dispatchEvent(new Event('storage'));
+    navigate('/');
   };
 
   // Đóng menu khi click ra ngoài
@@ -849,9 +840,8 @@ const ContractManagement = () => {
 
           {/* Loading State */}
           {loading && (
-            <div className="text-center py-12">
-              <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-              <p className="mt-4 text-gray-600">Đang tải hợp đồng...</p>
+            <div className="py-6">
+              <LoadingSkeleton.ListSkeleton items={3} />
             </div>
           )}
 

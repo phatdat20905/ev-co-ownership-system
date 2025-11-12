@@ -1,5 +1,6 @@
 // src/services/notification.service.js
 import apiClient from './api/interceptors.js';
+import { getAuthToken } from '../utils/storage.js';
 
 /**
  * Notification Service
@@ -17,28 +18,38 @@ class NotificationService {
 
   /**
    * Get user notifications
-   * GET /notifications
+   * GET /notifications/user/:userId
    */
   async getNotifications(params = {}) {
+    // If caller provides userId, call the backend route /notifications/user/:userId
+    const { userId, ...rest } = params || {};
+    if (userId) {
+      const response = await apiClient.get(`/notifications/user/${userId}`, { params: rest });
+      return response;
+    }
+
+    // Fallback: attempt generic /notifications (may be unsupported on backend)
     const response = await apiClient.get('/notifications', { params });
     return response;
   }
 
   /**
    * Get unread notifications
-   * GET /notifications/unread
+   * GET /notifications/user/:userId?status=unread
    */
-  async getUnreadNotifications() {
-    const response = await apiClient.get('/notifications/unread');
+  async getUnreadNotifications(userId) {
+    if (!userId) throw new Error('userId required for getUnreadNotifications');
+    const response = await apiClient.get(`/notifications/user/${userId}`, { params: { status: 'unread', limit: 1 } });
     return response;
   }
 
   /**
    * Get notification count
-   * GET /notifications/count
+   * GET /notifications/stats/:userId
    */
-  async getNotificationCount() {
-    const response = await apiClient.get('/notifications/count');
+  async getNotificationCount(userId) {
+    if (!userId) throw new Error('userId required for getNotificationCount');
+    const response = await apiClient.get(`/notifications/stats/${userId}`);
     return response;
   }
 
@@ -56,8 +67,14 @@ class NotificationService {
    * PUT /notifications/read-all
    */
   async markAllAsRead() {
-    const response = await apiClient.put('/notifications/read-all');
-    return response;
+    try {
+      // Try server-side endpoint first (may not exist)
+      const response = await apiClient.put('/notifications/read-all');
+      return response;
+    } catch (err) {
+      // Fallback: caller should handle marking individually
+      return { success: false, error: 'Not implemented on server' };
+    }
   }
 
   /**
@@ -164,55 +181,90 @@ class NotificationService {
    */
   connectWebSocket(userId, onMessage, onError) {
     try {
-      // Get WebSocket URL from environment or default
-      const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:3007/ws';
-      const token = localStorage.getItem('accessToken');
+      // Use Socket.IO client if available; fallback to dynamic CDN loader that exposes global `io`
+      const wsBase = import.meta.env.VITE_WS_URL || 'http://localhost:3008';
+    const token = getAuthToken();
 
-      // Create WebSocket connection with auth token
-      this.ws = new WebSocket(`${wsUrl}?token=${token}&userId=${userId}`);
-
-      this.ws.onopen = () => {
-        console.log('WebSocket connected');
-        this.reconnectAttempts = 0;
-      };
-
-      this.ws.onmessage = (event) => {
+      const connectWithIo = () => {
         try {
-          const data = JSON.parse(event.data);
-          if (onMessage) {
-            onMessage(data);
-          }
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
+          // Use global io (from socket.io-client) if present
+          const ioClient = (typeof io !== 'undefined') ? io : null;
+          if (!ioClient) throw new Error('socket.io client not loaded');
+
+          // Establish socket.io connection with auth token
+          this.socket = ioClient(wsBase, {
+            path: '/socket.io',
+            transports: ['websocket'],
+            auth: { token }
+          });
+
+          this.socket.on('connect', () => {
+            console.log('Socket.IO connected', this.socket.id);
+            this.reconnectAttempts = 0;
+            // Identify user to server-side socket manager
+            if (userId) this.socket.emit('identify', userId);
+          });
+
+          this.socket.on('disconnect', (reason) => {
+            console.log('Socket.IO disconnected', reason);
+          });
+
+          this.socket.on('notification', (payload) => {
+            if (onMessage) onMessage(payload);
+          });
+
+          this.socket.on('connect_error', (err) => {
+            console.error('Socket.IO connect_error', err);
+            if (onError) onError(err);
+          });
+
+          return this.socket;
+        } catch (err) {
+          console.warn('Socket.IO client not available:', err.message);
+          return null;
         }
       };
 
-      this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        if (onError) {
-          onError(error);
-        }
-      };
+      // Try to use an existing global `io`, otherwise inject socket.io client from CDN
+      if (typeof io !== 'undefined') {
+        // Normalize to always return a Promise so callers can await consistently
+        return Promise.resolve(connectWithIo());
+      }
 
-      this.ws.onclose = () => {
-        console.log('WebSocket disconnected');
-        // Attempt to reconnect
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-          this.reconnectAttempts++;
-          console.log(`Reconnecting... Attempt ${this.reconnectAttempts}`);
-          setTimeout(() => {
-            this.connectWebSocket(userId, onMessage, onError);
-          }, this.reconnectDelay);
+      // Dynamically load socket.io-client from CDN and then connect
+      const scriptUrl = import.meta.env.VITE_SOCKET_IO_CDN || 'https://cdn.socket.io/4.8.1/socket.io.min.js';
+      return new Promise((resolve) => {
+        const existing = document.querySelector(`script[src="${scriptUrl}"]`);
+        if (existing) {
+          existing.addEventListener('load', () => resolve(connectWithIo()));
+          existing.addEventListener('error', (e) => {
+            console.error('Failed to load socket.io client from CDN', e);
+            if (onError) onError(e);
+            resolve(null);
+          });
+          return;
         }
-      };
 
-      return this.ws;
+        const script = document.createElement('script');
+        script.src = scriptUrl;
+        script.async = true;
+        script.onload = () => {
+          resolve(connectWithIo());
+        };
+        script.onerror = (e) => {
+          console.error('Failed to load socket.io client from CDN', e);
+          if (onError) onError(e);
+          resolve(null);
+        };
+        document.head.appendChild(script);
+      });
     } catch (error) {
       console.error('Error connecting WebSocket:', error);
       if (onError) {
         onError(error);
       }
-      return null;
+      // Always return a Promise for consistent API
+      return Promise.resolve(null);
     }
   }
 
@@ -220,9 +272,13 @@ class NotificationService {
    * Disconnect WebSocket
    */
   disconnectWebSocket() {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
+    if (this.socket) {
+      try {
+        this.socket.disconnect();
+      } catch (e) {
+        // ignore
+      }
+      this.socket = null;
       this.reconnectAttempts = 0;
     }
   }
@@ -232,10 +288,10 @@ class NotificationService {
    * @param {object} message - Message to send
    */
   sendWebSocketMessage(message) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(message));
+    if (this.socket && this.socket.connected) {
+      this.socket.emit('message', message);
     } else {
-      console.warn('WebSocket is not connected');
+      console.warn('WebSocket/socket.io is not connected');
     }
   }
 
@@ -243,7 +299,7 @@ class NotificationService {
    * Check if WebSocket is connected
    */
   isWebSocketConnected() {
-    return this.ws && this.ws.readyState === WebSocket.OPEN;
+    return this.socket && this.socket.connected;
   }
 
   // ==================== TEMPLATES ====================

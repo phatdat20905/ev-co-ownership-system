@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import LoadingSkeleton from '../../components/LoadingSkeleton';
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { AlertTriangle, Search, Filter, MessageCircle, CheckCircle, XCircle, Clock, User, Car,QrCode, Calendar, Download, FileText, CreditCard, MapPin, Wrench, BarChart3, Send, ChevronDown, X, MoreVertical, Bell, LogOut, Menu, Plus, PieChart } from "lucide-react";
 import adminService from "../../services/admin.service";
@@ -37,13 +38,10 @@ const DisputeManagement = () => {
 
   // Hàm xử lý đăng xuất
   const handleLogout = () => {
-    // Xóa tất cả dữ liệu đăng nhập khỏi localStorage
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("userData");
-    localStorage.removeItem("authExpires");
-    localStorage.removeItem("rememberedLogin");
+    const { clearAuth } = require('../../utils/storage');
+    clearAuth();
     window.dispatchEvent(new Event('storage'));
-    navigate("/");
+    navigate('/');
   };
 
   // useEffect để đóng dropdown khi click ra ngoài
@@ -530,9 +528,8 @@ const DisputeManagement = () => {
 
               {/* Loading State */}
               {loading && (
-                <div className="text-center py-12">
-                  <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                  <p className="mt-4 text-gray-600">Đang tải tranh chấp...</p>
+                <div className="py-6">
+                  <LoadingSkeleton.ListSkeleton items={4} />
                 </div>
               )}
 

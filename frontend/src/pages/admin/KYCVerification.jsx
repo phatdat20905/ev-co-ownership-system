@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import LoadingSkeleton from '../../components/LoadingSkeleton';
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { 
   Shield, CheckCircle, XCircle, Eye, Clock, AlertTriangle, 
@@ -119,12 +120,10 @@ const KYCVerification = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("userData");
-    localStorage.removeItem("authExpires");
-    localStorage.removeItem("rememberedLogin");
+    const { clearAuth } = require('../../utils/storage');
+    clearAuth();
     window.dispatchEvent(new Event('storage'));
-    navigate("/");
+    navigate('/');
   };
 
   const menuItems = [
@@ -375,9 +374,8 @@ const KYCVerification = () => {
 
           {/* KYC List */}
           {loading && (
-            <div className="text-center py-12">
-              <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-              <p className="text-gray-600">Đang tải danh sách KYC...</p>
+            <div className="py-6">
+              <LoadingSkeleton.ListSkeleton items={4} />
             </div>
           )}
 

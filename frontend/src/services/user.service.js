@@ -1,5 +1,7 @@
 // src/services/user.service.js
 import apiClient from './api/interceptors.js';
+import { getUserData, setUserData } from '../utils/storage.js';
+import { useUserStore } from '../stores/useUserStore';
 
 /**
  * User Service
@@ -10,11 +12,11 @@ class UserService {
    * Create user profile (for registration - public endpoint)
    * POST /user/profile/create
    */
-  async createProfile(profileData) {
-    const response = await apiClient.post('/user/profile/create', profileData);
-    
-    // Don't update localStorage here as user is not logged in yet
-    
+  async createProfile(profileData, config = {}) {
+    // Allow callers to pass request config (e.g. headers) so register flow can mark this as a public call
+    const response = await apiClient.post('/user/profile/create', profileData, config);
+
+    // Don't update stored user here as the user may not be authenticated yet
     return response;
   }
 
@@ -24,15 +26,16 @@ class UserService {
    */
   async getProfile() {
     const response = await apiClient.get('/user/profile');
-    
-    // Update localStorage with latest profile data
-    if (response.success && response.data) {
-      const currentUser = JSON.parse(localStorage.getItem('userData') || '{}');
-      const updatedUser = { ...currentUser, ...response.data };
-      localStorage.setItem('userData', JSON.stringify(updatedUser));
-      window.dispatchEvent(new Event('storage'));
+
+    // Normalize and persist into user store + local storage for backward compatibility
+    if (response && response.success) {
+      const profile = response.data || {};
+      // Update zustand user store
+      try { useUserStore.setState({ user: profile }); } catch (e) {}
+      // Update legacy storage
+      try { setUserData(profile); window.dispatchEvent(new Event('storage')); } catch (e) {}
     }
-    
+
     return response;
   }
 
@@ -42,13 +45,13 @@ class UserService {
    */
   async updateProfile(profileData) {
     const response = await apiClient.put('/user/profile', profileData);
-    
-    // Update localStorage
-    if (response.success && response.data) {
-      localStorage.setItem('userData', JSON.stringify(response.data));
-      window.dispatchEvent(new Event('storage'));
+
+    if (response && response.success) {
+      const updated = response.data || {};
+      try { useUserStore.setState({ user: updated }); } catch (e) {}
+      try { setUserData(updated); window.dispatchEvent(new Event('storage')); } catch (e) {}
     }
-    
+
     return response;
   }
 
@@ -66,12 +69,13 @@ class UserService {
       }
     });
     
-    // Update localStorage
-    if (response.success && response.data) {
-      localStorage.setItem('userData', JSON.stringify(response.data));
-      window.dispatchEvent(new Event('storage'));
+    // Update stored user data
+    if (response && response.success) {
+      const updated = response.data || {};
+      try { useUserStore.setState({ user: updated }); } catch (e) {}
+      try { setUserData(updated); window.dispatchEvent(new Event('storage')); } catch (e) {}
     }
-    
+
     return response;
   }
 

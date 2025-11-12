@@ -2,10 +2,11 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { CreditCard, Wallet, QrCode, ArrowRight, Check, X, Loader2 } from 'lucide-react';
-import apiClient from '../../services/api/interceptors';
+import costService from '../../services/cost.service';
+import LoadingSkeleton from '../../components/LoadingSkeleton';
 import { showSuccessToast, showErrorToast } from '../../utils/toast';
 
-export default function PaymentGateway({ amount, description, onSuccess, onCancel }) {
+export default function PaymentGateway({ amount, description, onSuccess, onCancel, orderId, orderInfo }) {
   const [selectedMethod, setSelectedMethod] = useState('momo');
   const [loading, setLoading] = useState(false);
   const [qrCode, setQrCode] = useState(null);
@@ -42,39 +43,45 @@ export default function PaymentGateway({ amount, description, onSuccess, onCance
       
       switch (selectedMethod) {
         case 'momo':
-          response = await apiClient.post('/cost/payments/momo/create', {
+          response = await costService.createMomoPayment({
             amount,
             description,
+            orderId,
+            orderInfo: orderInfo || description,
             returnUrl: `${window.location.origin}/payment/callback`,
             notifyUrl: `${import.meta.env.VITE_API_BASE_URL}/cost/payments/webhook/momo`
           });
-          
-          if (response.success && response.data.payUrl) {
+
+          if (response?.success && response?.data?.payUrl) {
             // Redirect to MoMo payment page
             window.location.href = response.data.payUrl;
           }
           break;
 
         case 'vnpay':
-          response = await apiClient.post('/cost/payments/vnpay/create', {
+          response = await costService.createVnpayPayment({
             amount,
             description,
+            orderId,
+            orderInfo: orderInfo || description,
             returnUrl: `${window.location.origin}/payment/callback`
           });
-          
-          if (response.success && response.data.paymentUrl) {
+
+          if (response?.success && response?.data?.paymentUrl) {
             // Redirect to VNPay payment page
             window.location.href = response.data.paymentUrl;
           }
           break;
 
         case 'vietqr':
-          response = await apiClient.post('/cost/payments/vietqr/generate', {
+          response = await costService.generateVietQr({
             amount,
-            description
+            description,
+            orderId,
+            orderInfo: orderInfo || description
           });
-          
-          if (response.success && response.data.qrCode) {
+
+          if (response?.success && response?.data?.qrCode) {
             setQrCode(response.data.qrCode);
             showSuccessToast('Vui lòng quét mã QR để thanh toán');
           }
@@ -153,7 +160,7 @@ export default function PaymentGateway({ amount, description, onSuccess, onCance
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <LoadingSkeleton.Skeleton variant="circular" className="w-5 h-5" />
                   Đang xử lý...
                 </>
               ) : (

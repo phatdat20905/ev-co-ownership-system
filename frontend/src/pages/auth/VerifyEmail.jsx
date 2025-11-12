@@ -1,10 +1,11 @@
 import { motion } from "framer-motion";
-import { CheckCircle, Loader2, XCircle } from "lucide-react";
+import { CheckCircle, XCircle } from "lucide-react";
+import LoadingSkeleton from '../../components/LoadingSkeleton';
 import { useEffect, useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import Footer from "../../components/layout/Footer";
 import Header from "../../components/layout/Header";
-import { authService, userService } from "../../services";
+import { authService } from "../../services";
 import { showSuccessToast, showErrorToast } from "../../utils/toast";
 
 export default function VerifyEmail() {
@@ -17,7 +18,7 @@ export default function VerifyEmail() {
   useEffect(() => {
     const verifyToken = async () => {
       const token = searchParams.get('token');
-      
+
       if (!token) {
         setStatus('error');
         setMessage('Token xác thực không hợp lệ');
@@ -26,69 +27,17 @@ export default function VerifyEmail() {
       }
 
       try {
-        console.log('Starting email verification with token:', token);
-        
-        // Step 1: Verify email với auth service
         const verifyResponse = await authService.verifyEmail(token);
-        console.log('Email verification response:', verifyResponse);
-        
-        if (!verifyResponse.success) {
-          throw new Error(verifyResponse.message || 'Xác thực thất bại');
+
+        if (!verifyResponse || !verifyResponse.success) {
+          throw new Error(verifyResponse?.message || 'Xác thực thất bại');
         }
-        
-        // Step 2: Lấy pending profile data từ localStorage
-        const pendingProfileData = localStorage.getItem('pendingProfileData');
-        console.log('Pending profile data:', pendingProfileData);
-        
-        if (pendingProfileData) {
-          try {
-            const profileData = JSON.parse(pendingProfileData);
-            console.log('Parsed profile data:', profileData);
-            
-            // Lấy userId từ verifyResponse
-            const userId = verifyResponse.data?.userId || 
-                          verifyResponse.data?.user?.id ||
-                          verifyResponse.data?.id;
-            
-            if (!userId) {
-              console.error('No userId in verify response:', verifyResponse);
-              throw new Error('Không tìm thấy userId sau khi verify');
-            }
-            
-            // Thêm userId vào profileData
-            profileData.userId = userId;
-            
-            console.log('Creating profile with data:', profileData);
-            
-            // Gọi API tạo profile (public endpoint)
-            const createProfileResponse = await userService.createProfile(profileData);
-            
-            if (createProfileResponse.success) {
-              console.log('Profile created successfully:', createProfileResponse.data);
-              localStorage.removeItem('pendingProfileData');
-              showSuccessToast('Email xác thực và hồ sơ tạo thành công!');
-              setMessage('Email đã xác thực và hồ sơ đã được tạo thành công!');
-            } else {
-              throw new Error('Tạo profile thất bại');
-            }
-          } catch (profileError) {
-            console.error('Profile creation error:', profileError);
-            // Vẫn cho verify thành công, chỉ cảnh báo về profile
-            showSuccessToast('Email đã xác thực! Vui lòng cập nhật hồ sơ sau khi đăng nhập.');
-            setMessage('Email đã xác thực thành công! Vui lòng cập nhật hồ sơ trong tài khoản.');
-          }
-        } else {
-          // Không có pending profile data
-          showSuccessToast('Email đã được xác thực thành công!');
-          setMessage('Email đã được xác thực thành công!');
-        }
-        
+
         setStatus('success');
-        
-        // Redirect to login after 3 seconds
-        setTimeout(() => {
-          navigate('/login');
-        }, 3000);
+        setMessage('Email của bạn đã được xác thực.');
+        showSuccessToast('Xác thực email thành công! Vui lòng đăng nhập để tiếp tục.');
+        // Redirect to login after a short delay
+        setTimeout(() => navigate('/login'), 900);
       } catch (error) {
         console.error('Email verification error:', error);
         setStatus('error');
@@ -116,59 +65,52 @@ export default function VerifyEmail() {
 
           {loading && (
             <>
-              <Loader2 className="mx-auto h-14 w-14 text-sky-600 mb-4 animate-spin" />
-              <h2 className="text-2xl font-bold text-sky-700 mb-3">
-                Đang xác thực email...
-              </h2>
-              <p className="text-gray-600">
-                Vui lòng chờ trong giây lát
-              </p>
+              <LoadingSkeleton.Skeleton className="mx-auto h-14 w-14" variant="circular" />
+              <h2 className="text-2xl font-bold text-sky-700 mb-3">Đang xác thực email...</h2>
+              <p className="text-gray-600">Vui lòng chờ trong giây lát</p>
             </>
           )}
 
           {!loading && status === 'success' && (
             <>
               <CheckCircle className="mx-auto h-14 w-14 text-green-600 mb-4" />
-              <h2 className="text-2xl font-bold text-green-700 mb-3">
-                Xác thực thành công!
-              </h2>
-              <p className="text-gray-600 mb-6">
-                {message}
-              </p>
-              <p className="text-sm text-gray-500">
-                Bạn sẽ được chuyển đến trang đăng nhập trong giây lát...
-              </p>
-              <Link 
-                to="/login" 
-                className="inline-block mt-4 text-sky-600 hover:underline font-medium"
-              >
-                Đăng nhập ngay
-              </Link>
+              <h2 className="text-2xl font-bold text-green-700 mb-3">Xác thực thành công!</h2>
+              <p className="text-gray-600 mb-6">{message || 'Email đã được xác thực thành công!'}</p>
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <Link
+                  to="/login"
+                  className="inline-block py-2 px-4 rounded-xl text-white bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700 font-medium"
+                >
+                  Đăng nhập
+                </Link>
+                <Link
+                  to="/profile"
+                  className="inline-block py-2 px-4 rounded-xl text-sky-600 border border-sky-200 hover:bg-sky-50 font-medium"
+                >
+                  Xem hồ sơ
+                </Link>
+              </div>
             </>
           )}
 
           {!loading && status === 'error' && (
             <>
               <XCircle className="mx-auto h-14 w-14 text-red-600 mb-4" />
-              <h2 className="text-2xl font-bold text-red-700 mb-3">
-                Xác thực thất bại
-              </h2>
-              <p className="text-gray-600 mb-6">
-                {message}
-              </p>
-              <div className="space-y-3">
-                <Link 
-                  to="/login" 
-                  className="block w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700 shadow-md transition-all"
+              <h2 className="text-2xl font-bold text-red-700 mb-3">Xác thực thất bại</h2>
+              <p className="text-gray-600 mb-6">{message || 'Xác thực email thất bại. Token có thể đã hết hạn.'}</p>
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <Link
+                  to="/login"
+                  className="inline-block py-2 px-4 rounded-xl text-white bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700 font-medium"
                 >
-                  Quay lại đăng nhập
+                  Đăng nhập
                 </Link>
-                <p className="text-sm text-gray-500">
-                  Cần gửi lại email xác thực?{" "}
-                  <Link to="/register" className="text-sky-600 hover:underline">
-                    Đăng ký lại
-                  </Link>
-                </p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="inline-block py-2 px-4 rounded-xl text-sky-600 border border-sky-200 hover:bg-sky-50 font-medium"
+                >
+                  Thử lại
+                </button>
               </div>
             </>
           )}

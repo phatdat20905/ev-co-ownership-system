@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle, Circle, Eye, EyeOff, Loader2, Lock } from "lucide-react";
+import LoadingSkeleton from '../../components/LoadingSkeleton';
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Footer from "../../components/layout/Footer";
@@ -212,13 +213,13 @@ export default function ResetPassword() {
                   className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-sky-500 to-sky-600 text-white hover:from-sky-600 hover:to-sky-700 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
                 >
                   {loading ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      Đang cập nhật...
-                    </>
-                  ) : (
-                    "Đặt lại mật khẩu"
-                  )}
+                      <>
+                        <LoadingSkeleton.Skeleton className="h-5 w-5" variant="circular" />
+                        Đang cập nhật...
+                      </>
+                    ) : (
+                      "Đặt lại mật khẩu"
+                    )}
                 </button>
               </form>
             </>

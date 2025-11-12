@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import { getUserData } from '../../utils/storage';
 import {
   Car,
   Plus,
@@ -60,29 +61,18 @@ const CarManagement = () => {
     role: "staff",
   });
 
+  const currentUser = require('../../stores/useUserStore').useUserStore(state => state.user);
+
   useEffect(() => {
-    // Lấy và xử lý thông tin user từ localStorage
-    const storedUserData = localStorage.getItem("userData");
+    const storedUserData = currentUser || getUserData();
     if (storedUserData) {
-      try {
-        const parsedData = JSON.parse(storedUserData);
-        setUserData(parsedData);
-        // Đảm bảo role không có khoảng trắng thừa và chuyển về chữ thường
-        const cleanRole = (parsedData.role || "staff").trim().toLowerCase();
-        setUserRole(cleanRole);
-      } catch (error) {
-        console.error("Lỗi khi parse userData:", error);
-        setUserRole("staff");
-      }
+      setUserData(storedUserData);
+      setUserRole((storedUserData.role || 'staff').trim().toLowerCase());
     } else {
-      // Fallback data nếu không có trong localStorage
-      setUserData({
-        name: "Nguyễn Văn B",
-        role: "staff",
-      });
-      setUserRole("staff");
+      setUserData({ name: 'Nguyễn Văn B', role: 'staff' });
+      setUserRole('staff');
     }
-  }, []);
+  }, [currentUser]);
 
   // Thông báo
   const [notifications, setNotifications] = useState([
@@ -317,12 +307,10 @@ const CarManagement = () => {
 
   // Hàm xử lý logout
   const handleLogout = () => {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("userData");
-    localStorage.removeItem("authExpires");
-    localStorage.removeItem("rememberedLogin");
-    window.dispatchEvent(new Event("storage"));
-    navigate("/");
+    const { clearAuth } = require('../../utils/storage');
+    clearAuth();
+    window.dispatchEvent(new Event('storage'));
+    navigate('/');
   };
 
   // Đóng menu khi click ra ngoài

@@ -96,6 +96,33 @@ class CostService {
   }
 
   /**
+   * Create MoMo payment (wrapper for payment gateway endpoint)
+   * POST /cost/payments/momo/create
+   */
+  async createMomoPayment(payload) {
+    const response = await apiClient.post('/cost/payments/momo/create', payload);
+    return response;
+  }
+
+  /**
+   * Create VNPay payment
+   * POST /cost/payments/vnpay/create
+   */
+  async createVnpayPayment(payload) {
+    const response = await apiClient.post('/cost/payments/vnpay/create', payload);
+    return response;
+  }
+
+  /**
+   * Generate VietQR for payments
+   * POST /cost/payments/vietqr/generate
+   */
+  async generateVietQr(payload) {
+    const response = await apiClient.post('/cost/payments/vietqr/generate', payload);
+    return response;
+  }
+
+  /**
    * Get payment by ID
    * GET /costs/payments/:paymentId
    */

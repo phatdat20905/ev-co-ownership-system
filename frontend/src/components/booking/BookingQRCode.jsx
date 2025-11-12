@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { QrCode, CheckCircle, XCircle, Clock, Car, Calendar, MapPin } from 'lucide-react';
 import QRCodeLib from 'qrcode';
 import bookingService from '../../services/booking.service';
+import LoadingSkeleton from '../../components/LoadingSkeleton';
 
 export default function BookingQRCode({ booking, onCheckIn, onCheckOut }) {
   const [qrCodeUrl, setQrCodeUrl] = useState('');
@@ -249,7 +250,7 @@ export default function BookingQRCode({ booking, onCheckIn, onCheckOut }) {
           >
             {loading ? (
               <>
-                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+                <LoadingSkeleton.Skeleton variant="circular" className="w-5 h-5" />
                 Đang xử lý...
               </>
             ) : (
@@ -269,7 +270,7 @@ export default function BookingQRCode({ booking, onCheckIn, onCheckOut }) {
           >
             {loading ? (
               <>
-                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+                <LoadingSkeleton.Skeleton variant="circular" className="w-5 h-5" />
                 Đang xử lý...
               </>
             ) : (

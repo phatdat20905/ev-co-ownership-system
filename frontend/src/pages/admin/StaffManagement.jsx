@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Users, UserPlus, Search, Filter, Edit, Trash2, Shield, Mail, Phone, Calendar, ArrowLeft, BarChart3, Car, FileText, QrCode, Wrench, Download, CheckCircle, XCircle, Eye, X, Menu, Bell, User, LogOut, PieChart, AlertTriangle, ChevronDown, MoreVertical } from "lucide-react";
 import adminService from "../../services/admin.service";
+import LoadingSkeleton from '../../components/LoadingSkeleton';
 import { toast } from "../../utils/toast";
 
 const StaffManagement = () => {
@@ -114,12 +115,10 @@ const StaffManagement = () => {
 
   // Hàm xử lý đăng xuất
   const handleLogout = () => {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("userData");
-    localStorage.removeItem("authExpires");
-    localStorage.removeItem("rememberedLogin");
+    const { clearAuth } = require('../../utils/storage');
+    clearAuth();
     window.dispatchEvent(new Event('storage'));
-    navigate("/");
+    navigate('/');
   };
 
   // useEffect để đóng dropdown khi click ra ngoài
@@ -515,9 +514,8 @@ const StaffManagement = () => {
 
           {/* Staff Grid */}
           {loading && (
-            <div className="text-center py-12">
-              <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-              <p className="text-gray-600">Đang tải danh sách nhân viên...</p>
+            <div className="py-6">
+              <LoadingSkeleton.CardSkeleton count={6} />
             </div>
           )}
 

@@ -2,6 +2,9 @@ import React, { useState, useEffect } from "react";
 import { Search, Bell, Menu, X, Car, User, LogOut, Settings, ChevronDown } from "lucide-react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import NotificationCenter from "../notifications/NotificationCenter";
+import { useUserStore } from '../../stores/useUserStore';
+import { useAuthStore } from '../../stores/useAuthStore';
+import { clearAuth, getUserData, getAuthToken } from '../../utils/storage';
 
 // Hàm cuộn 
 const smoothScrollTo = (targetPosition, duration = 600) => {
@@ -30,6 +33,8 @@ export default function Header() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userData, setUserData] = useState(null);
+  const user = useUserStore(state => state.user);
+  const token = useAuthStore(state => state.token);
   const [openDropdown, setOpenDropdown] = useState(null);
   const [activeSection, setActiveSection] = useState("");
   
@@ -38,29 +43,23 @@ export default function Header() {
 
   // Kiểm tra trạng thái đăng nhập
   useEffect(() => {
-    const checkAuthStatus = () => {
-      const token = localStorage.getItem('authToken');
-      const user = JSON.parse(localStorage.getItem('userData') || 'null');
-      
-      if (token && user) {
-        setIsLoggedIn(true);
-        setUserData(user);
-      } else {
-        setIsLoggedIn(false);
-        setUserData(null);
-      }
+    // Subscribe to zustand stores via local selectors
+    setIsLoggedIn(!!token && !!user);
+    setUserData(user || null);
+
+    const onStorage = () => {
+      // fallback for legacy listeners that still write to localStorage
+      try {
+        const storedUser = getUserData();
+        setUserData(storedUser);
+        setIsLoggedIn(!!getAuthToken() && !!storedUser);
+      } catch (e) {}
     };
 
-    checkAuthStatus();
-    window.addEventListener('storage', checkAuthStatus);
-    
-    const interval = setInterval(checkAuthStatus, 1000);
-    
-    return () => {
-      window.removeEventListener('storage', checkAuthStatus);
-      clearInterval(interval);
-    };
-  }, []);
+    window.addEventListener('storage', onStorage);
+
+    return () => window.removeEventListener('storage', onStorage);
+  }, [token, user]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -121,8 +120,7 @@ export default function Header() {
   }, [location.pathname]);
 
   const handleLogout = () => {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('userData');
+    clearAuth();
     setIsLoggedIn(false);
     setUserData(null);
     setIsUserMenuOpen(false);

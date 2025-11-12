@@ -1,5 +1,6 @@
 // src/services/auth.service.js
 import apiClient from './api/interceptors.js';
+import { setAuthToken, setUserData, setAuthExpiry, clearAuth, isAuthenticated as storageIsAuthenticated, getUserData, setRefreshToken } from '../utils/storage.js';
 
 /**
  * Authentication Service
@@ -27,20 +28,20 @@ class AuthService {
       const { accessToken, token, refreshToken, user } = response.data;
       // Support both accessToken (backend) and token (legacy)
       const authToken = accessToken || token;
-      
-      localStorage.setItem('authToken', authToken);
-      localStorage.setItem('userData', JSON.stringify(user));
-      
+
+      // Persist via storage helpers (will update zustand store + localStorage)
+      setAuthToken(authToken);
+      setUserData(user);
       if (refreshToken) {
-        localStorage.setItem('refreshToken', refreshToken);
+        setRefreshToken(refreshToken);
       }
-      
+
       // Set expiry (7 days from now)
       const expiryDate = new Date();
       expiryDate.setDate(expiryDate.getDate() + 7);
-      localStorage.setItem('authExpires', expiryDate.toISOString());
-      
-      // Trigger storage event for Header update
+      setAuthExpiry(expiryDate.toISOString());
+
+      // Trigger storage event for legacy listeners
       window.dispatchEvent(new Event('storage'));
     }
     
@@ -55,12 +56,8 @@ class AuthService {
     try {
       await apiClient.post('/auth/logout');
     } finally {
-      // Clear auth data regardless of API response
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('userData');
-      localStorage.removeItem('authExpires');
-      localStorage.removeItem('rememberedLogin');
-      
+      // Clear auth data regardless of API response (uses storage helper to clear store + localStorage)
+      clearAuth();
       // Trigger storage event
       window.dispatchEvent(new Event('storage'));
     }
@@ -72,12 +69,12 @@ class AuthService {
    */
   async refreshToken(refreshToken) {
     const response = await apiClient.post('/auth/refresh-token', { refreshToken });
-    
+
     if (response.success && response.data) {
       const { token } = response.data;
-      localStorage.setItem('authToken', token);
+      setAuthToken(token);
     }
-    
+
     return response;
   }
 
@@ -129,7 +126,7 @@ class AuthService {
     
     // Update stored user data
     if (response.success && response.data) {
-      localStorage.setItem('userData', JSON.stringify(response.data));
+      setUserData(response.data);
       window.dispatchEvent(new Event('storage'));
     }
     
@@ -205,20 +202,15 @@ class AuthService {
    * Check if user is authenticated
    */
   isAuthenticated() {
-    const token = localStorage.getItem('authToken');
-    const expiry = localStorage.getItem('authExpires');
-    
-    if (!token || !expiry) return false;
-    
-    return new Date() < new Date(expiry);
+    // Delegate to storage helper which reads from zustand store or localStorage
+    return storageIsAuthenticated();
   }
 
   /**
    * Get current user data from localStorage
    */
   getCurrentUser() {
-    const userData = localStorage.getItem('userData');
-    return userData ? JSON.parse(userData) : null;
+    return getUserData();
   }
 }
 

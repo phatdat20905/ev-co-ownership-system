@@ -10,6 +10,7 @@ import {
   Settings as Cog6ToothIcon,
 } from 'lucide-react';
 import notificationService from '../../services/notification.service';
+import LoadingSkeleton from '../../components/LoadingSkeleton';
 
 const NotificationSettings = () => {
   const [loading, setLoading] = useState(true);
@@ -130,11 +131,7 @@ const NotificationSettings = () => {
   ];
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
+    return <LoadingSkeleton.NotificationSettingsSkeleton />;
   }
 
   return (
@@ -152,7 +149,7 @@ const NotificationSettings = () => {
         >
           {saving ? (
             <>
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              <LoadingSkeleton.Skeleton variant="circular" className="w-5 h-5 bg-white" />
               Đang lưu...
             </>
           ) : (

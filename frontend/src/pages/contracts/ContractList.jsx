@@ -16,6 +16,7 @@ import {
   Trash2 as TrashIcon,
 } from 'lucide-react';
 import contractService from '../../services/contract.service';
+import LoadingSkeleton from '../../components/LoadingSkeleton';
 
 const ContractList = () => {
   const navigate = useNavigate();
@@ -179,11 +180,7 @@ const ContractList = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
+    return <LoadingSkeleton.ListSkeleton items={4} />;
   }
 
   return (

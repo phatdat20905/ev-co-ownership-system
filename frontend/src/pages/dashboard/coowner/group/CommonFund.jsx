@@ -4,92 +4,133 @@ import { ArrowLeft, DollarSign, TrendingUp, TrendingDown, Download, Filter, Plus
 import { Link } from "react-router-dom";
 import Header from "../../../../components/layout/Header";
 import Footer from "../../../../components/layout/Footer";
+import userService from "../../../../services/user.service";
+import { useGroupStore } from "../../../../stores/useGroupStore";
+import { showSuccessToast, showErrorToast } from "../../../../utils/toast";
 
 export default function CommonFund() {
   const [fundData, setFundData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
+  const currentGroup = useGroupStore(state => state.currentGroup);
+  const [depositAmount, setDepositAmount] = useState('');
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [showDepositModal, setShowDepositModal] = useState(false);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
 
   useEffect(() => {
-    const fetchFundData = async () => {
-      setTimeout(() => {
-        setFundData({
-          balance: 25800000,
-          monthlyContribution: 2500000,
-          totalContributions: 12500000,
-          totalExpenses: 9920000,
-          monthlyBudget: 3000000,
-          transactions: [
-            {
-              id: 1,
-              date: "2024-02-01",
-              type: "contribution",
-              description: "Đóng góp tháng 2/2024",
-              amount: 2500000,
-              category: "contribution",
-              status: "completed",
-              member: "Nguyễn Văn A"
-            },
-            {
-              id: 2,
-              date: "2024-01-28",
-              type: "expense",
-              description: "Bảo dưỡng định kỳ",
-              amount: -3200000,
-              category: "maintenance",
-              status: "completed",
-              member: "Trần Thị B"
-            },
-            {
-              id: 3,
-              date: "2024-01-25",
-              type: "expense",
-              description: "Phí bảo hiểm tháng 1",
-              amount: -1250000,
-              category: "insurance",
-              status: "completed",
-              member: "Lê Văn C"
-            },
-            {
-              id: 4,
-              date: "2024-01-20",
-              type: "expense",
-              description: "Sạc điện trạm VinFast",
-              amount: -450000,
-              category: "charging",
-              status: "completed",
-              member: "Phạm Thị D"
-            },
-            {
-              id: 5,
-              date: "2024-01-15",
-              type: "contribution",
-              description: "Đóng góp tháng 1/2024",
-              amount: 2500000,
-              category: "contribution",
-              status: "completed",
-              member: "Nguyễn Văn A"
-            }
-          ],
-          budgetAllocation: [
-            { category: "Bảo dưỡng", allocated: 1500000, used: 1320000, percentage: 88, color: "bg-blue-500" },
-            { category: "Bảo hiểm", allocated: 800000, used: 800000, percentage: 100, color: "bg-green-500" },
-            { category: "Sạc điện", allocated: 400000, used: 320000, percentage: 80, color: "bg-yellow-500" },
-            { category: "Khác", allocated: 300000, used: 120000, percentage: 40, color: "bg-purple-500" }
-          ],
-          members: [
-            { name: "Nguyễn Văn A", contribution: 5000000, percentage: 40, status: "paid" },
-            { name: "Trần Thị B", contribution: 3750000, percentage: 30, status: "paid" },
-            { name: "Lê Văn C", contribution: 2500000, percentage: 20, status: "paid" },
-            { name: "Phạm Thị D", contribution: 1250000, percentage: 10, status: "pending" }
-          ]
-        });
-        setLoading(false);
-      }, 1500);
-    };
+    if (currentGroup?.id) {
+      fetchFundData();
+    }
+  }, [currentGroup]);
 
-    fetchFundData();
-  }, []);
+  const fetchFundData = async () => {
+    try {
+      setLoading(true);
+      const groupId = currentGroup?.id || localStorage.getItem('selectedGroupId');
+      
+      if (!groupId) {
+        showErrorToast('Vui lòng chọn nhóm để xem quỹ chung');
+        setLoading(false);
+        return;
+      }
+
+      // Lấy thông tin quỹ và lịch sử giao dịch
+      const [fundResponse, transactionsResponse] = await Promise.all([
+        userService.getGroupFund(groupId),
+        userService.getFundTransactions(groupId)
+      ]);
+
+      if (fundResponse.success && transactionsResponse.success) {
+        const fund = fundResponse.data;
+        const transactions = transactionsResponse.data || [];
+
+        // Tính toán thống kê
+        const totalContributions = transactions
+          .filter(t => t.type === 'deposit' || t.type === 'contribution')
+          .reduce((sum, t) => sum + t.amount, 0);
+        
+        const totalExpenses = transactions
+          .filter(t => t.type === 'withdraw' || t.type === 'expense')
+          .reduce((sum, t) => sum + t.amount, 0);
+
+        setFundData({
+          balance: fund.balance || 0,
+          monthlyContribution: fund.monthlyContribution || 0,
+          totalContributions,
+          totalExpenses,
+          monthlyBudget: fund.monthlyBudget || 0,
+          transactions: transactions.map(t => ({
+            ...t,
+            amount: t.type === 'withdraw' || t.type === 'expense' ? -t.amount : t.amount
+          })),
+          budgetAllocation: fund.budgetAllocation || [],
+          members: fund.members || []
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch fund data:', error);
+      showErrorToast(error.message || 'Không thể tải dữ liệu quỹ chung');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeposit = async () => {
+    try {
+      const amount = parseFloat(depositAmount);
+      if (isNaN(amount) || amount <= 0) {
+        showErrorToast('Số tiền không hợp lệ');
+        return;
+      }
+
+      const groupId = currentGroup?.id || localStorage.getItem('selectedGroupId');
+      const response = await userService.contributeFund(groupId, {
+        amount,
+        description: 'Nộp tiền vào quỹ chung'
+      });
+
+      if (response.success) {
+        showSuccessToast('Đã nộp tiền thành công');
+        setShowDepositModal(false);
+        setDepositAmount('');
+        await fetchFundData();
+      } else {
+        showErrorToast(response.message || 'Không thể nộp tiền');
+      }
+    } catch (error) {
+      console.error('Deposit error:', error);
+      showErrorToast(error.message || 'Đã xảy ra lỗi');
+    }
+  };
+
+  const handleWithdraw = async () => {
+    try {
+      const amount = parseFloat(withdrawAmount);
+      if (isNaN(amount) || amount <= 0) {
+        showErrorToast('Số tiền không hợp lệ');
+        return;
+      }
+
+      const groupId = currentGroup?.id || localStorage.getItem('selectedGroupId');
+      const response = await userService.requestWithdrawal(groupId, {
+        amount,
+        reason: 'Yêu cầu rút tiền từ quỹ chung'
+      });
+
+      if (response.success) {
+        showSuccessToast('Đã gửi yêu cầu rút tiền (cần phê duyệt)');
+        setShowWithdrawModal(false);
+        setWithdrawAmount('');
+        await fetchFundData();
+      } else {
+        showErrorToast(response.message || 'Không thể rút tiền');
+      }
+    } catch (error) {
+      console.error('Withdraw error:', error);
+      showErrorToast(error.message || 'Đã xảy ra lỗi');
+    }
+  };
 
   if (loading) {
     return (

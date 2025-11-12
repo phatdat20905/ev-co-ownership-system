@@ -3,6 +3,9 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import ScrollToTop from "./components/layout/ScrollToTop";
 import ErrorBoundary from "./components/ErrorBoundary";
+import notificationService from './services/notification.service';
+import { useEffect } from 'react';
+import { useUserStore } from './stores/useUserStore';
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -44,6 +47,8 @@ import NotificationSettings from "./pages/notifications/NotificationSettings";
 import CostBreakdown from "./pages/dashboard/coowner/financial/CostBreakdown";
 import PaymentHistory from "./pages/dashboard/coowner/financial/PaymentHistory";
 import ExpenseTracking from "./pages/dashboard/coowner/financial/ExpenseTracking";
+import PaymentCallback from "./pages/payment/PaymentCallback";
+import SocketSmokeTest from './pages/debug/SocketSmokeTest';
 import UsageHistory from "./pages/dashboard/coowner/history/UsageHistory";
 import UsageAnalytics from "./pages/dashboard/coowner/history/UsageAnalytics";
 import GroupManagement from "./pages/dashboard/coowner/group/GroupManagement";
@@ -52,7 +57,6 @@ import VotingManagement from "./pages/dashboard/coowner/group/VotingManagement";
 import CommonFund from "./pages/dashboard/coowner/group/CommonFund";
 import Profile from "./pages/dashboard/coowner/account/Profile";
 import KYCStatus from "./pages/profile/KYCStatus";
-import ProfileSettings from "./pages/profile/ProfileSettings";
 import ChangePassword from "./pages/profile/ChangePassword";
 
 // Staff Pages
@@ -65,6 +69,25 @@ import QuyDinhHoatDong from "./pages/policies/QuyDinhHoatDong";
 import QuyenLoiThanhVien from "./pages/policies/QuyenLoiThanhVien";
 
 export default function App() {
+  const user = useUserStore(state => state.user);
+
+  useEffect(() => {
+    // Auto-connect to notification socket when user data is present (reactive)
+    let socketHandle = null;
+    if (user && user.id) {
+      notificationService.connectWebSocket(user.id, (msg) => {
+        window.dispatchEvent(new CustomEvent('notification:received', { detail: msg }));
+      }, (err) => {
+        console.error('Notification WS error', err);
+      }).then((s) => {
+        socketHandle = s;
+      }).catch(() => {});
+    }
+
+    return () => {
+      try { notificationService.disconnectWebSocket(); } catch (e) {}
+    };
+  }, [user]);
   return (
     <ErrorBoundary>
       <Router>
@@ -171,6 +194,8 @@ export default function App() {
           path="/dashboard/coowner/financial/payment"
           element={<PaymentHistory />}
         />
+        <Route path="/payment/callback" element={<PaymentCallback />} />
+        <Route path="/debug/socket-smoke" element={<SocketSmokeTest />} />
         <Route
           path="/dashboard/coowner/financial/expense-tracking"
           element={<ExpenseTracking />}
@@ -212,7 +237,7 @@ export default function App() {
         />
         <Route
           path="/profile/settings"
-          element={<ProfileSettings />}
+          element={<Profile />}
         />
         <Route
           path="/profile/change-password"

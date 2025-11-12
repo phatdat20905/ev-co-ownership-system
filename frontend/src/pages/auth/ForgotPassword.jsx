@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { ArrowLeft, Loader2, Mail } from "lucide-react";
+import LoadingSkeleton from '../../components/LoadingSkeleton';
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import Footer from "../../components/layout/Footer";
@@ -89,13 +90,13 @@ export default function ForgotPassword() {
                 className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-sky-500 to-sky-600 text-white hover:from-sky-600 hover:to-sky-700 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    Đang gửi...
-                  </>
-                ) : (
-                  "Gửi email đặt lại mật khẩu"
-                )}
+                      <>
+                        <LoadingSkeleton.Skeleton className="h-5 w-5" variant="circular" />
+                        Đang gửi...
+                      </>
+                    ) : (
+                      "Gửi email đặt lại mật khẩu"
+                    )}
               </button>
 
               <div className="text-center mt-6">

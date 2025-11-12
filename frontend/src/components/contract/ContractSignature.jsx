@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { FileText, CheckCircle, XCircle, Download, Eye, PenTool, User, Calendar, Shield } from 'lucide-react';
 import contractService from '../../services/contract.service';
+import LoadingSkeleton from '../../components/LoadingSkeleton';
 
 export default function ContractSignature({ contract, onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -78,7 +79,7 @@ export default function ContractSignature({ contract, onSuccess }) {
   const handleDownload = async () => {
     try {
       setLoading(true);
-      const blob = await contractService.downloadContract(contract.id);
+      const blob = await contractService.downloadContractPDF(contract.id);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -263,7 +264,7 @@ export default function ContractSignature({ contract, onSuccess }) {
           >
             {signing ? (
               <>
-                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+                <LoadingSkeleton.Skeleton variant="circular" className="w-5 h-5" />
                 Đang xử lý...
               </>
             ) : (

@@ -83,12 +83,10 @@ const StaffDashboard = () => {
 
   // Hàm xử lý logout
   const handleLogout = () => {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("userData");
-    localStorage.removeItem("authExpires");
-    localStorage.removeItem("rememberedLogin");
-    window.dispatchEvent(new Event("storage"));
-    navigate("/");
+    const { clearAuth } = require('../../utils/storage');
+    clearAuth();
+    window.dispatchEvent(new Event('storage'));
+    navigate('/');
   };
 
   const stats = {

@@ -1,5 +1,6 @@
 // src/services/booking.service.js
 import apiClient from './api/interceptors.js';
+import { useBookingStore } from '../stores/useBookingStore';
 
 /**
  * Booking Service
@@ -12,6 +13,9 @@ class BookingService {
    */
   async createBooking(bookingData) {
     const response = await apiClient.post('/bookings', bookingData);
+    if (response.success) {
+      useBookingStore.getState().addBooking(response.data);
+    }
     return response;
   }
 
@@ -21,6 +25,9 @@ class BookingService {
    */
   async getUserBookings(params = {}) {
     const response = await apiClient.get('/bookings', { params });
+    if (response.success) {
+      useBookingStore.getState().setBookings(response.data);
+    }
     return response;
   }
 

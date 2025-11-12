@@ -14,6 +14,7 @@ import Header from "../../components/layout/Header";
 import Footer from "../../components/layout/Footer";
 import authService from "../../services/auth.service";
 import { showSuccessToast, showErrorToast } from "../../utils/toast";
+import LoadingSkeleton from '../../components/LoadingSkeleton';
 
 export default function ChangePassword() {
   const [loading, setLoading] = useState(false);
@@ -281,7 +282,7 @@ export default function ChangePassword() {
               >
                 {loading ? (
                   <div className="flex items-center justify-center gap-2">
-                    <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <LoadingSkeleton.Skeleton variant="circular" className="h-5 w-5" />
                     Đang xử lý...
                   </div>
                 ) : (

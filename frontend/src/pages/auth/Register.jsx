@@ -16,7 +16,9 @@ import { Link, useNavigate } from "react-router-dom";
 import Footer from "../../components/layout/Footer";
 import Header from "../../components/layout/Header";
 import { authService, userService } from "../../services";
+import { setAuthToken, setUserData, setAuthExpiry } from "../../utils/storage";
 import { showSuccessToast, showErrorToast } from "../../utils/toast";
+import LoadingSkeleton from '../../components/LoadingSkeleton';
 
 export default function Register() {
   const [loading, setLoading] = useState(false);
@@ -106,7 +108,28 @@ export default function Register() {
       console.log('Register response:', registerResponse);
 
       if (registerResponse.success) {
-        // Step 2: Store profile data để dùng sau khi verify email
+        // If register returns tokens/user, persist auth info so client can call protected endpoints if needed
+        try {
+          const { accessToken, token, refreshToken, user } = registerResponse.data || {};
+          const authToken = accessToken || token;
+          if (authToken) {
+            // Persist via storage helpers (updates zustand store + localStorage fallback)
+            setAuthToken(authToken);
+            if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+            if (user) setUserData(user);
+
+            // set expiry (7 days)
+            const expiryDate = new Date();
+            expiryDate.setDate(expiryDate.getDate() + 7);
+            setAuthExpiry(expiryDate.toISOString());
+
+            // Trigger storage event for legacy listeners
+            window.dispatchEvent(new Event('storage'));
+          }
+        } catch (e) {
+          console.warn('Failed to persist auth tokens after register', e);
+        }
+        // Step 2: Create profile immediately using returned user info if possible
         const profileData = {
           full_name: formData.fullName,
           date_of_birth: formData.dateOfBirth,
@@ -115,16 +138,40 @@ export default function Register() {
           phone: formData.phone,
           email: formData.email,
         };
-        
-        console.log('Storing profile data for later:', profileData);
-        localStorage.setItem('pendingProfileData', JSON.stringify(profileData));
-        
-        showSuccessToast('Đăng ký thành công! Vui lòng kiểm tra email để xác thực tài khoản.');
-        
+
+        // Try to extract userId from register response
+        const userId = registerResponse.data?.user?.id || registerResponse.data?.id || registerResponse.data?.userId;
+
+        try {
+          if (userId) {
+            // attach userId to profile payload for public create endpoint
+            profileData.userId = userId;
+          }
+
+          // Mark createProfile as a public call so interceptors won't treat 401 as global logout
+          const createResp = await userService.createProfile(profileData, { headers: { 'x-skip-auth': '1' } });
+
+          if (createResp && createResp.success) {
+            showSuccessToast('Đăng ký và lưu hồ sơ thành công! Vui lòng kiểm tra email để xác thực tài khoản.');
+          } else {
+            // If creation failed, keep pending data to attempt again after verification
+              // store via helper
+              const { setPendingProfileData } = require('../../utils/storage');
+              setPendingProfileData(profileData);
+              showSuccessToast('Đăng ký thành công! Hồ sơ tạm thời được lưu. Vui lòng kiểm tra email để xác thực tài khoản.');
+          }
+        } catch (profileErr) {
+          console.error('Create profile error:', profileErr);
+          // Fallback: store pending profile data so VerifyEmail can try later
+          const { setPendingProfileData } = require('../../utils/storage');
+          setPendingProfileData(profileData);
+          showSuccessToast('Đăng ký thành công! Hồ sơ tạm thời được lưu. Vui lòng kiểm tra email để xác thực tài khoản.');
+        }
+
         // Redirect đến trang verify email instructions
         setTimeout(() => {
-          navigate("/verify-email");
-        }, 2000);
+          navigate("/login");
+        }, 1200);
       }
     } catch (error) {
       console.error('Register error:', error);
@@ -371,13 +418,13 @@ export default function Register() {
               className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-sky-500 to-sky-600 text-white hover:from-sky-600 hover:to-sky-700 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
-                <>
-                  <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Đang xử lý...
-                </>
-              ) : (
-                "Đăng ký"
-              )}
+                  <>
+                    <LoadingSkeleton.Skeleton variant="circular" className="h-5 w-5" />
+                    Đang xử lý...
+                  </>
+                ) : (
+                  "Đăng ký"
+                )}
             </button>
 
             {/* Links */}

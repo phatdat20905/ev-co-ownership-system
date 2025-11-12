@@ -74,6 +74,19 @@ export default function BookingForm() {
         passengerCount: parseInt(formData.passengers),
         notes: formData.notes
       };
+      // Check for booking conflicts before creating
+      try {
+        const conflictResp = await bookingService.checkConflicts(formData.vehicleId, startDateTime, endDateTime);
+        const conflicts = conflictResp?.data || conflictResp?.conflicts || [];
+        if (Array.isArray(conflicts) && conflicts.length > 0) {
+          showErrorToast('Thời gian bạn chọn trùng với booking khác. Vui lòng chọn khoảng thời gian khác.');
+          setSubmitting(false);
+          return;
+        }
+      } catch (confErr) {
+        // If conflict check fails, proceed but warn the user
+        console.warn('Conflict check failed, proceeding to create booking', confErr);
+      }
 
       const response = await bookingService.createBooking(bookingData);
       

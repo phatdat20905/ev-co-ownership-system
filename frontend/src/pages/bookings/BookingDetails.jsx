@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import BookingQRCode from '../../components/booking/BookingQRCode';
 import bookingService from '../../services/booking.service';
+import LoadingSkeleton from '../../components/LoadingSkeleton';
 
 export default function BookingDetails() {
   const { bookingId } = useParams();
@@ -55,11 +56,7 @@ export default function BookingDetails() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-sky-500 border-t-transparent"></div>
-      </div>
-    );
+    return <LoadingSkeleton.PageLoading message="Đang tải chi tiết đặt xe..." />;
   }
 
   if (error) {
