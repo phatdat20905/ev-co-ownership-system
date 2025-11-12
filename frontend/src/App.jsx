@@ -8,18 +8,16 @@ import { useEffect } from 'react';
 import { useUserStore } from './stores/useUserStore';
 
 // Admin Pages
-import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminDashboard from "./pages/admin/Dashboard";
 import DisputeManagement from "./pages/admin/DisputeManagement";
 import FinancialReports from "./pages/admin/FinancialReports";
 import StaffManagement from "./pages/admin/StaffManagement";
-import AdminProfile from "./pages/admin/AdminProfile";
+import AdminProfile from "./pages/admin/Profile";
 import KYCVerification from "./pages/admin/KYCVerification";
 
 // Shared Pages (dùng chung cho admin và staff)
-import CarManagement from "./pages/shared/CarManagement";
-import ContractManagement from "./pages/shared/ContractManagement";
 import ServiceManagement from "./pages/shared/ServiceManagement";
-import CheckInOutManagement from "./pages/shared/CheckInOutManagement";
+import CheckInOutManagement from "./pages/staff/CheckInOutManagement";
 
 // Auth Pages
 import ForgotPassword from "./pages/auth/ForgotPassword";
@@ -30,38 +28,36 @@ import VerifyEmail from "./pages/auth/VerifyEmail";
 
 // Dashboard & Co-owner Pages
 import Home from "./pages/dashboard/Dashboard";
-import CoownerDashboard from "./pages/dashboard/coowner/CoownerDashboard";
-import AIRecommendations from "./pages/dashboard/coowner/AIRecommendations";
-import OwnershipManagement from "./pages/dashboard/coowner/ownership/OwnershipManagement";
-import ContractViewer from "./pages/dashboard/coowner/ownership/ContractViewer";
-import DocumentUpload from "./pages/dashboard/coowner/ownership/DocumentUpload";
-import BookingCalendar from "./pages/dashboard/coowner/booking/BookingCalendar";
-import BookingForm from "./pages/dashboard/coowner/booking/BookingForm";
+import CoownerDashboard from "./pages/coowner/Dashboard";
+import AIRecommendations from "./pages/coowner/ai/AIRecommendations";
+import OwnershipManagement from "./pages/coowner/ownership/OwnershipManagement";
+import ContractViewer from "./pages/coowner/ownership/ContractViewer";
+import DocumentUpload from "./pages/coowner/ownership/DocumentUpload";
+import BookingCalendar from "./pages/coowner/booking/BookingCalendar";
+import BookingForm from "./pages/coowner/booking/BookingForm";
 import BookingDetails from "./pages/bookings/BookingDetails";
-import ScheduleView from "./pages/dashboard/coowner/booking/ScheduleView";
-import VehicleList from "./pages/vehicles/VehicleList";
-import VehicleDetails from "./pages/vehicles/VehicleDetails";
-import ContractList from "./pages/contracts/ContractList";
-import ContractDetails from "./pages/contracts/ContractDetails";
+import ScheduleView from "./pages/coowner/booking/ScheduleView";
+import VehicleDashboard from "./pages/coowner/vehicles/VehicleDashboard";
 import NotificationSettings from "./pages/notifications/NotificationSettings";
-import CostBreakdown from "./pages/dashboard/coowner/financial/CostBreakdown";
-import PaymentHistory from "./pages/dashboard/coowner/financial/PaymentHistory";
-import ExpenseTracking from "./pages/dashboard/coowner/financial/ExpenseTracking";
+import CostBreakdown from "./pages/coowner/financial/CostBreakdown";
+import PaymentHistory from "./pages/coowner/financial/PaymentHistory";
+import ExpenseTracking from "./pages/coowner/financial/ExpenseTracking";
+import PaymentPortal from "./pages/coowner/financial/PaymentPortal";
 import PaymentCallback from "./pages/payment/PaymentCallback";
-import SocketSmokeTest from './pages/debug/SocketSmokeTest';
-import UsageHistory from "./pages/dashboard/coowner/history/UsageHistory";
-import UsageAnalytics from "./pages/dashboard/coowner/history/UsageAnalytics";
-import GroupManagement from "./pages/dashboard/coowner/group/GroupManagement";
-import VotingSystem from "./pages/dashboard/coowner/group/VotingSystem";
-import VotingManagement from "./pages/dashboard/coowner/group/VotingManagement";
-import CommonFund from "./pages/dashboard/coowner/group/CommonFund";
-import Profile from "./pages/dashboard/coowner/account/Profile";
+import UsageHistory from "./pages/coowner/history/UsageHistory";
+import UsageAnalytics from "./pages/coowner/history/UsageAnalytics";
+import GroupManagement from "./pages/coowner/group/GroupManagement";
+import VotingSystem from "./pages/coowner/group/VotingSystem";
+import VotingManagement from "./pages/coowner/group/VotingManagement";
+import CommonFund from "./pages/coowner/group/CommonFund";
+import ContractManagement from "./pages/coowner/contracts/ContractManagement";
+import Profile from "./pages/coowner/account/Profile";
 import KYCStatus from "./pages/profile/KYCStatus";
 import ChangePassword from "./pages/profile/ChangePassword";
 
 // Staff Pages
-import StaffDashboard from "./pages/staff/StaffDashboard";
-import StaffProfile from "./pages/staff/StaffProfile";
+import StaffDashboard from "./pages/staff/Dashboard";
+import StaffProfile from "./pages/staff/Profile";
 
 // Policies Pages
 import ChinhSachBaoMat from "./pages/policies/ChinhSachBaoMat";
@@ -118,8 +114,6 @@ export default function App() {
         <Route path="/admin/kyc" element={<KYCVerification />} />
 
         {/* Shared Management Routes - Dùng chung cho Admin và Staff */}
-        <Route path="/admin/cars" element={<CarManagement />} />
-        <Route path="/admin/contracts" element={<ContractManagement />} />
         <Route path="/admin/services" element={<ServiceManagement />} />
         <Route path="/admin/checkin" element={<CheckInOutManagement />} />
 
@@ -127,126 +121,63 @@ export default function App() {
         <Route path="/staff" element={<StaffDashboard />} />
         <Route path="/staff/dashboard" element={<StaffDashboard />} />
         <Route path="/staff/profile" element={<StaffProfile />} />
-        <Route path="/staff/cars" element={<CarManagement />} />
-        <Route path="/staff/contracts" element={<ContractManagement />} />
         <Route path="/staff/services" element={<ServiceManagement />} />
         <Route path="/staff/checkin" element={<CheckInOutManagement />} />
 
         {/* Co-owner Routes */}
-        <Route path="/dashboard/coowner" element={<CoownerDashboard />} />
-        <Route
-          path="/dashboard/coowner/ownership"
-          element={<OwnershipManagement />}
-        />
-        <Route
-          path="/dashboard/coowner/ownership/contracts"
-          element={<ContractViewer />}
-        />
-        <Route
-          path="/dashboard/coowner/ownership/contract"
-          element={<ContractViewer />}
-        />
-        <Route
-          path="/dashboard/coowner/ownership/documents"
-          element={<DocumentUpload />}
-        />
-        <Route
-          path="/dashboard/coowner/booking"
-          element={<BookingCalendar />}
-        />
-        <Route
-          path="/dashboard/coowner/booking/new"
-          element={<BookingForm />}
-        />
-        <Route
-          path="/dashboard/coowner/booking/:bookingId"
-          element={<BookingDetails />}
-        />
-        <Route
-          path="/dashboard/coowner/booking/schedule"
-          element={<ScheduleView />}
-        />
-        <Route
-          path="/dashboard/coowner/vehicles"
-          element={<VehicleList />}
-        />
-        <Route
-          path="/dashboard/coowner/vehicles/:vehicleId"
-          element={<VehicleDetails />}
-        />
-        <Route
-          path="/dashboard/coowner/contracts"
-          element={<ContractList />}
-        />
-        <Route
-          path="/dashboard/coowner/contracts/:contractId"
-          element={<ContractDetails />}
-        />
-        <Route
-          path="/dashboard/coowner/financial"
-          element={<CostBreakdown />}
-        />
-        <Route
-          path="/dashboard/coowner/financial/cost-breakdown"
-          element={<CostBreakdown />}
-        />
-        <Route
-          path="/dashboard/coowner/financial/payment"
-          element={<PaymentHistory />}
-        />
+        <Route path="/coowner" element={<CoownerDashboard />} />
+        <Route path="/coowner/dashboard" element={<CoownerDashboard />} />
+        <Route path="/dashboard/coowner" element={<CoownerDashboard />} /> {/* Legacy support */}
+        
+        {/* Ownership Routes */}
+        <Route path="/coowner/ownership" element={<OwnershipManagement />} />
+        <Route path="/coowner/ownership/contracts" element={<ContractViewer />} />
+        <Route path="/coowner/ownership/contract" element={<ContractViewer />} />
+        <Route path="/coowner/ownership/documents" element={<DocumentUpload />} />
+        
+        {/* Booking Routes */}
+        <Route path="/coowner/booking" element={<BookingCalendar />} />
+        <Route path="/coowner/booking/new" element={<BookingForm />} />
+        <Route path="/coowner/booking/:bookingId" element={<BookingDetails />} />
+        <Route path="/coowner/booking/schedule" element={<ScheduleView />} />
+        
+        {/* Vehicle Routes */}
+        <Route path="/coowner/vehicles" element={<VehicleDashboard />} />
+        
+        {/* Contract Routes */}
+        <Route path="/coowner/contracts" element={<ContractManagement />} />
+        
+        {/* Financial Routes */}
+        <Route path="/coowner/financial" element={<PaymentPortal />} />
+        <Route path="/coowner/financial/cost-breakdown" element={<CostBreakdown />} />
+        <Route path="/coowner/financial/payment" element={<PaymentHistory />} />
+        <Route path="/coowner/financial/payment-portal" element={<PaymentPortal />} />
+        <Route path="/coowner/financial/expense-tracking" element={<ExpenseTracking />} />
         <Route path="/payment/callback" element={<PaymentCallback />} />
-        <Route path="/debug/socket-smoke" element={<SocketSmokeTest />} />
-        <Route
-          path="/dashboard/coowner/financial/expense-tracking"
-          element={<ExpenseTracking />}
-        />
-        <Route path="/dashboard/coowner/history" element={<UsageHistory />} />
-        <Route
-          path="/dashboard/coowner/history/analytics"
-          element={<UsageAnalytics />}
-        />
-        <Route path="/dashboard/coowner/group" element={<GroupManagement />} />
-        <Route
-          path="/dashboard/coowner/group/voting"
-          element={<VotingSystem />}
-        />
-        <Route
-          path="/dashboard/coowner/group/voting-management"
-          element={<VotingManagement />}
-        />
-        <Route path="/dashboard/coowner/group/fund" element={<CommonFund />} />
-        <Route
-          path="/dashboard/coowner/account/profile"
-          element={<Profile />}
-        />
-        <Route
-          path="/dashboard/coowner/account/kyc"
-          element={<KYCStatus />}
-        />
-        <Route
-          path="/dashboard/coowner/settings/notifications"
-          element={<NotificationSettings />}
-        />
-        <Route
-          path="/kyc-status"
-          element={<KYCStatus />}
-        />
-        <Route
-          path="/profile/kyc-status"
-          element={<KYCStatus />}
-        />
-        <Route
-          path="/profile/settings"
-          element={<Profile />}
-        />
-        <Route
-          path="/profile/change-password"
-          element={<ChangePassword />}
-        />
-        <Route
-          path="/dashboard/coowner/ai-recommendations"
-          element={<AIRecommendations />}
-        />
+        
+        {/* History Routes */}
+        <Route path="/coowner/history" element={<UsageHistory />} />
+        <Route path="/coowner/history/analytics" element={<UsageAnalytics />} />
+        
+        {/* Group Routes */}
+        <Route path="/coowner/group" element={<GroupManagement />} />
+        <Route path="/coowner/group/voting" element={<VotingSystem />} />
+        <Route path="/coowner/group/voting-management" element={<VotingManagement />} />
+        <Route path="/coowner/group/fund" element={<CommonFund />} />
+        
+        {/* Account Routes */}
+        <Route path="/coowner/account/profile" element={<Profile />} />
+        <Route path="/coowner/account/kyc" element={<KYCStatus />} />
+        <Route path="/coowner/settings/notifications" element={<NotificationSettings />} />
+        
+        {/* AI Routes */}
+        <Route path="/coowner/ai-recommendations" element={<AIRecommendations />} />
+        
+        {/* Profile Routes */}
+        <Route path="/kyc-status" element={<KYCStatus />} />
+        <Route path="/profile/kyc-status" element={<KYCStatus />} />
+        <Route path="/profile/settings" element={<Profile />} />
+        <Route path="/profile/change-password" element={<ChangePassword />} />
 
         {/* Fallback Route */}
         <Route path="*" element={<div>404 - Page Not Found</div>} />
