@@ -4,95 +4,70 @@ import { ArrowLeft, Calendar, Clock, MapPin, Car, Download, Filter, Search, Chev
 import { Link } from "react-router-dom";
 import Header from "../../../../components/layout/Header";
 import Footer from "../../../../components/layout/Footer";
+import bookingService from "../../../../services/booking.service";
+import { useBookingStore } from "../../../../stores/useBookingStore";
+import { showErrorToast } from "../../../../utils/toast";
 
 export default function UsageHistory() {
   const [usageData, setUsageData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const { bookings: storeBookings, setBookings: setStoreBookings } = useBookingStore();
 
   useEffect(() => {
-    // Mock data fetch
     const fetchUsageData = async () => {
-      setTimeout(() => {
-        setUsageData({
-          totalUsage: 45,
-          averageDuration: 3.5,
-          totalCost: 1850000,
-          recentBookings: [
-            {
-              id: 1,
-              date: "2024-01-15",
-              startTime: "08:00",
-              endTime: "12:00",
-              duration: 4,
-              car: "Tesla Model 3",
-              location: "Q.1, TP.HCM",
-              purpose: "Đi làm",
-              cost: 320000,
-              status: "completed",
-              type: "business"
-            },
-            {
-              id: 2,
-              date: "2024-01-10",
-              startTime: "14:00",
-              endTime: "16:30",
-              duration: 2.5,
-              car: "VinFast VF e34",
-              location: "Q.7, TP.HCM",
-              purpose: "Đi họp",
-              cost: 200000,
-              status: "completed",
-              type: "business"
-            },
-            {
-              id: 3,
-              date: "2024-01-05",
-              startTime: "09:00",
-              endTime: "18:00",
-              duration: 9,
-              car: "Tesla Model 3",
-              location: "Q.1, TP.HCM",
-              purpose: "Cuối tuần",
-              cost: 720000,
-              status: "completed",
-              type: "personal"
-            },
-            {
-              id: 4,
-              date: "2024-01-02",
-              startTime: "07:00",
-              endTime: "08:30",
-              duration: 1.5,
-              car: "VinFast VF e34",
-              location: "Q.7, TP.HCM",
-              purpose: "Đưa đón",
-              cost: 120000,
-              status: "completed",
-              type: "personal"
-            },
-            {
-              id: 5,
-              date: "2023-12-28",
-              startTime: "10:00",
-              endTime: "15:00",
-              duration: 5,
-              car: "Tesla Model 3",
-              location: "Q.2, TP.HCM",
-              purpose: "Du lịch",
-              cost: 490000,
-              status: "completed",
-              type: "personal"
-            }
-          ]
-        });
+      try {
+        setLoading(true);
+        const response = await bookingService.getUserBookings();
+        
+        // Transform bookings to usage history format
+        const bookings = response.bookings || [];
+        const completedBookings = bookings.filter(b => b.status === 'completed');
+        
+        const totalUsage = completedBookings.length;
+        const totalDuration = completedBookings.reduce((sum, b) => {
+          const start = new Date(b.startTime);
+          const end = new Date(b.endTime);
+          return sum + (end - start) / (1000 * 60 * 60); // hours
+        }, 0);
+        const averageDuration = totalUsage > 0 ? totalDuration / totalUsage : 0;
+        const totalCost = completedBookings.reduce((sum, b) => sum + (b.cost || 0), 0);
+
+        const transformedData = {
+          totalUsage,
+          averageDuration: parseFloat(averageDuration.toFixed(1)),
+          totalCost,
+          recentBookings: bookings.map(booking => ({
+            id: booking.id,
+            date: new Date(booking.startTime).toISOString().split('T')[0],
+            startTime: new Date(booking.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+            endTime: new Date(booking.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+            duration: ((new Date(booking.endTime) - new Date(booking.startTime)) / (1000 * 60 * 60)).toFixed(1),
+            car: booking.vehicleName || 'EV',
+            location: booking.location || 'TP.HCM',
+            purpose: booking.purpose || booking.note || 'Sử dụng xe',
+            cost: booking.cost || 0,
+            status: booking.status,
+            type: booking.type || 'personal'
+          }))
+        };
+
+        setUsageData(transformedData);
+        setStoreBookings(bookings);
+      } catch (error) {
+        console.error('Error fetching usage history:', error);
+        showErrorToast(error.response?.data?.message || 'Không thể tải lịch sử sử dụng');
+        setUsageData({ totalUsage: 0, averageDuration: 0, totalCost: 0, recentBookings: [] });
+      } finally {
         setLoading(false);
-      }, 1500);
+      }
     };
 
     fetchUsageData();
-  }, []);
+  }, [setStoreBookings]);
+    fetchUsageData();
+  }, [setStoreBookings]);
 
   // Filter bookings based on filter and search
   const filteredBookings = usageData?.recentBookings?.filter(booking => {

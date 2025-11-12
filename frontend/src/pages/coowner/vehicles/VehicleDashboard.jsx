@@ -6,67 +6,48 @@ import { ArrowLeft, Car, Plus } from 'lucide-react';
 import Header from '../../../../components/layout/Header';
 import Footer from '../../../../components/layout/Footer';
 import VehicleStatus from '../../../../components/vehicle/VehicleStatus';
+import vehicleService from '../../../../services/vehicle.service';
+import { useVehicleStore } from '../../../../stores/useVehicleStore';
+import { showErrorToast } from '../../../../utils/toast';
 
 export default function VehicleDashboard() {
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { vehicles: storeVehicles, setVehicles: setStoreVehicles } = useVehicleStore();
 
   useEffect(() => {
-    // Mock data - trong thực tế sẽ fetch từ API
-    setTimeout(() => {
-      setVehicles([
-        {
-          id: 1,
-          name: 'VinFast VF e34',
-          status: 'available',
-          batteryLevel: 85,
-          range: 245,
-          odometer: 12450,
-          currentLocation: '123 Nguyễn Huệ, Quận 1, TP.HCM',
-          imageUrl: 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=500',
-          lastMaintenance: '2024-01-05',
-          nextMaintenance: '2024-04-05'
-        },
-        {
-          id: 2,
-          name: 'Tesla Model 3',
-          status: 'charging',
-          batteryLevel: 45,
-          range: 180,
-          odometer: 8230,
-          currentLocation: 'Trạm sạc Gigamall, Quận 2, TP.HCM',
-          imageUrl: 'https://images.unsplash.com/photo-1560958089-b8a1929cea89?w=500',
-          lastMaintenance: '2023-12-20',
-          nextMaintenance: '2024-03-20'
-        },
-        {
-          id: 3,
-          name: 'Hyundai Kona Electric',
-          status: 'in_use',
-          batteryLevel: 62,
-          range: 198,
-          odometer: 15670,
-          currentLocation: 'Đang di chuyển - Quận 7',
-          imageUrl: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=500',
-          lastMaintenance: '2023-11-15',
-          nextMaintenance: '2024-02-15'
-        },
-        {
-          id: 4,
-          name: 'BYD Atto 3',
-          status: 'maintenance',
-          batteryLevel: 100,
-          range: 320,
-          odometer: 5420,
-          currentLocation: 'Trung tâm bảo dưỡng AutoPro',
-          imageUrl: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=500',
-          lastMaintenance: '2024-01-10',
-          nextMaintenance: '2024-04-10'
-        }
-      ]);
-      setLoading(false);
-    }, 500);
-  }, []);
+    const fetchVehicles = async () => {
+      try {
+        setLoading(true);
+        const response = await vehicleService.getVehicles();
+        
+        // Transform API data to match component format
+        const transformedVehicles = response.vehicles?.map(vehicle => ({
+          id: vehicle.id,
+          name: vehicle.name || vehicle.model,
+          status: vehicle.status || 'available',
+          batteryLevel: vehicle.batteryLevel || 0,
+          range: vehicle.range || 0,
+          odometer: vehicle.odometer || 0,
+          currentLocation: vehicle.location || 'TP.HCM',
+          imageUrl: vehicle.imageUrl || 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=500',
+          lastMaintenance: vehicle.lastMaintenance || new Date().toISOString().split('T')[0],
+          nextMaintenance: vehicle.nextMaintenance || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+        })) || [];
+
+        setVehicles(transformedVehicles);
+        setStoreVehicles(transformedVehicles);
+      } catch (error) {
+        console.error('Error fetching vehicles:', error);
+        showErrorToast(error.response?.data?.message || 'Không thể tải danh sách xe');
+        setVehicles([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchVehicles();
+  }, [setStoreVehicles]);
 
   if (loading) {
     return (

@@ -6,55 +6,86 @@ import { ArrowLeft, DollarSign, Clock, CheckCircle, XCircle, FileText } from 'lu
 import Header from '../../../../components/layout/Header';
 import Footer from '../../../../components/layout/Footer';
 import PaymentGateway from '../../../../components/payment/PaymentGateway';
+import costService from '../../../../services/cost.service';
+import { useCostStore } from '../../../../stores/useCostStore';
+import { showErrorToast, showSuccessToast } from '../../../../utils/toast';
 
 export default function PaymentPortal() {
   const [selectedBill, setSelectedBill] = useState(null);
   const [pendingBills, setPendingBills] = useState([]);
   const [showPayment, setShowPayment] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const { splits: storeSplits, setSplits: setStoreSplits } = useCostStore();
 
   useEffect(() => {
-    // Mock data - trong thực tế sẽ fetch từ API
-    setPendingBills([
-      {
-        id: 1,
-        description: 'Chi phí sử dụng xe tháng 1/2024',
-        amount: 1540000,
-        dueDate: '2024-01-31',
-        status: 'pending',
-        breakdown: [
-          { name: 'Sạc điện', amount: 500000 },
-          { name: 'Bảo dưỡng', amount: 340000 },
-          { name: 'Bảo hiểm', amount: 300000 },
-          { name: 'Khác', amount: 400000 }
-        ]
-      },
-      {
-        id: 2,
-        description: 'Chi phí bảo hiểm quý 1/2024',
-        amount: 2250000,
-        dueDate: '2024-01-15',
-        status: 'overdue',
-        breakdown: [
-          { name: 'Bảo hiểm trách nhiệm', amount: 1500000 },
-          { name: 'Bảo hiểm vật chất', amount: 750000 }
-        ]
-      }
-    ]);
-  }, []);
+    const fetchPendingBills = async () => {
+      try {
+        setLoading(true);
+        const response = await costService.getUserSplits();
+        
+        // Transform cost splits to bill format
+        const bills = response.splits?.filter(split => split.status === 'pending' || split.status === 'overdue').map(split => ({
+          id: split.id,
+          description: split.description || `Chi phí ${split.costType || 'sử dụng'} - ${new Date(split.createdAt).toLocaleDateString('vi-VN')}`,
+          amount: split.amount || 0,
+          dueDate: split.dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          status: split.status,
+          breakdown: split.breakdown || [
+            { name: split.costType || 'Chi phí', amount: split.amount || 0 }
+          ]
+        })) || [];
 
-  const handlePaymentSuccess = (paymentResult) => {
-    console.log('Payment successful:', paymentResult);
-    alert('Thanh toán thành công! Mã giao dịch: ' + (paymentResult.transactionId || 'N/A'));
-    setShowPayment(false);
-    setSelectedBill(null);
-    // Reload bills
-    // fetchPendingBills();
+        setPendingBills(bills);
+        setStoreSplits(response.splits || []);
+      } catch (error) {
+        console.error('Error fetching bills:', error);
+        showErrorToast(error.response?.data?.message || 'Không thể tải danh sách hóa đơn');
+        setPendingBills([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPendingBills();
+  }, [setStoreSplits]);
+
+  const handlePaymentSuccess = async (paymentResult) => {
+    try {
+      console.log('Payment successful:', paymentResult);
+      
+      // Update payment status via API
+      if (selectedBill) {
+        await costService.payBill(selectedBill.id, {
+          transactionId: paymentResult.transactionId,
+          paymentMethod: paymentResult.paymentMethod
+        });
+        showSuccessToast(`Thanh toán thành công! Mã giao dịch: ${paymentResult.transactionId || 'N/A'}`);
+      }
+      
+      setShowPayment(false);
+      setSelectedBill(null);
+      
+      // Reload bills
+      const response = await costService.getUserSplits();
+      const bills = response.splits?.filter(split => split.status === 'pending' || split.status === 'overdue').map(split => ({
+        id: split.id,
+        description: split.description || `Chi phí ${split.costType || 'sử dụng'}`,
+        amount: split.amount || 0,
+        dueDate: split.dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        status: split.status,
+        breakdown: split.breakdown || [{ name: split.costType || 'Chi phí', amount: split.amount || 0 }]
+      })) || [];
+      setPendingBills(bills);
+    } catch (error) {
+      console.error('Error updating payment:', error);
+      showErrorToast(error.response?.data?.message || 'Có lỗi xảy ra khi cập nhật thanh toán');
+    }
   };
 
   const handlePaymentCancel = () => {
     console.log('Payment cancelled');
-    alert('Thanh toán đã bị hủy');
     setShowPayment(false);
+    setSelectedBill(null);
   };
 
   const getStatusBadge = (status) => {

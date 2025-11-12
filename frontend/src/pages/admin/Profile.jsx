@@ -1,56 +1,72 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { User, Mail, Phone, MapPin, Calendar, Shield, Bell, Camera, Save, Edit, CheckCircle, X, Badge, Building, Clock, Key } from "lucide-react";
+import { User, Mail, Phone, MapPin, Calendar, Shield, Bell, CreditCard, FileText, Camera, Save, Edit, CheckCircle, X, Users, Building, Badge, Key } from "lucide-react";
+import userService from "../../services/user.service";
+import { useUserStore } from "../../stores/useUserStore";
+import { useAuthStore } from "../../stores/useAuthStore";
+import { showSuccessToast, showErrorToast } from "../../utils/toast";
 
-const StaffProfile = () => {
-  const [staffData, setStaffData] = useState(null);
+const AdminProfile = () => {
+  const [adminData, setAdminData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({});
   const [activeTab, setActiveTab] = useState("personal");
   const fileInputRef = useRef(null);
+  const { user } = useAuthStore();
+  const { profile, setProfile } = useUserStore();
 
-  // Mock data cho staff
+  // Fetch admin data from API
   useEffect(() => {
-    const fetchStaffData = async () => {
-      setTimeout(() => {
-        const data = {
-          id: 2,
-          name: "Nguyễn Văn B",
-          email: "staff@evcoownership.com",
-          phone: "+84 987 654 321",
-          address: "123 Nguyễn Huệ, Q.1, TP.HCM",
-          joinDate: "2023-08-20",
-          position: "Nhân viên vận hành",
-          department: "Vận hành xe",
-          permissions: ["car_management", "service_management", "checkin_out"],
-          verified: true,
-          avatar: null,
-          employeeId: "STF002",
-          accessLevel: "Staff",
-          lastLogin: "2024-01-15T08:15:00Z",
-          notificationPreferences: {
+    const fetchAdminData = async () => {
+      try {
+        setLoading(true);
+        const profileData = await userService.getProfile();
+        
+        const transformedData = {
+          id: profileData.id,
+          name: profileData.fullName || user?.email || "Admin",
+          email: profileData.email || user?.email,
+          phone: profileData.phone || "",
+          address: profileData.address || "",
+          joinDate: profileData.createdAt?.split('T')[0] || "",
+          position: profileData.role === 'admin' ? "Quản trị viên hệ thống" : "Quản trị viên",
+          department: "IT & Quản lý hệ thống",
+          permissions: profileData.permissions || ["full_access", "user_management", "car_management", "financial_reports"],
+          verified: profileData.kycStatus === 'approved',
+          avatar: profileData.avatar || null,
+          employeeId: `ADM${String(profileData.id).padStart(3, '0')}`,
+          accessLevel: profileData.role === 'admin' ? "Super Admin" : "Admin",
+          lastLogin: profileData.lastLogin || new Date().toISOString(),
+          notificationPreferences: profileData.notificationPreferences || {
             email: true,
             sms: false,
             push: true,
-            bookingAlerts: true,
-            serviceAlerts: true,
-            systemUpdates: false
+            systemAlerts: true,
+            securityAlerts: true,
+            reportNotifications: true
           },
-          securitySettings: {
+          securitySettings: profileData.securitySettings || {
             twoFactor: false,
             sessionTimeout: 30,
-            loginAlerts: true
+            loginAlerts: true,
+            passwordExpiry: 90
           }
         };
-        setStaffData(data);
-        setFormData(data);
+        
+        setAdminData(transformedData);
+        setFormData(transformedData);
+        setProfile(profileData);
+      } catch (error) {
+        console.error('Error fetching admin profile:', error);
+        showErrorToast(error.response?.data?.message || 'Không thể tải thông tin profile');
+      } finally {
         setLoading(false);
-      }, 1000);
+      }
     };
 
-    fetchStaffData();
-  }, []);
+    fetchAdminData();
+  }, [user, setProfile]);
 
   // Hàm xử lý chọn ảnh
   const handleAvatarClick = () => {
@@ -89,17 +105,17 @@ const StaffProfile = () => {
     if (isEditing) {
       return formData.avatar;
     }
-    return staffData?.avatar;
+    return adminData?.avatar;
   };
 
   const handleSave = () => {
-    setStaffData(formData);
+    setAdminData(formData);
     setIsEditing(false);
-    console.log("Staff data saved:", formData);
+    console.log("Admin data saved:", formData);
   };
 
   const handleCancel = () => {
-    setFormData(staffData);
+    setFormData(adminData);
     setIsEditing(false);
   };
 
@@ -130,15 +146,11 @@ const StaffProfile = () => {
     }));
   };
 
-  // Kiểm tra xem có thay đổi không
-  const hasChanges = () => {
-    return JSON.stringify(formData) !== JSON.stringify(staffData);
-  };
-
   const tabs = [
     { id: "personal", name: "Thông tin cá nhân", icon: User },
     { id: "security", name: "Bảo mật", icon: Shield },
-    { id: "notifications", name: "Thông báo", icon: Bell }
+    { id: "notifications", name: "Thông báo", icon: Bell },
+    { id: "permissions", name: "Quyền hạn", icon: Key }
   ];
 
   if (loading) {
@@ -151,7 +163,7 @@ const StaffProfile = () => {
               <div className="lg:col-span-1">
                 <div className="bg-white rounded-2xl p-6 shadow-sm">
                   <div className="h-6 bg-gray-200 rounded w-3/4 mb-4"></div>
-                  {[...Array(3)].map((_, i) => (
+                  {[...Array(4)].map((_, i) => (
                     <div key={i} className="h-4 bg-gray-200 rounded w-full mb-3"></div>
                   ))}
                 </div>
@@ -182,13 +194,13 @@ const StaffProfile = () => {
           className="mb-8"
         >
           <h1 className="text-4xl lg:text-5xl font-bold text-gray-900">
-            Nhân viên{" "}
-            <span className="bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+            Quản trị viên{" "}
+            <span className="bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
               Hệ thống
             </span>
           </h1>
           <p className="text-xl text-gray-600 mt-4">
-            Quản lý thông tin nhân viên và thiết lập tài khoản
+            Quản lý thông tin quản trị viên và thiết lập hệ thống
           </p>
         </motion.div>
 
@@ -208,7 +220,7 @@ const StaffProfile = () => {
                   ) : (
                     <div className="w-24 h-24 rounded-full mx-auto border-4 border-white shadow-lg bg-blue-600 flex items-center justify-center">
                       <span className="text-white font-bold text-2xl">
-                        {staffData?.name ? staffData.name.charAt(0).toUpperCase() : 'S'}
+                        {adminData?.name ? adminData.name.charAt(0).toUpperCase() : 'A'}
                       </span>
                     </div>
                   )}
@@ -233,13 +245,13 @@ const StaffProfile = () => {
                   </button>
                 </div>
                 <h2 className="text-xl font-bold text-gray-900 mt-4">
-                  {staffData?.name}
+                  {adminData?.name}
                 </h2>
-                <p className="text-gray-600">{staffData?.position}</p>
-                {staffData?.verified && (
+                <p className="text-gray-600">{adminData?.position}</p>
+                {adminData?.verified && (
                   <div className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm mt-2">
                     <CheckCircle className="w-4 h-4" />
-                    Đã xác thực
+                    Super Admin
                   </div>
                 )}
               </div>
@@ -283,12 +295,11 @@ const StaffProfile = () => {
                     {tabs.find(tab => tab.id === activeTab)?.name}
                   </h2>
                   <p className="text-gray-600 mt-1">
-                    Quản lý {tabs.find(tab => tab.id === activeTab)?.name.toLowerCase()} của nhân viên
+                    Quản lý {tabs.find(tab => tab.id === activeTab)?.name.toLowerCase()} của quản trị viên
                   </p>
                 </div>
                 
-                {/* Hiển thị nút điều khiển phù hợp với từng tab */}
-                {activeTab === "personal" ? (
+                {activeTab === "personal" && (
                   <div className="flex gap-3">
                     {isEditing ? (
                       <>
@@ -301,12 +312,7 @@ const StaffProfile = () => {
                         </button>
                         <button
                           onClick={handleSave}
-                          disabled={!hasChanges()}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-colors ${
-                            hasChanges() 
-                              ? "bg-blue-600 text-white hover:bg-blue-700" 
-                              : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                          }`}
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
                         >
                           <Save className="w-4 h-4" />
                           Lưu thay đổi
@@ -321,34 +327,6 @@ const StaffProfile = () => {
                         Chỉnh sửa
                       </button>
                     )}
-                  </div>
-                ) : (
-                  // Nút lưu cho các tab khác
-                  <div className="flex gap-3">
-                    <button
-                      onClick={handleCancel}
-                      disabled={!hasChanges()}
-                      className={`flex items-center gap-2 px-4 py-2 border rounded-xl transition-colors ${
-                        hasChanges()
-                          ? "text-gray-600 border-gray-300 hover:bg-gray-50"
-                          : "text-gray-400 border-gray-200 cursor-not-allowed"
-                      }`}
-                    >
-                      <X className="w-4 h-4" />
-                      Hủy
-                    </button>
-                    <button
-                      onClick={handleSave}
-                      disabled={!hasChanges()}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-colors ${
-                        hasChanges() 
-                          ? "bg-blue-600 text-white hover:bg-blue-700" 
-                          : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      }`}
-                    >
-                      <Save className="w-4 h-4" />
-                      Lưu thay đổi
-                    </button>
                   </div>
                 )}
               </div>
@@ -370,7 +348,7 @@ const StaffProfile = () => {
                         />
                       ) : (
                         <div className="px-4 py-3 bg-gray-50 rounded-xl text-gray-900">
-                          {staffData?.name}
+                          {adminData?.name}
                         </div>
                       )}
                     </div>
@@ -389,7 +367,7 @@ const StaffProfile = () => {
                       ) : (
                         <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl">
                           <Mail className="w-5 h-5 text-gray-400" />
-                          <span className="text-gray-900">{staffData?.email}</span>
+                          <span className="text-gray-900">{adminData?.email}</span>
                         </div>
                       )}
                     </div>
@@ -408,7 +386,7 @@ const StaffProfile = () => {
                       ) : (
                         <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl">
                           <Phone className="w-5 h-5 text-gray-400" />
-                          <span className="text-gray-900">{staffData?.phone}</span>
+                          <span className="text-gray-900">{adminData?.phone}</span>
                         </div>
                       )}
                     </div>
@@ -419,7 +397,7 @@ const StaffProfile = () => {
                       </label>
                       <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl">
                         <Badge className="w-5 h-5 text-gray-400" />
-                        <span className="text-gray-900">{staffData?.employeeId}</span>
+                        <span className="text-gray-900">{adminData?.employeeId}</span>
                       </div>
                     </div>
 
@@ -437,7 +415,7 @@ const StaffProfile = () => {
                       ) : (
                         <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl">
                           <User className="w-5 h-5 text-gray-400" />
-                          <span className="text-gray-900">{staffData?.position}</span>
+                          <span className="text-gray-900">{adminData?.position}</span>
                         </div>
                       )}
                     </div>
@@ -456,7 +434,7 @@ const StaffProfile = () => {
                       ) : (
                         <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl">
                           <Building className="w-5 h-5 text-gray-400" />
-                          <span className="text-gray-900">{staffData?.department}</span>
+                          <span className="text-gray-900">{adminData?.department}</span>
                         </div>
                       )}
                     </div>
@@ -467,7 +445,7 @@ const StaffProfile = () => {
                       </label>
                       <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl">
                         <Shield className="w-5 h-5 text-gray-400" />
-                        <span className="text-gray-900">{staffData?.accessLevel}</span>
+                        <span className="text-gray-900">{adminData?.accessLevel}</span>
                       </div>
                     </div>
 
@@ -478,7 +456,7 @@ const StaffProfile = () => {
                       <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl">
                         <Calendar className="w-5 h-5 text-gray-400" />
                         <span className="text-gray-900">
-                          {new Date(staffData?.joinDate).toLocaleDateString("vi-VN")}
+                          {new Date(adminData?.joinDate).toLocaleDateString("vi-VN")}
                         </span>
                       </div>
                     </div>
@@ -498,7 +476,7 @@ const StaffProfile = () => {
                     ) : (
                       <div className="flex items-start gap-3 px-4 py-3 bg-gray-50 rounded-xl">
                         <MapPin className="w-5 h-5 text-gray-400 mt-0.5" />
-                        <span className="text-gray-900">{staffData?.address}</span>
+                        <span className="text-gray-900">{adminData?.address}</span>
                       </div>
                     )}
                   </div>
@@ -514,7 +492,7 @@ const StaffProfile = () => {
                           Đăng nhập lần cuối
                         </label>
                         <div className="px-4 py-3 bg-gray-50 rounded-xl text-gray-900">
-                          {staffData?.lastLogin ? new Date(staffData.lastLogin).toLocaleString("vi-VN") : "Chưa đăng nhập"}
+                          {new Date(adminData?.lastLogin).toLocaleString("vi-VN")}
                         </div>
                       </div>
                       <div>
@@ -534,10 +512,10 @@ const StaffProfile = () => {
                 <div className="space-y-6">
                   <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
                     <h3 className="text-lg font-semibold text-blue-900 mb-2">
-                      Bảo mật tài khoản
+                      Bảo mật hệ thống
                     </h3>
                     <p className="text-blue-700">
-                      Bảo vệ tài khoản của bạn bằng các thiết lập bảo mật
+                      Cài đặt bảo mật nâng cao cho tài khoản quản trị viên
                     </p>
                   </div>
 
@@ -560,7 +538,7 @@ const StaffProfile = () => {
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={formData.securitySettings?.twoFactor || false}
+                          checked={formData.securitySettings?.twoFactor}
                           onChange={(e) => handleSecurityChange("twoFactor", e.target.checked)}
                           className="sr-only peer"
                         />
@@ -576,7 +554,7 @@ const StaffProfile = () => {
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={formData.securitySettings?.loginAlerts || false}
+                          checked={formData.securitySettings?.loginAlerts}
                           onChange={(e) => handleSecurityChange("loginAlerts", e.target.checked)}
                           className="sr-only peer"
                         />
@@ -591,11 +569,11 @@ const StaffProfile = () => {
                           <p className="text-sm text-gray-600">Tự động đăng xuất sau khi không hoạt động</p>
                         </div>
                         <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
-                          {formData.securitySettings?.sessionTimeout || 30} phút
+                          {formData.securitySettings?.sessionTimeout} phút
                         </span>
                       </div>
                       <select 
-                        value={formData.securitySettings?.sessionTimeout || 30}
+                        value={formData.securitySettings?.sessionTimeout}
                         onChange={(e) => handleSecurityChange("sessionTimeout", parseInt(e.target.value))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       >
@@ -611,29 +589,29 @@ const StaffProfile = () => {
 
               {activeTab === "notifications" && (
                 <div className="space-y-6">
-                  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
-                    <h3 className="text-lg font-semibold text-blue-900 mb-2">
-                      Cài đặt thông báo
+                  <div className="bg-purple-50 border border-purple-200 rounded-2xl p-6">
+                    <h3 className="text-lg font-semibold text-purple-900 mb-2">
+                      Cài đặt thông báo hệ thống
                     </h3>
-                    <p className="text-blue-700">
-                      Chọn loại thông báo bạn muốn nhận
+                    <p className="text-purple-700">
+                      Quản lý thông báo cho tài khoản quản trị viên
                     </p>
                   </div>
 
                   <div className="space-y-4">
-                    {formData.notificationPreferences && Object.entries(formData.notificationPreferences).map(([key, value]) => (
+                    {Object.entries(formData.notificationPreferences || {}).map(([key, value]) => (
                       <div key={key} className="flex items-center justify-between p-4 border border-gray-200 rounded-xl">
                         <div>
                           <h4 className="font-medium text-gray-900 capitalize">
-                            {key === 'bookingAlerts' ? 'Cảnh báo đặt lịch' :
-                             key === 'serviceAlerts' ? 'Cảnh báo dịch vụ' :
-                             key === 'systemUpdates' ? 'Cập nhật hệ thống' :
+                            {key === 'systemAlerts' ? 'Cảnh báo hệ thống' :
+                             key === 'securityAlerts' ? 'Cảnh báo bảo mật' :
+                             key === 'reportNotifications' ? 'Thông báo báo cáo' :
                              key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
                           </h4>
                           <p className="text-sm text-gray-600">
-                            {key === 'bookingAlerts' ? 'Thông báo khi có đặt lịch mới' :
-                             key === 'serviceAlerts' ? 'Cảnh báo dịch vụ cần xử lý' :
-                             key === 'systemUpdates' ? 'Cập nhật từ hệ thống' :
+                            {key === 'systemAlerts' ? 'Nhận cảnh báo quan trọng từ hệ thống' :
+                             key === 'securityAlerts' ? 'Cảnh báo về các vấn đề bảo mật' :
+                             key === 'reportNotifications' ? 'Thông báo khi có báo cáo mới' :
                              `Nhận thông báo qua ${key.includes('email') ? 'email' : key.includes('sms') ? 'SMS' : 'ứng dụng'}`}
                           </p>
                         </div>
@@ -651,6 +629,113 @@ const StaffProfile = () => {
                   </div>
                 </div>
               )}
+
+              {activeTab === "permissions" && (
+                <div className="space-y-6">
+                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6">
+                    <h3 className="text-lg font-semibold text-amber-900 mb-2">
+                      Quyền hạn và Phân quyền
+                    </h3>
+                    <p className="text-amber-700">
+                      Quản lý các quyền truy cập và chức năng của quản trị viên
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="p-6 border border-gray-200 rounded-xl">
+                      <div className="flex items-center gap-3 mb-4">
+                        <Users className="w-6 h-6 text-blue-600" />
+                        <h4 className="text-lg font-semibold text-gray-900">Quản lý người dùng</h4>
+                      </div>
+                      <ul className="space-y-2">
+                        <li className="flex items-center gap-2 text-gray-700">
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          Thêm/Xóa người dùng
+                        </li>
+                        <li className="flex items-center gap-2 text-gray-700">
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          Phân quyền người dùng
+                        </li>
+                        <li className="flex items-center gap-2 text-gray-700">
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          Xem lịch sử người dùng
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className="p-6 border border-gray-200 rounded-xl">
+                      <div className="flex items-center gap-3 mb-4">
+                        <CreditCard className="w-6 h-6 text-green-600" />
+                        <h4 className="text-lg font-semibold text-gray-900">Quản lý xe</h4>
+                      </div>
+                      <ul className="space-y-2">
+                        <li className="flex items-center gap-2 text-gray-700">
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          Thêm/Xóa xe
+                        </li>
+                        <li className="flex items-center gap-2 text-gray-700">
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          Quản lý bảo dưỡng
+                        </li>
+                        <li className="flex items-center gap-2 text-gray-700">
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          Theo dõi lịch sử sử dụng
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className="p-6 border border-gray-200 rounded-xl">
+                      <div className="flex items-center gap-3 mb-4">
+                        <FileText className="w-6 h-6 text-purple-600" />
+                        <h4 className="text-lg font-semibold text-gray-900">Báo cáo & Phân tích</h4>
+                      </div>
+                      <ul className="space-y-2">
+                        <li className="flex items-center gap-2 text-gray-700">
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          Xem báo cáo tài chính
+                        </li>
+                        <li className="flex items-center gap-2 text-gray-700">
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          Xuất báo cáo
+                        </li>
+                        <li className="flex items-center gap-2 text-gray-700">
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          Phân tích hiệu suất
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className="p-6 border border-gray-200 rounded-xl">
+                      <div className="flex items-center gap-3 mb-4">
+                        <Shield className="w-6 h-6 text-red-600" />
+                        <h4 className="text-lg font-semibold text-gray-900">Quản trị hệ thống</h4>
+                      </div>
+                      <ul className="space-y-2">
+                        <li className="flex items-center gap-2 text-gray-700">
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          Cấu hình hệ thống
+                        </li>
+                        <li className="flex items-center gap-2 text-gray-700">
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          Quản lý sao lưu
+                        </li>
+                        <li className="flex items-center gap-2 text-gray-700">
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          Theo dõi nhật ký hệ thống
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="p-6 border border-blue-200 bg-blue-50 rounded-xl">
+                    <h4 className="text-lg font-semibold text-blue-900 mb-2">Tổng quan quyền hạn</h4>
+                    <p className="text-blue-700">
+                      Tài khoản của bạn có toàn quyền truy cập và quản lý hệ thống. 
+                      Đây là cấp độ truy cập cao nhất trong hệ thống.
+                    </p>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </div>
         </div>
@@ -659,4 +744,4 @@ const StaffProfile = () => {
   );
 };
 
-export default StaffProfile;
+export default AdminProfile;

@@ -23,65 +23,98 @@ import { motion, AnimatePresence } from "framer-motion";
 import Header from "../../../components/layout/Header";
 import Footer from "../../../components/layout/Footer";
 import AIRecommendations from "../../../components/ai/AIRecommendations";
+import userService from "../../../services/user.service";
+import bookingService from "../../../services/booking.service";
+import vehicleService from "../../../services/vehicle.service";
+import { useUserStore } from "../../../stores/useUserStore";
+import { useAuthStore } from "../../../stores/useAuthStore";
+import { showErrorToast } from "../../../utils/toast";
 
 export default function CoownerDashboard() {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeCarIndex, setActiveCarIndex] = useState(0);
+  const [recentBookings, setRecentBookings] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+  const { user } = useAuthStore();
+  const { profile } = useUserStore();
 
-  // Mock data - trong thực tế sẽ gọi API
+  // Fetch real data from API
   useEffect(() => {
-    const fetchUserData = async () => {
-      setTimeout(() => {
-        setUserData({
-          name: "Nguyễn Văn A",
-          membershipType: "Co-owner Premium",
-          totalCars: 2,
-          ownershipPercentage: 40,
-          groupMembers: 3,
-          monthlyCost: 1250000,
-          nextBooking: "2024-01-15T08:00:00",
-          totalSavings: 18400000,
-          usageThisMonth: 12,
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch user profile, bookings, and vehicles in parallel
+        const [profileData, bookingsData, vehiclesData] = await Promise.all([
+          userService.getProfile(),
+          bookingService.getUserBookings().catch(() => ({ bookings: [] })),
+          vehicleService.getVehicles().catch(() => ({ vehicles: [] }))
+        ]);
+
+        // Transform profile data
+        const transformedUserData = {
+          name: profileData.fullName || user?.email || "User",
+          membershipType: profileData.kycStatus === 'approved' ? "Co-owner Premium" : "Co-owner",
+          totalCars: vehiclesData.vehicles?.length || 0,
+          ownershipPercentage: profileData.ownershipPercentage || 0,
+          groupMembers: profileData.groupMembers || 0,
+          monthlyCost: profileData.monthlyCost || 0,
+          nextBooking: bookingsData.bookings?.[0]?.startTime,
+          totalSavings: profileData.totalSavings || 0,
+          usageThisMonth: bookingsData.bookings?.filter(b => {
+            const bookingDate = new Date(b.startTime);
+            const now = new Date();
+            return bookingDate.getMonth() === now.getMonth() && 
+                   bookingDate.getFullYear() === now.getFullYear();
+          }).length || 0,
           usageLimit: 30,
-          recentActivity: [
-            {
-              id: 1,
-              type: "booking",
-              message: "Đã đặt lịch sử dụng xe Tesla Model 3",
-              time: "2 giờ trước",
-              status: "completed",
-            },
-            {
-              id: 2,
-              type: "payment",
-              message: "Đã thanh toán phí bảo dưỡng tháng 12",
-              time: "1 ngày trước",
-              status: "completed",
-            },
-            {
-              id: 3,
-              type: "maintenance",
-              message: "Xe cần bảo dưỡng định kỳ",
-              time: "3 ngày trước",
-              status: "pending",
-            },
-          ],
-        });
+          recentActivity: bookingsData.bookings?.slice(0, 3).map((booking, index) => ({
+            id: booking.id,
+            type: booking.status === 'completed' ? 'booking' : 'pending',
+            message: `${booking.status === 'completed' ? 'Đã hoàn thành' : 'Đặt lịch'} sử dụng xe ${booking.vehicleName || 'EV'}`,
+            time: formatTimeAgo(booking.createdAt),
+            status: booking.status
+          })) || []
+        };
+
+        setUserData(transformedUserData);
+        setRecentBookings(bookingsData.bookings || []);
+        setVehicles(vehiclesData.vehicles || []);
+        
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+        showErrorToast(error.response?.data?.message || "Không thể tải dữ liệu dashboard");
+      } finally {
         setLoading(false);
-      }, 1500);
+      }
     };
 
-    fetchUserData();
-  }, []);
+    fetchDashboardData();
+  }, [user]);
+
+  // Helper function to format time ago
+  const formatTimeAgo = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 60) return `${diffMins} phút trước`;
+    if (diffHours < 24) return `${diffHours} giờ trước`;
+    return `${diffDays} ngày trước`;
+  };
 
   // Car images rotation
   useEffect(() => {
+    if (vehicles.length === 0) return;
     const interval = setInterval(() => {
-      setActiveCarIndex((prev) => (prev + 1) % carStatus.length);
+      setActiveCarIndex((prev) => (prev + 1) % vehicles.length);
     }, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [vehicles]);
 
   // Stats cards data
   const statsCards = [
@@ -90,7 +123,7 @@ export default function CoownerDashboard() {
       value: userData?.totalCars || 0,
       icon: Car,
       color: "from-blue-500 to-cyan-500",
-      link: "/dashboard/coowner/ownership",
+      link: "/coowner/ownership",
       description: "Xe đang đồng sở hữu",
     },
     {
@@ -98,7 +131,7 @@ export default function CoownerDashboard() {
       value: `${userData?.ownershipPercentage || 0}%`,
       icon: Users,
       color: "from-green-500 to-emerald-500",
-      link: "/dashboard/coowner/ownership",
+      link: "/coowner/ownership",
       description: "Quyền sở hữu của bạn",
     },
     {
@@ -106,7 +139,7 @@ export default function CoownerDashboard() {
       value: `${(userData?.monthlyCost || 0).toLocaleString()}đ`,
       icon: DollarSign,
       color: "from-purple-500 to-pink-500",
-      link: "/dashboard/coowner/financial",
+      link: "/coowner/financial",
       description: "Tổng chi phí tháng này",
     },
     {
@@ -114,7 +147,7 @@ export default function CoownerDashboard() {
       value: userData?.groupMembers || 0,
       icon: Users,
       color: "from-orange-500 to-amber-500",
-      link: "/dashboard/coowner/group",
+      link: "/coowner/group",
       description: "Đồng sở hữu với",
     },
   ];
@@ -125,7 +158,7 @@ export default function CoownerDashboard() {
       title: "Đặt lịch sử dụng",
       description: "Đặt lịch sử dụng xe của bạn",
       icon: Calendar,
-      link: "/dashboard/coowner/booking",
+      link: "/coowner/booking",
       color: "from-blue-500 to-cyan-500",
       buttonColor: "bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-200",
     },
@@ -133,7 +166,7 @@ export default function CoownerDashboard() {
       title: "Xem hợp đồng",
       description: "Hợp đồng đồng sở hữu",
       icon: FileText,
-      link: "/dashboard/coowner/ownership",
+      link: "/coowner/ownership",
       color: "from-green-500 to-emerald-500",
       buttonColor:
         "bg-green-50 text-green-600 hover:bg-green-100 border-green-200",
@@ -142,7 +175,7 @@ export default function CoownerDashboard() {
       title: "Quản lý chi phí",
       description: "Theo dõi và thanh toán",
       icon: DollarSign,
-      link: "/dashboard/coowner/financial",
+      link: "/coowner/financial",
       color: "from-purple-500 to-pink-500",
       buttonColor:
         "bg-purple-50 text-purple-600 hover:bg-purple-100 border-purple-200",
@@ -151,42 +184,27 @@ export default function CoownerDashboard() {
       title: "Phân tích sử dụng",
       description: "Thống kê và báo cáo",
       icon: BarChart3,
-      link: "/dashboard/coowner/history",
+      link: "/coowner/history",
       color: "from-orange-500 to-amber-500",
       buttonColor:
         "bg-orange-50 text-orange-600 hover:bg-orange-100 border-orange-200",
     },
   ];
 
-  // Car status
-  const carStatus = [
-    {
-      id: 1,
-      name: "Tesla Model 3",
-      model: "2023 Long Range",
-      status: "available",
-      battery: 85,
-      location: "Q.1, TP.HCM",
-      nextMaintenance: "15 ngày tới",
-      usageThisMonth: "12/30 giờ",
-      image: "/api/placeholder/400/250",
-      efficiency: "6.2 km/kWh",
-      range: "420 km",
-    },
-    {
-      id: 2,
-      name: "VinFast VF e34",
-      model: "2023 Premium",
-      status: "in_use",
-      battery: 45,
-      location: "Q.7, TP.HCM",
-      nextMaintenance: "8 ngày tới",
-      usageThisMonth: "8/30 giờ",
-      image: "/api/placeholder/400/250",
-      efficiency: "5.8 km/kWh",
-      range: "320 km",
-    },
-  ];
+  // Transform vehicles data to match carStatus format
+  const carStatus = vehicles.map(vehicle => ({
+    id: vehicle.id,
+    name: vehicle.name || vehicle.model,
+    model: vehicle.year ? `${vehicle.year} ${vehicle.variant || ''}` : vehicle.variant || '',
+    status: vehicle.status || 'available',
+    battery: vehicle.batteryLevel || 0,
+    location: vehicle.location || 'TP.HCM',
+    nextMaintenance: vehicle.nextMaintenance || 'Chưa có lịch',
+    usageThisMonth: `${userData?.usageThisMonth || 0}/${userData?.usageLimit || 30} giờ`,
+    image: vehicle.imageUrl || "/api/placeholder/400/250",
+    efficiency: vehicle.efficiency || "N/A",
+    range: vehicle.range ? `${vehicle.range} km` : "N/A",
+  }));
 
   const getStatusColor = (status) => {
     switch (status) {
