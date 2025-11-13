@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import LoadingSkeleton from '../../../../components/LoadingSkeleton';
+import LoadingSkeleton from '../../../components/LoadingSkeleton';
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
@@ -18,8 +18,8 @@ import {
   Filter,
   Search,
 } from "lucide-react";
-import userService from "../../../../services/user.service";
-import { toast } from "../../../../utils/toast";
+import userService from "../../../services/user.service";
+import { toast } from "../../../utils/toast";
 
 const VotingManagement = () => {
   const navigate = useNavigate();

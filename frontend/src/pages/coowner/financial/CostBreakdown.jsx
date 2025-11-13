@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, PieChart, DollarSign, Users, Car, Battery, Shield, Calendar, Download, Filter, TrendingUp } from 'lucide-react';
-import Header from '../../../../components/layout/Header';
-import Footer from '../../../../components/layout/Footer';
+import Header from '../../../components/layout/Header';
+import Footer from '../../../components/layout/Footer';
 
 export default function CostBreakdown() {
   const [timeRange, setTimeRange] = useState('month'); 
@@ -117,7 +117,7 @@ export default function CostBreakdown() {
             className="mb-8"
           >
             <Link
-              to="/dashboard/coowner/financial"
+              to="/coowner/financial"
               className="inline-flex items-center gap-2 text-sky-600 hover:text-sky-700 mb-6 group transition-colors"
             >
               <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />

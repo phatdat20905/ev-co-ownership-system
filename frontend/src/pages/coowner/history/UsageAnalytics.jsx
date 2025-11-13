@@ -2,8 +2,8 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, BarChart3, TrendingUp, Calendar, Download, PieChart, Users, Clock, DollarSign } from "lucide-react";
 import { Link } from "react-router-dom";
-import Header from "../../../../components/layout/Header";
-import Footer from "../../../../components/layout/Footer";
+import Header from "../../../components/layout/Header";
+import Footer from "../../../components/layout/Footer";
 
 export default function UsageAnalytics() {
   const [analyticsData, setAnalyticsData] = useState(null);
@@ -93,7 +93,7 @@ export default function UsageAnalytics() {
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
               <Link
-                to="/dashboard/coowner/history"
+                to="/coowner/history"
                 className="p-2 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
               >
                 <ArrowLeft className="w-5 h-5 text-gray-600" />

@@ -3,12 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, DollarSign, Clock, CheckCircle, XCircle, FileText } from 'lucide-react';
-import Header from '../../../../components/layout/Header';
-import Footer from '../../../../components/layout/Footer';
-import PaymentGateway from '../../../../components/payment/PaymentGateway';
-import costService from '../../../../services/cost.service';
-import { useCostStore } from '../../../../stores/useCostStore';
-import { showErrorToast, showSuccessToast } from '../../../../utils/toast';
+import Header from '../../../components/layout/Header';
+import Footer from '../../../components/layout/Footer';
+import PaymentGateway from '../../../components/payment/PaymentGateway';
+import costService from '../../../services/cost.service';
+import { useCostStore } from '../../../stores/useCostStore';
+import { showErrorToast, showSuccessToast } from '../../../utils/toast';
 
 export default function PaymentPortal() {
   const [selectedBill, setSelectedBill] = useState(null);
@@ -119,7 +119,7 @@ export default function PaymentPortal() {
           {/* Header */}
           <div className="flex items-center gap-4 mb-8">
             <Link
-              to="/dashboard/coowner/financial"
+              to="/coowner/financial"
               className="p-2 rounded-lg hover:bg-white/80 transition-colors"
             >
               <ArrowLeft className="w-6 h-6 text-gray-600" />

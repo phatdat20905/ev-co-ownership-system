@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, Car, MapPin, Users, FileText, Zap, Battery, CheckCircle } from 'lucide-react';
-import Header from '../../../../components/layout/Header';
-import Footer from '../../../../components/layout/Footer';
-import { bookingService, vehicleService } from '../../../../services';
-import { showSuccessToast, showErrorToast } from '../../../../utils/toast';
+import Header from '../../../components/layout/Header';
+import Footer from '../../../components/layout/Footer';
+import { bookingService, vehicleService } from '../../../services';
+import { showSuccessToast, showErrorToast } from '../../../utils/toast';
 
 export default function BookingForm() {
   const navigate = useNavigate();
@@ -152,7 +152,7 @@ export default function BookingForm() {
             className="mb-8"
           >
             <Link
-              to="/dashboard/coowner/booking"
+              to="/coowner/booking"
               className="inline-flex items-center gap-2 text-sky-600 hover:text-sky-700 mb-6 group transition-colors"
             >
               <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />

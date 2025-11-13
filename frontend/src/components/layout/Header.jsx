@@ -352,7 +352,7 @@ export default function Header() {
                 <>
                   {/* Dashboard Link */}
                   <Link
-                    to="/dashboard/coowner"
+                    to="/coowner"
                     className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-300 hover:text-sky-600 hover:scale-105 ${
                       isDashboardActive() ? 'text-sky-600 bg-sky-50' : 'text-gray-600'
                     }`}
@@ -510,7 +510,7 @@ export default function Header() {
               <>
                 {/* Dashboard Link */}
                 <Link
-                  to="/dashboard/coowner"
+                  to="/coowner"
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={`block w-full text-left py-3 px-4 text-sm font-medium rounded-lg transition-colors ${
                     isDashboardActive() 

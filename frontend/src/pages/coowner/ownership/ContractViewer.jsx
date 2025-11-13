@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { FileText, Download, Printer, Share2, CheckCircle, Clock, AlertCircle, ArrowLeft, Eye } from 'lucide-react';
-import Header from '../../../../components/layout/Header';
-import Footer from '../../../../components/layout/Footer';
+import Header from '../../../components/layout/Header';
+import Footer from '../../../components/layout/Footer';
 
 export default function ContractViewer() {
   const [contract] = useState({
@@ -57,7 +57,7 @@ export default function ContractViewer() {
             className="mb-8"
           >
             <Link
-              to="/dashboard/coowner/ownership"
+              to="/coowner/ownership"
               className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4"
             >
               <ArrowLeft className="w-5 h-5" />

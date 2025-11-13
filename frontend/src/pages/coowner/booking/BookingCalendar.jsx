@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Calendar, Clock, MapPin, Car, Users, Plus, Filter, Search, ChevronLeft, ChevronRight, Battery, Zap } from 'lucide-react';
-import Header from '../../../../components/layout/Header';
-import Footer from '../../../../components/layout/Footer';
-import { bookingService, vehicleService } from '../../../../services';
-import { showSuccessToast, showErrorToast } from '../../../../utils/toast';
+import Header from '../../../components/layout/Header';
+import Footer from '../../../components/layout/Footer';
+import { bookingService, vehicleService } from '../../../services';
+import { showSuccessToast, showErrorToast } from '../../../utils/toast';
 
 export default function BookingCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -151,7 +151,7 @@ export default function BookingCalendar() {
               </div>
               
               <Link
-                to="/dashboard/coowner/booking/new"
+                to="/coowner/booking/new"
                 className="inline-flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-sky-500 to-cyan-500 text-white font-semibold rounded-2xl shadow-lg hover:shadow-xl transition-all hover:scale-105"
               >
                 <Plus className="w-5 h-5" />

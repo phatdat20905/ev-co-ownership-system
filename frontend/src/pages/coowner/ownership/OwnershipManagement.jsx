@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Users, FileText, Upload, BarChart3, Edit3, CheckCircle, ArrowRight, Download, Share2 } from 'lucide-react';
-import Header from '../../../../components/layout/Header';
-import Footer from '../../../../components/layout/Footer';
+import Header from '../../../components/layout/Header';
+import Footer from '../../../components/layout/Footer';
 
 export default function OwnershipManagement() {
   const [ownershipData, setOwnershipData] = useState([
@@ -173,7 +173,7 @@ export default function OwnershipManagement() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Hành động nhanh</h3>
                 <div className="space-y-3">
                   <Link
-                    to="/dashboard/coowner/ownership/contract"
+                    to="/coowner/ownership/contract"
                     className="flex items-center gap-3 p-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors group"
                   >
                     <FileText className="w-5 h-5" />
@@ -181,7 +181,7 @@ export default function OwnershipManagement() {
                     <ArrowRight className="w-4 h-4 ml-auto group-hover:translate-x-1 transition-transform" />
                   </Link>
                   <Link
-                    to="/dashboard/coowner/ownership/documents"
+                    to="/coowner/ownership/documents"
                     className="flex items-center gap-3 p-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors group"
                   >
                     <Upload className="w-5 h-5" />

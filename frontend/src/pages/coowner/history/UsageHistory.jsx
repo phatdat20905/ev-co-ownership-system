@@ -2,11 +2,11 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Calendar, Clock, MapPin, Car, Download, Filter, Search, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
-import Header from "../../../../components/layout/Header";
-import Footer from "../../../../components/layout/Footer";
-import bookingService from "../../../../services/booking.service";
-import { useBookingStore } from "../../../../stores/useBookingStore";
-import { showErrorToast } from "../../../../utils/toast";
+import Header from "../../../components/layout/Header";
+import Footer from "../../../components/layout/Footer";
+import bookingService from "../../../services/booking.service";
+import { useBookingStore } from "../../../stores/useBookingStore";
+import { showErrorToast } from "../../../utils/toast";
 
 export default function UsageHistory() {
   const [usageData, setUsageData] = useState(null);

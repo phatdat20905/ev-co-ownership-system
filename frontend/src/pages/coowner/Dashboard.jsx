@@ -20,15 +20,15 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import Header from "../../../components/layout/Header";
-import Footer from "../../../components/layout/Footer";
-import AIRecommendations from "../../../components/ai/AIRecommendations";
-import userService from "../../../services/user.service";
-import bookingService from "../../../services/booking.service";
-import vehicleService from "../../../services/vehicle.service";
-import { useUserStore } from "../../../stores/useUserStore";
-import { useAuthStore } from "../../../stores/useAuthStore";
-import { showErrorToast } from "../../../utils/toast";
+import Header from "../../components/layout/Header";
+import Footer from "../../components/layout/Footer";
+import AIRecommendations from "../../components/ai/AIRecommendations";
+import userService from "../../services/user.service";
+import bookingService from "../../services/booking.service";
+import vehicleService from "../../services/vehicle.service";
+import { useUserStore } from "../../stores/useUserStore";
+import { useAuthStore } from "../../stores/useAuthStore";
+import { showErrorToast } from "../../utils/toast";
 
 export default function CoownerDashboard() {
   const [userData, setUserData] = useState(null);
@@ -205,6 +205,9 @@ export default function CoownerDashboard() {
     efficiency: vehicle.efficiency || "N/A",
     range: vehicle.range ? `${vehicle.range} km` : "N/A",
   }));
+
+  // Safe reference for the currently active car (may be null if no vehicles)
+  const activeCar = carStatus.length > 0 ? carStatus[activeCarIndex] : null;
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -435,46 +438,46 @@ export default function CoownerDashboard() {
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-4">
                             <h3 className="text-xl font-bold text-gray-900">
-                              {carStatus[activeCarIndex].name}
+                              {activeCar?.name || 'Chưa có xe'}
                             </h3>
                             <span
                               className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
-                                carStatus[activeCarIndex].status
+                                activeCar?.status
                               )}`}
                             >
-                              {getStatusText(carStatus[activeCarIndex].status)}
+                              {getStatusText(activeCar?.status)}
                             </span>
                           </div>
 
                           <p className="text-gray-600 mb-2">
-                            {carStatus[activeCarIndex].model}
+                            {activeCar?.model || ''}
                           </p>
 
                           <div className="space-y-3">
                             <div className="flex items-center gap-3">
                               <Battery className="w-5 h-5 text-green-600" />
                               <span className="text-gray-700">
-                                Pin: {carStatus[activeCarIndex].battery}%
+                                Pin: {activeCar?.battery ?? '-'}%
                               </span>
                             </div>
                             <div className="flex items-center gap-3">
                               <MapPin className="w-5 h-5 text-blue-600" />
                               <span className="text-gray-700">
-                                {carStatus[activeCarIndex].location}
+                                {activeCar?.location || 'N/A'}
                               </span>
                             </div>
                             <div className="flex items-center gap-3">
                               <Clock className="w-5 h-5 text-orange-600" />
                               <span className="text-gray-700">
                                 Bảo dưỡng:{" "}
-                                {carStatus[activeCarIndex].nextMaintenance}
+                                {activeCar?.nextMaintenance || 'Chưa có lịch'}
                               </span>
                             </div>
                             <div className="flex items-center gap-3">
                               <BarChart3 className="w-5 h-5 text-purple-600" />
                               <span className="text-gray-700">
                                 Sử dụng:{" "}
-                                {carStatus[activeCarIndex].usageThisMonth}
+                                {activeCar?.usageThisMonth || '0/0 giờ'}
                               </span>
                             </div>
                           </div>
@@ -483,7 +486,7 @@ export default function CoownerDashboard() {
                         <div className="lg:w-48 flex flex-col gap-3">
                           <div className="bg-white rounded-xl p-4 text-center border border-gray-200">
                             <div className="text-2xl font-bold text-gray-900">
-                              {carStatus[activeCarIndex].efficiency}
+                              {activeCar?.efficiency || 'N/A'}
                             </div>
                             <div className="text-sm text-gray-600">
                               Hiệu suất
@@ -491,7 +494,7 @@ export default function CoownerDashboard() {
                           </div>
                           <div className="bg-white rounded-xl p-4 text-center border border-gray-200">
                             <div className="text-2xl font-bold text-gray-900">
-                              {carStatus[activeCarIndex].range}
+                              {activeCar?.range || 'N/A'}
                             </div>
                             <div className="text-sm text-gray-600">
                               Tầm hoạt động
@@ -552,7 +555,7 @@ export default function CoownerDashboard() {
                 </div>
 
                 <Link
-                  to="/dashboard/coowner/history"
+                  to="/coowner/history"
                   className="block mt-6 text-center py-3 text-blue-600 font-medium rounded-xl border-2 border-blue-200 hover:bg-blue-50 transition-all duration-300 group"
                 >
                   <span className="flex items-center justify-center gap-2">

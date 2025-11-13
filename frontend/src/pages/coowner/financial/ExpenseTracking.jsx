@@ -2,10 +2,10 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Download, Filter, Plus, TrendingUp, TrendingDown, DollarSign, Calendar, PieChart, BarChart3, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
-import Header from "../../../../components/layout/Header";
-import Footer from "../../../../components/layout/Footer";
-import { costService } from "../../../../services";
-import { showSuccessToast, showErrorToast } from "../../../../utils/toast";
+import Header from "../../../components/layout/Header";
+import Footer from "../../../components/layout/Footer";
+import { costService } from "../../../services";
+import { showSuccessToast, showErrorToast } from "../../../utils/toast";
 
 export default function ExpenseTracking() {
   const [expenseData, setExpenseData] = useState(null);
@@ -91,7 +91,7 @@ export default function ExpenseTracking() {
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
               <Link
-                to="/dashboard/coowner/financial"
+                to="/coowner/financial"
                 className="p-2 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
               >
                 <ArrowLeft className="w-5 h-5 text-gray-600" />

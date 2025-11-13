@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { User, Mail, Phone, MapPin, Calendar, Shield, Bell, CreditCard, FileText, Camera, Save, Edit, CheckCircle, X, Eye, EyeOff, Upload, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { motion } from "framer-motion";
-import Header from "../../../../components/layout/Header";
-import Footer from "../../../../components/layout/Footer";
-import { userService, authService } from "../../../../services";
-import { showSuccessToast, showErrorToast } from "../../../../utils/toast";
+import Header from "../../../components/layout/Header";
+import Footer from "../../../components/layout/Footer";
+import { userService, authService } from "../../../services";
+import { showSuccessToast, showErrorToast } from "../../../utils/toast";
 
 export default function Profile() {
   // Helper: normalize profile fields từ API response sang frontend format

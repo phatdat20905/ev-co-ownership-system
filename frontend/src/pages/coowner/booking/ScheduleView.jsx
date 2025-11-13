@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, Car, MapPin, Users, DollarSign, Battery, TrendingUp, Filter, Download, Eye } from 'lucide-react';
-import Header from '../../../../components/layout/Header';
-import Footer from '../../../../components/layout/Footer';
+import Header from '../../../components/layout/Header';
+import Footer from '../../../components/layout/Footer';
 
 export default function ScheduleView() {
   const [timeRange, setTimeRange] = useState('month'); 
@@ -113,7 +113,7 @@ export default function ScheduleView() {
             className="mb-8"
           >
             <Link
-              to="/dashboard/coowner/booking"
+              to="/coowner/booking"
               className="inline-flex items-center gap-2 text-sky-600 hover:text-sky-700 mb-6 group transition-colors"
             >
               <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
@@ -314,7 +314,7 @@ export default function ScheduleView() {
                       <Calendar className="w-16 h-16 mx-auto mb-4 text-gray-300" />
                       <p className="text-gray-500 text-lg">Không có lịch đặt nào</p>
                       <Link
-                        to="/dashboard/coowner/booking/new"
+                        to="/coowner/booking/new"
                         className="inline-block mt-4 text-sky-600 hover:text-sky-700 font-medium"
                       >
                         Đặt lịch ngay

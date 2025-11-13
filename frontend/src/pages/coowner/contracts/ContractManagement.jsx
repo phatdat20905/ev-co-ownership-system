@@ -3,9 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, FileText, Plus, Filter } from 'lucide-react';
-import Header from '../../../../components/layout/Header';
-import Footer from '../../../../components/layout/Footer';
-import ContractSignature from '../../../../components/contract/ContractSignature';
+import Header from '../../../components/layout/Header';
+import Footer from '../../../components/layout/Footer';
+import ContractSignature from '../../../components/contract/ContractSignature';
 
 export default function ContractManagement() {
   const [contracts, setContracts] = useState([]);
@@ -119,7 +119,7 @@ Hai bên cam kết thực hiện đúng các điều khoản đã thỏa thuận
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-4">
                   <Link
-                    to="/dashboard/coowner"
+                    to="/coowner"
                     className="p-2 rounded-lg hover:bg-white/80 transition-colors"
                   >
                     <ArrowLeft className="w-6 h-6 text-gray-600" />

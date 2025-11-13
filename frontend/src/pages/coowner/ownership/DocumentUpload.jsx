@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Upload, FileText, CheckCircle, X, Download, Eye, ArrowLeft, AlertCircle } from 'lucide-react';
-import Header from '../../../../components/layout/Header';
-import Footer from '../../../../components/layout/Footer';
-import LoadingSkeleton from '../../../../components/LoadingSkeleton';
+import Header from '../../../components/layout/Header';
+import Footer from '../../../components/layout/Footer';
+import LoadingSkeleton from '../../../components/LoadingSkeleton';
 
 export default function DocumentUpload() {
   const [documents, setDocuments] = useState([
@@ -125,7 +125,7 @@ export default function DocumentUpload() {
             className="mb-8"
           >
             <Link
-              to="/dashboard/coowner/ownership"
+              to="/coowner/ownership"
               className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4"
             >
               <ArrowLeft className="w-5 h-5" />

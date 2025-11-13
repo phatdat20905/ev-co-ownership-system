@@ -2,12 +2,12 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Vote, Plus, Clock, Users, CheckCircle, XCircle, TrendingUp, BarChart3, Calendar, MoreVertical } from "lucide-react";
 import { Link } from "react-router-dom";
-import Header from "../../../components/layout/Header";
-import Footer from "../../../components/layout/Footer";
-import votingService from "../../../services/voting.service";
-import { useVotingStore } from "../../../stores/useVotingStore";
-import { useGroupStore } from "../../../stores/useGroupStore";
-import { showSuccessToast, showErrorToast } from "../../../utils/toast";
+import Header from "../../../../components/layout/Header";
+import Footer from "../../../../components/layout/Footer";
+import votingService from "../../../../services/voting.service";
+import { useVotingStore } from "../../../../stores/useVotingStore";
+import { useGroupStore } from "../../../../stores/useGroupStore";
+import { showSuccessToast, showErrorToast } from "../../../../utils/toast";
 
 export default function VotingSystem() {
   const [votingData, setVotingData] = useState(null);
@@ -117,7 +117,7 @@ export default function VotingSystem() {
     }
   };
 
-  const displayedVotes = activeTab === 'active' ? (votingData?.activeVotes || []) : (votingData?.completedVotes || []);
+  const votesList = activeTab === 'active' ? votingData.activeVotes : votingData.completedVotes;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -129,12 +129,11 @@ export default function VotingSystem() {
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
               <Link
-                to="/coowner/group"
+                to="/dashboard/coowner/group"
                 className="p-2 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
               >
                 <ArrowLeft className="w-5 h-5 text-gray-600" />
               </Link>
-
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">Hệ thống bỏ phiếu</h1>
                 <p className="text-gray-600 mt-1">Đưa ra quyết định cùng nhau</p>
@@ -234,7 +233,7 @@ export default function VotingSystem() {
 
           {/* Votes Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {votes.map((vote) => (
+            {votesList.map((vote) => (
               <motion.div
                 key={vote.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -334,7 +333,7 @@ export default function VotingSystem() {
           </div>
 
           {/* Empty State */}
-          {votes.length === 0 && (
+          {votesList.length === 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}

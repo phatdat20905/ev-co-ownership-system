@@ -2,11 +2,11 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, DollarSign, TrendingUp, TrendingDown, Download, Filter, Plus, Users, Calendar, CreditCard, PiggyBank, BarChart3 } from "lucide-react";
 import { Link } from "react-router-dom";
-import Header from "../../../components/layout/Header";
-import Footer from "../../../components/layout/Footer";
-import userService from "../../../services/user.service";
-import { useGroupStore } from "../../../stores/useGroupStore";
-import { showSuccessToast, showErrorToast } from "../../../utils/toast";
+import Header from "../../../../components/layout/Header";
+import Footer from "../../../../components/layout/Footer";
+import userService from "../../../../services/user.service";
+import { useGroupStore } from "../../../../stores/useGroupStore";
+import { showSuccessToast, showErrorToast } from "../../../../utils/toast";
 
 export default function CommonFund() {
   const [fundData, setFundData] = useState(null);
@@ -195,7 +195,7 @@ export default function CommonFund() {
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
               <Link
-                to="/coowner/group"
+                to="/dashboard/coowner/group"
                 className="p-2 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
               >
                 <ArrowLeft className="w-5 h-5 text-gray-600" />

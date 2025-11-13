@@ -1,4 +1,4 @@
-import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
+import { Route, BrowserRouter as Router, Routes, Navigate, useLocation } from "react-router-dom";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import ScrollToTop from "./components/layout/ScrollToTop";
@@ -65,6 +65,12 @@ import QuyDinhHoatDong from "./pages/policies/QuyDinhHoatDong";
 import QuyenLoiThanhVien from "./pages/policies/QuyenLoiThanhVien";
 
 export default function App() {
+  function LegacyCoownerRedirect() {
+    const location = useLocation();
+    const to = location.pathname.replace(/^\/dashboard\/coowner/, '/coowner');
+    return <Navigate to={to + location.search} replace />;
+  }
+
   const user = useUserStore(state => state.user);
 
   useEffect(() => {
@@ -125,9 +131,10 @@ export default function App() {
         <Route path="/staff/checkin" element={<CheckInOutManagement />} />
 
         {/* Co-owner Routes */}
-        <Route path="/coowner" element={<CoownerDashboard />} />
-        <Route path="/coowner/dashboard" element={<CoownerDashboard />} />
-        <Route path="/dashboard/coowner" element={<CoownerDashboard />} /> {/* Legacy support */}
+  <Route path="/coowner" element={<CoownerDashboard />} />
+  <Route path="/coowner/dashboard" element={<CoownerDashboard />} />
+  {/* Legacy route: redirect any /dashboard/coowner/* to /coowner/* */}
+  <Route path="/dashboard/coowner/*" element={<LegacyCoownerRedirect />} />
         
         {/* Ownership Routes */}
         <Route path="/coowner/ownership" element={<OwnershipManagement />} />

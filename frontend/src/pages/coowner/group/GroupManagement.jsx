@@ -2,10 +2,10 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Users, UserPlus, Settings, Mail, Phone, Calendar, Car, MoreVertical, Edit, Trash2, Shield, Crown, Check, X, Send, UserCheck, UserX, Search } from "lucide-react";
 import { Link } from "react-router-dom";
-import Header from "../../../../components/layout/Header";
-import Footer from "../../../../components/layout/Footer";
-import { userService } from "../../../../services";
-import { showSuccessToast, showErrorToast } from "../../../../utils/toast";
+import Header from "../../../components/layout/Header";
+import Footer from "../../../components/layout/Footer";
+import { userService } from "../../../services";
+import { showSuccessToast, showErrorToast } from "../../../utils/toast";
 
 export default function GroupManagement() {
   const [groups, setGroups] = useState([]);
@@ -272,7 +272,7 @@ export default function GroupManagement() {
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
               <Link
-                to="/dashboard/coowner/group"
+                to="/coowner/group"
                 className="p-2 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
               >
                 <ArrowLeft className="w-5 h-5 text-gray-600" />
