@@ -20,8 +20,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import Header from "../../components/layout/Header";
-import Footer from "../../components/layout/Footer";
+import CoownerLayout from "../../components/layout/CoownerLayout";
 import AIRecommendations from "../../components/ai/AIRecommendations";
 import userService from "../../services/user.service";
 import bookingService from "../../services/booking.service";
@@ -237,34 +236,27 @@ export default function CoownerDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
-        <div className="pt-20">
-          <div className="max-w-7xl mx-auto px-6 py-8">
-            <div className="animate-pulse">
-              <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="bg-white rounded-2xl p-6 shadow-sm">
-                    <div className="h-6 bg-gray-200 rounded w-1/2 mb-4"></div>
-                    <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-                  </div>
-                ))}
-              </div>
+      <CoownerLayout>
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="bg-white rounded-2xl p-6 shadow-sm">
+                  <div className="h-6 bg-gray-200 rounded w-1/2 mb-4"></div>
+                  <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
-      </div>
+      </CoownerLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-
-      {/* Main Content */}
-      <main className="pt-20">
-        <div className="max-w-7xl mx-auto px-6 py-8">
+    <CoownerLayout>
+      <div className="max-w-7xl mx-auto px-6 py-8">
           {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -573,9 +565,6 @@ export default function CoownerDashboard() {
             </motion.div>
           </div>
         </div>
-      </main>
-
-      <Footer />
-    </div>
-  );
-}
+      </CoownerLayout>
+    );
+  }

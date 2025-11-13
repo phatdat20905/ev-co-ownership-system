@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Users, FileText, Upload, BarChart3, Edit3, CheckCircle, ArrowRight, Download, Share2 } from 'lucide-react';
-import Header from '../../../components/layout/Header';
-import Footer from '../../../components/layout/Footer';
+import { Users, FileText, Upload, BarChart3, Edit3, CheckCircle, ArrowRight, Download, Share2, X } from 'lucide-react';
+import CoownerLayout from '../../../components/layout/CoownerLayout';
 
 export default function OwnershipManagement() {
   const [ownershipData, setOwnershipData] = useState([
@@ -36,11 +35,8 @@ export default function OwnershipManagement() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      
-      <main className="pt-20">
-        <div className="max-w-7xl mx-auto px-6 py-8">
+    <CoownerLayout>
+      <div className="max-w-7xl mx-auto px-6 py-8">
           {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -198,9 +194,6 @@ export default function OwnershipManagement() {
             </div>
           </div>
         </div>
-      </main>
-
-      <Footer />
-    </div>
-  );
-}
+      </CoownerLayout>
+    );
+  }
