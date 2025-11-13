@@ -1,13 +1,67 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
-dotenv.config();
+import express from 'express';
+import helmet from 'helmet';
+import { config } from 'dotenv';
+import { createCorsMiddleware } from '@ev-coownership/shared';
+import { createHealthRoute } from '@ev-coownership/shared';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Shared imports
+import {
+  logger,
+  errorHandler,
+  notFoundHandler,
+  generalRateLimiter
+} from '@ev-coownership/shared';
+
+import routes from './routes/index.js';
+
+// Load .env file
+config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
-app.use(cors());
-app.use(express.json());
 
-app.get("/", (req, res) => res.json({ message: "Auth Service running 🚀" }));
+// 🛡️ Security middleware
+app.use(helmet());
+app.use(createCorsMiddleware());
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`Auth Service listening on port ${PORT}`));
+// 📦 Body parsers
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// 📁 Static files - KYC uploads
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// 🚦 Rate limiting is applied at route level (see authRoutes.js)
+// app.use(generalRateLimiter); // Removed to avoid double-counting
+
+// 🧾 Request logger
+app.use((req, res, next) => {
+  const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  res.locals.requestId = requestId;
+
+  logger.info(`[${requestId}] ${req.method} ${req.url}`, {
+    ip: req.ip,
+    userAgent: req.get('User-Agent')
+  });
+
+  next();
+});
+
+// 🩺 Health check route (sử dụng tiện ích bạn tách riêng)
+app.get('/health', createHealthRoute({
+  eventBus: 'healthy',
+  cache: 'healthy'
+}));
+
+// 📍 API routes
+app.use('/api/v1', routes);
+
+// 🚫 404 và xử lý lỗi tổng quát
+app.use(notFoundHandler);
+app.use(errorHandler);
+
+export default app;
