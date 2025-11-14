@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, BarChart3, TrendingUp, Calendar, Download, PieChart, Users, Clock, DollarSign } from "lucide-react";
 import { Link } from "react-router-dom";
-import Header from "../../../components/layout/Header";
-import Footer from "../../../components/layout/Footer";
+import CoownerLayout from "../../../components/layout/CoownerLayout";
+import bookingService from "../../../services/booking.service";
+import { showErrorToast } from "../../../utils/toast";
 
 export default function UsageAnalytics() {
   const [analyticsData, setAnalyticsData] = useState(null);
@@ -11,82 +12,163 @@ export default function UsageAnalytics() {
   const [timeRange, setTimeRange] = useState("month");
 
   useEffect(() => {
-    // Mock data fetch
-    const fetchAnalyticsData = async () => {
-      setTimeout(() => {
-        setAnalyticsData({
-          usageByDay: [
-            { day: "Thứ 2", hours: 4.5, percentage: 45 },
-            { day: "Thứ 3", hours: 3.2, percentage: 32 },
-            { day: "Thứ 4", hours: 5.1, percentage: 51 },
-            { day: "Thứ 5", hours: 2.8, percentage: 28 },
-            { day: "Thứ 6", hours: 6.3, percentage: 63 },
-            { day: "Thứ 7", hours: 8.7, percentage: 87 },
-            { day: "Chủ nhật", hours: 7.2, percentage: 72 }
-          ],
-          usageByCar: [
-            { car: "Tesla Model 3", percentage: 60, hours: 27, color: "bg-blue-500" },
-            { car: "VinFast VF e34", percentage: 40, hours: 18, color: "bg-green-500" }
-          ],
-          peakHours: [
-            { hour: "6-8", usage: 15, color: "from-blue-100 to-blue-200" },
-            { hour: "8-10", usage: 35, color: "from-blue-200 to-blue-300" },
-            { hour: "10-12", usage: 20, color: "from-blue-300 to-blue-400" },
-            { hour: "12-14", usage: 10, color: "from-blue-400 to-blue-500" },
-            { hour: "14-16", usage: 25, color: "from-blue-500 to-blue-600" },
-            { hour: "16-18", usage: 40, color: "from-blue-600 to-blue-700" },
-            { hour: "18-20", usage: 30, color: "from-blue-700 to-blue-800" },
-            { hour: "20-22", usage: 15, color: "from-blue-800 to-blue-900" }
-          ],
-          monthlyTrend: [
-            { month: "T1", hours: 45, cost: 1850000 },
-            { month: "T2", hours: 52, cost: 2100000 },
-            { month: "T3", hours: 48, cost: 1950000 },
-            { month: "T4", hours: 60, cost: 2450000 },
-            { month: "T5", hours: 55, cost: 2250000 },
-            { month: "T6", hours: 65, cost: 2650000 }
-          ],
-          usageStats: {
-            totalHours: 325,
-            averagePerMonth: 54.2,
-            costPerHour: 42000,
-            efficiency: "6.1 km/kWh"
-          }
-        });
-        setLoading(false);
-      }, 1500);
-    };
-
     fetchAnalyticsData();
-  }, []);
+  }, [timeRange]);
+
+  const fetchAnalyticsData = async () => {
+    try {
+      setLoading(true);
+      const response = await bookingService.getUserBookings();
+      const bookings = response.bookings || [];
+      
+      // Filter completed bookings
+      const completedBookings = bookings.filter(b => b.status === 'completed');
+      
+      // Calculate usage by day
+      const dayNames = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
+      const usageByDayMap = {};
+      dayNames.forEach(day => usageByDayMap[day] = 0);
+      
+      completedBookings.forEach(booking => {
+        const dayIndex = new Date(booking.startTime).getDay();
+        const dayName = dayNames[dayIndex];
+        const hours = (new Date(booking.endTime) - new Date(booking.startTime)) / (1000 * 60 * 60);
+        usageByDayMap[dayName] += hours;
+      });
+      
+      const maxHours = Math.max(...Object.values(usageByDayMap));
+      const usageByDay = dayNames.map(day => ({
+        day,
+        hours: parseFloat(usageByDayMap[day].toFixed(1)),
+        percentage: maxHours > 0 ? Math.round((usageByDayMap[day] / maxHours) * 100) : 0
+      }));
+      
+      // Calculate usage by car
+      const carUsageMap = {};
+      completedBookings.forEach(booking => {
+        const carName = booking.vehicleName || booking.vehicleModel || 'Chưa rõ xe';
+        if (!carUsageMap[carName]) {
+          carUsageMap[carName] = 0;
+        }
+        const hours = (new Date(booking.endTime) - new Date(booking.startTime)) / (1000 * 60 * 60);
+        carUsageMap[carName] += hours;
+      });
+      
+      const totalCarHours = Object.values(carUsageMap).reduce((sum, h) => sum + h, 0);
+      const colors = ["bg-blue-500", "bg-green-500", "bg-purple-500", "bg-orange-500"];
+      const usageByCar = Object.entries(carUsageMap).map(([car, hours], index) => ({
+        car,
+        hours: parseFloat(hours.toFixed(1)),
+        percentage: totalCarHours > 0 ? Math.round((hours / totalCarHours) * 100) : 0,
+        color: colors[index % colors.length]
+      }));
+      
+      // Calculate peak hours
+      const hourUsageMap = {};
+      for (let i = 0; i < 24; i += 2) {
+        hourUsageMap[`${i}-${i+2}`] = 0;
+      }
+      
+      completedBookings.forEach(booking => {
+        const startHour = new Date(booking.startTime).getHours();
+        const bucket = Math.floor(startHour / 2) * 2;
+        const key = `${bucket}-${bucket+2}`;
+        if (hourUsageMap[key] !== undefined) {
+          hourUsageMap[key]++;
+        }
+      });
+      
+      const colorGradients = [
+        "from-blue-100 to-blue-200", "from-blue-200 to-blue-300",
+        "from-blue-300 to-blue-400", "from-blue-400 to-blue-500",
+        "from-blue-500 to-blue-600", "from-blue-600 to-blue-700",
+        "from-blue-700 to-blue-800", "from-blue-800 to-blue-900",
+        "from-blue-900 to-blue-950", "from-indigo-800 to-indigo-900",
+        "from-purple-800 to-purple-900", "from-violet-800 to-violet-900"
+      ];
+      
+      const peakHours = Object.entries(hourUsageMap).map(([hour, usage], index) => ({
+        hour,
+        usage,
+        color: colorGradients[index % colorGradients.length]
+      }));
+      
+      // Calculate monthly trend (last 6 months)
+      const monthlyMap = {};
+      completedBookings.forEach(booking => {
+        const month = new Date(booking.startTime).getMonth() + 1;
+        if (!monthlyMap[month]) {
+          monthlyMap[month] = { hours: 0, cost: 0 };
+        }
+        const hours = (new Date(booking.endTime) - new Date(booking.startTime)) / (1000 * 60 * 60);
+        monthlyMap[month].hours += hours;
+        monthlyMap[month].cost += booking.totalCost || 0;
+      });
+      
+      const monthNames = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"];
+      const currentMonth = new Date().getMonth() + 1;
+      const monthlyTrend = [];
+      for (let i = 5; i >= 0; i--) {
+        let month = currentMonth - i;
+        if (month <= 0) month += 12;
+        monthlyTrend.push({
+          month: monthNames[month - 1],
+          hours: monthlyMap[month] ? parseFloat(monthlyMap[month].hours.toFixed(1)) : 0,
+          cost: monthlyMap[month] ? monthlyMap[month].cost : 0
+        });
+      }
+      
+      // Calculate overall stats
+      const totalHours = completedBookings.reduce((sum, b) => {
+        const hours = (new Date(b.endTime) - new Date(b.startTime)) / (1000 * 60 * 60);
+        return sum + hours;
+      }, 0);
+      
+      const totalCost = completedBookings.reduce((sum, b) => sum + (b.totalCost || 0), 0);
+      const costPerHour = totalHours > 0 ? Math.round(totalCost / totalHours) : 0;
+      const averagePerMonth = totalHours / 6;
+      
+      setAnalyticsData({
+        usageByDay,
+        usageByCar,
+        peakHours,
+        monthlyTrend,
+        usageStats: {
+          totalHours: parseFloat(totalHours.toFixed(1)),
+          averagePerMonth: parseFloat(averagePerMonth.toFixed(1)),
+          costPerHour,
+          efficiency: "6.1 km/kWh" // This would come from vehicle data in real implementation
+        }
+      });
+      
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+      showErrorToast(error.response?.data?.message || 'Không thể tải dữ liệu phân tích');
+      setLoading(false);
+    }
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
-        <div className="pt-20">
-          <div className="max-w-7xl mx-auto px-6 py-8">
-            <div className="animate-pulse">
-              <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {[...Array(2)].map((_, i) => (
-                  <div key={i} className="bg-white rounded-2xl p-6 shadow-sm">
-                    <div className="h-6 bg-gray-200 rounded w-1/2 mb-4"></div>
-                    <div className="h-64 bg-gray-200 rounded"></div>
-                  </div>
-                ))}
+      <CoownerLayout>
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {[...Array(2)].map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl p-6 shadow-sm">
+                <div className="h-6 bg-gray-200 rounded w-1/2 mb-4"></div>
+                <div className="h-64 bg-gray-200 rounded"></div>
               </div>
-            </div>
+            ))}
           </div>
         </div>
-      </div>
+      </CoownerLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      
+    <CoownerLayout>
       <main className="pt-20">
         <div className="max-w-7xl mx-auto px-6 py-8">
           {/* Header */}
@@ -133,7 +215,7 @@ export default function UsageAnalytics() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Tổng giờ sử dụng</p>
                   <p className="text-2xl font-bold text-gray-900 mt-2">
-                    {analyticsData.usageStats.totalHours}h
+                    {analyticsData?.usageStats?.totalHours ?? 0}h
                   </p>
                 </div>
                 <div className="p-3 bg-blue-100 rounded-xl">
@@ -153,7 +235,7 @@ export default function UsageAnalytics() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Trung bình tháng</p>
                   <p className="text-2xl font-bold text-gray-900 mt-2">
-                    {analyticsData.usageStats.averagePerMonth}h
+                    {analyticsData?.usageStats?.averagePerMonth ?? 0}h
                   </p>
                 </div>
                 <div className="p-3 bg-green-100 rounded-xl">
@@ -173,7 +255,7 @@ export default function UsageAnalytics() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Chi phí/giờ</p>
                   <p className="text-2xl font-bold text-gray-900 mt-2">
-                    {analyticsData.usageStats.costPerHour.toLocaleString()}đ
+                    {(analyticsData?.usageStats?.costPerHour ?? 0).toLocaleString()}đ
                   </p>
                 </div>
                 <div className="p-3 bg-purple-100 rounded-xl">
@@ -193,7 +275,7 @@ export default function UsageAnalytics() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Hiệu suất</p>
                   <p className="text-2xl font-bold text-gray-900 mt-2">
-                    {analyticsData.usageStats.efficiency}
+                    {analyticsData?.usageStats?.efficiency ?? '-'}
                   </p>
                 </div>
                 <div className="p-3 bg-orange-100 rounded-xl">
@@ -217,7 +299,7 @@ export default function UsageAnalytics() {
               </div>
               
               <div className="space-y-4">
-                {analyticsData.usageByDay.map((day, index) => (
+                {(analyticsData?.usageByDay || []).map((day, index) => (
                   <div key={index} className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-700 w-20">{day.day}</span>
                     <div className="flex-1 mx-4">
@@ -248,7 +330,7 @@ export default function UsageAnalytics() {
               </div>
               
               <div className="space-y-4">
-                {analyticsData.usageByCar.map((car, index) => (
+                {(analyticsData?.usageByCar || []).map((car, index) => (
                   <div key={index} className="flex items-center justify-between">
                     <div className="flex items-center gap-3 flex-1">
                       <div className={`w-3 h-3 rounded-full ${car.color}`}></div>
@@ -285,7 +367,7 @@ export default function UsageAnalytics() {
               </div>
               
               <div className="grid grid-cols-4 gap-3">
-                {analyticsData.peakHours.map((hour, index) => (
+                {(analyticsData?.peakHours || []).map((hour, index) => (
                   <div key={index} className="text-center">
                     <div className={`bg-gradient-to-br ${hour.color} rounded-xl p-3 text-white shadow-sm`}>
                       <div className="text-sm font-medium">{hour.hour}</div>
@@ -309,7 +391,7 @@ export default function UsageAnalytics() {
               </div>
               
               <div className="space-y-4">
-                {analyticsData.monthlyTrend.map((month, index) => (
+                {(analyticsData?.monthlyTrend || []).map((month, index) => (
                   <div key={index} className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-700 w-8">{month.month}</span>
                     <div className="flex-1 mx-4">
@@ -368,8 +450,6 @@ export default function UsageAnalytics() {
           </motion.div>
         </div>
       </main>
-
-      <Footer />
-    </div>
+    </CoownerLayout>
   );
 }

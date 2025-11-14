@@ -1,79 +1,107 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import CoownerLayout from '../../../components/layout/CoownerLayout';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, Car, MapPin, Users, DollarSign, Battery, TrendingUp, Filter, Download, Eye } from 'lucide-react';
-import Header from '../../../components/layout/Header';
-import Footer from '../../../components/layout/Footer';
+import bookingService from '../../../services/booking.service';
+import { showErrorToast } from '../../../utils/toast';
 
 export default function ScheduleView() {
   const [timeRange, setTimeRange] = useState('month'); 
-  const [filter, setFilter] = useState('all'); 
+  const [filter, setFilter] = useState('all');
+  const [scheduleData, setScheduleData] = useState({ upcoming: [], past: [] });
+  const [stats, setStats] = useState({
+    totalBookings: 0,
+    totalHours: 0,
+    totalCost: 0,
+    favoriteCar: 'N/A',
+    efficiency: '0.0 km/kWh'
+  });
+  const [loading, setLoading] = useState(true);
 
-  const scheduleData = {
-    upcoming: [
-      {
-        id: 1,
-        car: 'Tesla Model 3',
-        date: '2024-01-20',
-        startTime: '09:00',
-        endTime: '12:00',
-        duration: '3 giờ',
-        purpose: 'Công việc',
-        location: 'Q.1 đến Q.7',
-        cost: 180000,
-        status: 'confirmed'
-      },
-      {
-        id: 2,
-        car: 'VinFast VF e34',
-        date: '2024-01-22',
-        startTime: '14:00',
-        endTime: '18:00',
-        duration: '4 giờ',
-        purpose: 'Gia đình',
-        location: 'TP.HCM đến Long An',
-        cost: 240000,
-        status: 'confirmed'
-      }
-    ],
-    past: [
-      {
-        id: 3,
-        car: 'Tesla Model 3',
-        date: '2024-01-15',
-        startTime: '08:00',
-        endTime: '17:00',
-        duration: '9 giờ',
-        purpose: 'Du lịch',
-        location: 'TP.HCM đến Vũng Tàu',
-        cost: 540000,
-        status: 'completed',
-        efficiency: '6.1 km/kWh',
-        distance: '250 km'
-      },
-      {
-        id: 4,
-        car: 'VinFast VF e34',
-        date: '2024-01-10',
-        startTime: '10:00',
-        endTime: '15:00',
-        duration: '5 giờ',
-        purpose: 'Cá nhân',
-        location: 'Nội thành TP.HCM',
-        cost: 300000,
-        status: 'completed',
-        efficiency: '5.7 km/kWh',
-        distance: '120 km'
-      }
-    ]
-  };
+  useEffect(() => {
+    fetchScheduleData();
+  }, [timeRange]);
 
-  const stats = {
-    totalBookings: 12,
-    totalHours: 48,
-    totalCost: 2850000,
-    favoriteCar: 'Tesla Model 3',
-    efficiency: '6.0 km/kWh'
+  const fetchScheduleData = async () => {
+    try {
+      setLoading(true);
+      const response = await bookingService.getUserBookings();
+      
+      if (response.success && response.data) {
+        const bookings = response.data;
+        const now = new Date();
+        
+        // Separate upcoming and past bookings
+        const upcoming = [];
+        const past = [];
+        
+        bookings.forEach(booking => {
+          const startTime = new Date(booking.startTime);
+          const endTime = new Date(booking.endTime);
+          const duration = ((endTime - startTime) / (1000 * 60 * 60)).toFixed(1);
+          
+          const scheduleItem = {
+            id: booking.id,
+            car: booking.vehicleName || booking.vehicleModel || 'Chưa rõ xe',
+            date: startTime.toISOString().split('T')[0],
+            startTime: startTime.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+            endTime: endTime.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+            duration: `${duration} giờ`,
+            purpose: booking.purpose || booking.note || 'Không rõ',
+            location: booking.destination || booking.pickupLocation || 'N/A',
+            cost: booking.totalCost || 0,
+            status: booking.status,
+            efficiency: booking.efficiency || '0.0 km/kWh',
+            distance: booking.distance ? `${booking.distance} km` : 'N/A'
+          };
+          
+          if (startTime > now) {
+            upcoming.push(scheduleItem);
+          } else {
+            past.push(scheduleItem);
+          }
+        });
+        
+        setScheduleData({ upcoming, past });
+        
+        // Calculate stats
+        const totalBookings = bookings.length;
+        const totalHours = bookings.reduce((sum, b) => {
+          const hours = (new Date(b.endTime) - new Date(b.startTime)) / (1000 * 60 * 60);
+          return sum + hours;
+        }, 0);
+        const totalCost = bookings.reduce((sum, b) => sum + (b.totalCost || 0), 0);
+        
+        // Find favorite car (most used)
+        const carUsageMap = {};
+        bookings.forEach(b => {
+          const carName = b.vehicleName || b.vehicleModel || 'N/A';
+          carUsageMap[carName] = (carUsageMap[carName] || 0) + 1;
+        });
+        const favoriteCar = Object.entries(carUsageMap).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
+        
+        // Calculate average efficiency
+        const efficiencies = bookings.map(b => parseFloat(b.efficiency || 0)).filter(e => e > 0);
+        const avgEfficiency = efficiencies.length > 0 
+          ? (efficiencies.reduce((sum, e) => sum + e, 0) / efficiencies.length).toFixed(1)
+          : '0.0';
+        
+        setStats({
+          totalBookings,
+          totalHours: Math.round(totalHours),
+          totalCost,
+          favoriteCar,
+          efficiency: `${avgEfficiency} km/kWh`
+        });
+      }
+      
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching schedule:', error);
+      showErrorToast(error.response?.data?.message || 'Không thể tải lịch sử dụng');
+      setLoading(false);
+    }
   };
 
   const getStatusColor = (status) => {
@@ -101,10 +129,8 @@ export default function ScheduleView() {
     : scheduleData[filter];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50">
-      <Header />
-      
-      <main className="pt-20">
+    <CoownerLayout>
+      <div className="container mx-auto px-4 max-w-7xl">
         <div className="max-w-7xl mx-auto px-6 py-8">
           {/* Header */}
           <motion.div
@@ -404,9 +430,7 @@ export default function ScheduleView() {
             </div>
           </div>
         </div>
-      </main>
-
-      <Footer />
-    </div>
+      </div>
+    </CoownerLayout>
   );
 }

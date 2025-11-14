@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
+import CoownerLayout from '../../../components/layout/CoownerLayout';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { FileText, Download, Printer, Share2, CheckCircle, Clock, AlertCircle, ArrowLeft, Eye } from 'lucide-react';
-import Header from '../../../components/layout/Header';
-import Footer from '../../../components/layout/Footer';
 
 export default function ContractViewer() {
   const [contract] = useState({
@@ -44,10 +43,8 @@ export default function ContractViewer() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      
-      <main className="pt-20">
+    <CoownerLayout>
+      <div className="container mx-auto px-4 max-w-7xl">
         <div className="max-w-6xl mx-auto px-6 py-8">
           {/* Header */}
           <motion.div
@@ -232,9 +229,7 @@ export default function ContractViewer() {
             </div>
           </div>
         </div>
-      </main>
-
-      <Footer />
-    </div>
+      </div>
+    </CoownerLayout>
   );
 }

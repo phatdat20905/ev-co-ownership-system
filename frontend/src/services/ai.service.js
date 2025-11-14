@@ -144,6 +144,30 @@ class AIService {
     return response;
   }
 
+  /**
+   * Generic recommendations endpoint used by UI components.
+   * GET /ai/recommendations
+   * Returns response.data (object with recommendations[])
+   */
+  async getRecommendations(params = {}) {
+    try {
+      // apiClient returns response.data via interceptor
+      const data = await apiClient.get('/ai/recommendations', { params });
+      return data;
+    } catch (err) {
+      // If backend AI endpoint is not available or times out, don't crash the UI — return empty recommendations
+      const status = err?.response?.status;
+      if (status === 404) {
+        console.warn('AI recommendations endpoint not found (404), returning empty list');
+        return { recommendations: [] };
+      }
+
+      // For gateway/timeouts or other server errors, log and return empty list so UI can continue
+      console.warn('AI recommendations request failed (status:', status, '), returning empty list');
+      return { recommendations: [] };
+    }
+  }
+
   // ==================== FEEDBACK ====================
 
   /**

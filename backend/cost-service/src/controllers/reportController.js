@@ -10,7 +10,13 @@ export class ReportController {
       const userId = req.user.id;
 
       if (!groupId) {
-        return successResponse(res, 'Group ID is required', null, 400);
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'MISSING_GROUP_ID',
+            message: 'Group ID is required'
+          }
+        });
       }
 
       const report = await reportService.getCostSummary(groupId, period, userId);
@@ -57,7 +63,13 @@ export class ReportController {
       const userId = req.user.id;
 
       if (!groupId || !startDate || !endDate) {
-        return successResponse(res, 'Group ID, start date, and end date are required', null, 400);
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'MISSING_PARAMETERS',
+            message: 'Group ID, start date, and end date are required'
+          }
+        });
       }
 
       const report = await reportService.getCostAnalysis(groupId, startDate, endDate, userId);
@@ -87,7 +99,13 @@ export class ReportController {
       const userId = req.user.id;
 
       if (!groupId) {
-        return successResponse(res, 'Group ID is required', null, 400);
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'MISSING_GROUP_ID',
+            message: 'Group ID is required'
+          }
+        });
       }
 
       const report = await reportService.getPaymentAnalysis(groupId, period, userId);

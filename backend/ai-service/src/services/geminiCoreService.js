@@ -7,21 +7,37 @@ export class GeminiCoreService {
   constructor() {
     this.config = geminiConfig;
     this.ai = geminiConfig.getModel();
+    this.failureCount = 0;
+    this.failureThreshold = parseInt(process.env.GEMINI_FAILURE_THRESHOLD) || 5;
+    this.circuitOpenUntil = null; // timestamp until which circuit is open (degraded mode)
+    this.circuitCooldownMs = parseInt(process.env.GEMINI_CIRCUIT_COOLDOWN_MS) || 2 * 60 * 1000; // 2 minutes
   }
 
   async generateAIResponse(promptTemplate, context = {}, featureType) {
     const startTime = Date.now();
     const maxRetries = this.config.maxRetries;
+    const timeoutMs = this.config.timeout || 30000;
+
+    // Circuit breaker: if open, immediately throw to let caller handle fallback
+    if (this.circuitOpenUntil && Date.now() < this.circuitOpenUntil) {
+      const err = new Error('Gemini circuit is open (degraded mode)');
+      err.code = 'CIRCUIT_OPEN';
+      throw err;
+    }
     
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         const fullPrompt = this.buildFullPrompt(promptTemplate, context);
         
-        const response = await this.ai.generateContent({
-          model: this.config.modelName,
-          contents: fullPrompt,
-          generationConfig: this.config.getGenerationConfig()
-        });
+        // Wrap generateContent with a timeout
+        const response = await Promise.race([
+          this.ai.generateContent({
+            model: this.config.modelName,
+            contents: fullPrompt,
+            generationConfig: this.config.getGenerationConfig()
+          }),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('Gemini request timeout')), timeoutMs))
+        ]);
 
         const responseTime = Date.now() - startTime;
         
@@ -34,6 +50,9 @@ export class GeminiCoreService {
           parsedResponse, 
           featureType
         );
+
+        // Reset failure counter on success
+        this.failureCount = 0;
 
         logger.info('Gemini API call successful', {
           featureType,
@@ -60,11 +79,22 @@ export class GeminiCoreService {
           attempt: attempt + 1
         });
 
+        // Increment failure counter and possibly open circuit
+        this.failureCount += 1;
+        if (this.failureCount >= this.failureThreshold) {
+          this.circuitOpenUntil = Date.now() + this.circuitCooldownMs;
+          logger.warn('Gemini circuit opened due to repeated failures', {
+            failureCount: this.failureCount,
+            openUntil: new Date(this.circuitOpenUntil).toISOString()
+          });
+        }
+
+        // If last attempt, throw descriptive error
         if (attempt === maxRetries) {
           throw new Error(`Gemini API failed after ${maxRetries + 1} attempts: ${error.message}`);
         }
 
-        // Exponential backoff
+        // Exponential backoff before retrying
         await this.delay(1000 * Math.pow(2, attempt));
       }
     }

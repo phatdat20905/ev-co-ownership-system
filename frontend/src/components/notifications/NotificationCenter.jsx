@@ -19,6 +19,8 @@ export default function NotificationCenter() {
   // Refs to manage polling lifecycle
   const pollRef = useRef(null);
   const lastFetchTs = useRef(0);
+  const consecutiveErrorCount = useRef(0);
+  const MAX_CONSECUTIVE_ERRORS = 3;
 
   // Fetch notifications when panel opens
   useEffect(() => {
@@ -36,9 +38,10 @@ export default function NotificationCenter() {
 
     // Setup polling only if endpoint is available
     if (!pollRef.current) {
+      const POLL_INTERVAL = Number(import.meta.env.VITE_NOTIF_POLL_INTERVAL_MS) || 60000; // default 60s
       pollRef.current = setInterval(() => {
-        fetchUnreadCount();
-      }, 30000); // 30 seconds
+        if (endpointAvailable) fetchUnreadCount();
+      }, POLL_INTERVAL);
     }
 
     // Cleanup
@@ -88,21 +91,33 @@ export default function NotificationCenter() {
       if (response && response.success) {
         const total = response.data?.pagination?.total ?? 0;
         setUnreadCount(Number(total) || 0);
+        // reset error counter on success
+        consecutiveErrorCount.current = 0;
       }
     } catch (error) {
       handleApiError(error);
+      // increment error counter and disable after threshold
+      consecutiveErrorCount.current += 1;
+      if (consecutiveErrorCount.current >= MAX_CONSECUTIVE_ERRORS) {
+        console.warn('Notification API failing repeatedly; disabling polling');
+        setEndpointAvailable(false);
+        if (pollRef.current) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+      }
     }
   };
 
   // Centralized API error handling
   const handleApiError = (error) => {
     const status = error?.response?.status;
-    
+
     if (status === 404) {
       console.warn('Notifications endpoint not found (404). Disabling notifications.');
       setEndpointAvailable(false);
       setUnreadCount(0);
-      
+
       // Stop polling
       if (pollRef.current) {
         clearInterval(pollRef.current);
@@ -110,7 +125,8 @@ export default function NotificationCenter() {
       }
       return;
     }
-    
+
+    // For other errors, log and increment error counter elsewhere
     console.error('Notification API error:', error);
   };
 

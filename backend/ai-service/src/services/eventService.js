@@ -61,6 +61,23 @@ class EventService {
     });
   }
 
+  // Compatibility method for AI health updates
+  async publishAIServiceHealthUpdate(healthData) {
+    // Prefer specialized publisher if available (aiEventPublisher may be used elsewhere)
+    try {
+      // Reuse generic publishEvent to send a well-known routing key
+      await this.publishEvent('ai.service.health_updated', {
+        service: 'ai-service',
+        healthy: healthData.healthy,
+        checks: healthData.checks,
+        timestamp: healthData.timestamp || new Date().toISOString()
+      });
+      logger.debug('Published ai.service.health_updated via EventService');
+    } catch (err) {
+      logger.error('Failed to publish AI service health update via EventService', { error: err.message });
+    }
+  }
+
   async publishRecommendationAccepted(recommendationData) {
     if (!recommendationData?.recommendation_id) return;
     await this.publishEvent(eventTypes.RECOMMENDATION_ACCEPTED, {

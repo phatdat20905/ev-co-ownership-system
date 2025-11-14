@@ -1,10 +1,9 @@
 // src/pages/dashboard/coowner/financial/PaymentPortal.jsx
 import React, { useState, useEffect } from 'react';
+import CoownerLayout from '../../../components/layout/CoownerLayout';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, DollarSign, Clock, CheckCircle, XCircle, FileText } from 'lucide-react';
-import Header from '../../../components/layout/Header';
-import Footer from '../../../components/layout/Footer';
 import PaymentGateway from '../../../components/payment/PaymentGateway';
 import costService from '../../../services/cost.service';
 import { useCostStore } from '../../../stores/useCostStore';
@@ -111,10 +110,8 @@ export default function PaymentPortal() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-cyan-50 flex flex-col">
-      <Header />
-      
-      <main className="flex-grow pt-24 pb-12">
+    <CoownerLayout>
+      <div className="container mx-auto px-4 max-w-7xl">
         <div className="container mx-auto px-4 max-w-5xl">
           {/* Header */}
           <div className="flex items-center gap-4 mb-8">
@@ -244,9 +241,7 @@ export default function PaymentPortal() {
             </>
           )}
         </div>
-      </main>
-
-      <Footer />
-    </div>
+      </div>
+    </CoownerLayout>
   );
 }

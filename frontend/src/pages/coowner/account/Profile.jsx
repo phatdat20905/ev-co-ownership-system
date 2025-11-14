@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
+import CoownerLayout from '../../../components/layout/CoownerLayout';
+import Header from '../../../components/layout/Header';
+import Footer from '../../../components/layout/Footer';
 import { Link } from "react-router-dom";
 import { User, Mail, Phone, MapPin, Calendar, Shield, Bell, CreditCard, FileText, Camera, Save, Edit, CheckCircle, X, Eye, EyeOff, Upload, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { motion } from "framer-motion";
-import Header from "../../../components/layout/Header";
-import Footer from "../../../components/layout/Footer";
 import { userService, authService } from "../../../services";
 import { showSuccessToast, showErrorToast } from "../../../utils/toast";
 
@@ -474,10 +475,8 @@ export default function Profile() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      
-      <main className="pt-20">
+    <CoownerLayout>
+      <div className="container mx-auto px-4 max-w-7xl">
         <div className="max-w-6xl mx-auto px-6 py-8">
           {/* Header */}
           <motion.div
@@ -568,6 +567,19 @@ export default function Profile() {
                       </button>
                     );
                   })}
+                  {/* KYC quick action */}
+                  <div className="mt-4">
+                    <Link
+                      to="/coowner/account/kyc"
+                      className="w-full inline-flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-left transition-all text-gray-600 hover:bg-gray-50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Shield className="w-5 h-5 text-gray-500" />
+                        <span className="font-medium">Xác minh KYC</span>
+                      </div>
+                      <div>{getKYCStatusBadge()}</div>
+                    </Link>
+                  </div>
                 </nav>
               </div>
             </div>
@@ -814,9 +826,7 @@ export default function Profile() {
             </div>
           </div>
         </div>
-      </main>
-
-      <Footer />
-    </div>
+      </div>
+    </CoownerLayout>
   );
 }

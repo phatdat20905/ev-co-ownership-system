@@ -143,14 +143,21 @@ export class PaymentController {
         success: result.success 
       });
 
-      // Return success response for VNPay
-      return res.status(200).json({ RspCode: '00', Message: 'Success' });
+      // VNPay expects specific response format
+      return res.status(200).json({ 
+        RspCode: '00', 
+        Message: 'Success' 
+      });
     } catch (error) {
       logger.error('Failed to process VNPay IPN', { 
         error: error.message, 
         ipnData: req.body 
       });
-      return res.status(200).json({ RspCode: '99', Message: 'Failed' });
+      // VNPay expects specific error format
+      return res.status(200).json({ 
+        RspCode: '99', 
+        Message: 'Failed' 
+      });
     }
   }
 

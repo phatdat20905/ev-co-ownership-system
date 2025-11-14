@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import CoownerLayout from '../../../components/layout/CoownerLayout';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, DollarSign, Calendar, CheckCircle, Clock, AlertCircle, Download, Filter, Search, Receipt } from "lucide-react";
-import Header from '../../../components/layout/Header';
-import Footer from '../../../components/layout/Footer';
 import { costService } from '../../../services';
 import { showSuccessToast, showErrorToast } from '../../../utils/toast';
 
@@ -99,10 +98,8 @@ export default function PaymentHistory() {
     : paymentHistory.filter(payment => payment.status === filter);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50">
-      <Header />
-      
-      <main className="pt-20">
+    <CoownerLayout>
+      <div className="container mx-auto px-4 max-w-7xl">
         <div className="max-w-7xl mx-auto px-6 py-8">
           {/* Header */}
           <motion.div
@@ -395,9 +392,7 @@ export default function PaymentHistory() {
             </div>
           </div>
         </div>
-      </main>
-
-      <Footer />
-    </div>
+      </div>
+    </CoownerLayout>
   );
 }

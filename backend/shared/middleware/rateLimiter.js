@@ -26,6 +26,18 @@ export const createRateLimiter = (options = {}) => {
     skipSuccessfulRequests,
     skipFailedRequests,
     keyGenerator,
+    // Skip option: allow caller to provide a skip function or
+    // automatically skip when not in production or when request comes from localhost
+    skip: options.skip || ((req) => {
+      try {
+        // In non-production (development/test) skip rate limiting by default
+        if (process.env.NODE_ENV !== 'production') return true;
+        const localIps = ['::1', '127.0.0.1', '::ffff:127.0.0.1'];
+        return localIps.includes(req.ip);
+      } catch (e) {
+        return false;
+      }
+    }),
     handler: (req, res, next, optionsUsed) => {
       // Log warning for monitoring
       logger.warn('Rate limit exceeded', {
@@ -35,8 +47,8 @@ export const createRateLimiter = (options = {}) => {
         method: req.method
       });
 
-      // Throw a custom application error
-      throw new AppError(message, 429, 'RATE_LIMIT_EXCEEDED');
+      // Use next() with AppError instead of throwing to ensure Express error handlers catch it
+      return next(new AppError(message, 429, 'RATE_LIMIT_EXCEEDED'));
     },
     standardHeaders: true, // Adds RateLimit-* headers
     legacyHeaders: false,  // Disables X-RateLimit-* headers

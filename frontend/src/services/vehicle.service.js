@@ -22,8 +22,16 @@ class VehicleService {
    * GET /vehicles
    */
   async getVehicles(params = {}) {
-    const response = await apiClient.get('/vehicles', { params });
-    return response;
+    try {
+      const response = await apiClient.get('/vehicles', { params });
+      return response;
+    } catch (err) {
+      if (err?.response?.status === 404) {
+        console.warn('Vehicles endpoint not found; returning empty list');
+        return { vehicles: [] };
+      }
+      throw err;
+    }
   }
 
   /**

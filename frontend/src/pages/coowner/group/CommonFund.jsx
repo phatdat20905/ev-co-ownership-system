@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
+import CoownerLayout from '../../../components/layout/CoownerLayout';
+import Header from '../../../components/layout/Header';
+import Footer from '../../../components/layout/Footer';
 import { motion } from "framer-motion";
 import { ArrowLeft, DollarSign, TrendingUp, TrendingDown, Download, Filter, Plus, Users, Calendar, CreditCard, PiggyBank, BarChart3 } from "lucide-react";
 import { Link } from "react-router-dom";
-import Header from "../../../components/layout/Header";
-import Footer from "../../../components/layout/Footer";
 import userService from "../../../services/user.service";
 import { useGroupStore } from "../../../stores/useGroupStore";
 import { showSuccessToast, showErrorToast } from "../../../utils/toast";
@@ -186,10 +187,8 @@ export default function CommonFund() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      
-      <main className="pt-20">
+    <CoownerLayout>
+      <div className="container mx-auto px-4 max-w-7xl">
         <div className="max-w-7xl mx-auto px-6 py-8">
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
@@ -477,9 +476,7 @@ export default function CommonFund() {
             </div>
           </div>
         </div>
-      </main>
-
-      <Footer />
-    </div>
+      </div>
+    </CoownerLayout>
   );
 }

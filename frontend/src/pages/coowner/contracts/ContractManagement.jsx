@@ -6,6 +6,8 @@ import { ArrowLeft, FileText, Plus, Filter } from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Footer from '../../../components/layout/Footer';
 import ContractSignature from '../../../components/contract/ContractSignature';
+import contractService from '../../../services/contract.service';
+import { showErrorToast, showSuccessToast } from '../../../utils/toast';
 
 export default function ContractManagement() {
   const [contracts, setContracts] = useState([]);
@@ -14,71 +16,51 @@ export default function ContractManagement() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Mock data - trong thực tế sẽ fetch từ API
-    setTimeout(() => {
-      setContracts([
-        {
-          id: 'CTR-2024-001',
-          partyA: 'Công ty CP Xe Điện Xanh',
-          partyB: 'Nguyễn Văn A',
-          status: 'pending',
-          startDate: '2024-02-01',
-          endDate: '2025-02-01',
-          content: `HỢP ĐỒNG ĐỒNG SỞ HỮU XE ĐIỆN
-
-Bên A (Bên cung cấp): Công ty CP Xe Điện Xanh
-Bên B (Bên sở hữu): Nguyễn Văn A
-
-ĐIỀU 1: THÔNG TIN XE
-- Loại xe: Tesla Model 3
-- Biển số: 30A-12345
-- Tỷ lệ sở hữu: 40%
-
-ĐIỀU 2: QUYỀN VÀ NGHĨA VỤ
-1. Bên B có quyền sử dụng xe theo lịch đã đặt
-2. Bên B chịu trách nhiệm chi phí bảo dưỡng theo tỷ lệ sở hữu
-3. Chi phí sửa chữa do lỗi người dùng sẽ do Bên B chịu hoàn toàn
-
-ĐIỀU 3: THỜI HẠN HỢP ĐỒNG
-Hợp đồng có hiệu lực từ ngày 01/02/2024 đến 01/02/2025.
-
-ĐIỀU 4: ĐIỀU KHOẢN CHUNG
-Hai bên cam kết thực hiện đúng các điều khoản đã thỏa thuận.`,
-          createdAt: '2024-01-10'
-        },
-        {
-          id: 'CTR-2024-002',
-          partyA: 'Công ty CP Xe Điện Xanh',
-          partyB: 'Nguyễn Văn A',
-          status: 'signed',
-          startDate: '2024-01-01',
-          endDate: '2025-01-01',
-          content: 'Nội dung hợp đồng đã ký...',
-          signedAt: '2024-01-05T10:30:00',
-          signature: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-          createdAt: '2023-12-20'
-        },
-        {
-          id: 'CTR-2023-058',
-          partyA: 'Công ty CP Xe Điện Xanh',
-          partyB: 'Nguyễn Văn A',
-          status: 'active',
-          startDate: '2023-06-01',
-          endDate: '2024-06-01',
-          content: 'Nội dung hợp đồng đang hiệu lực...',
-          signedAt: '2023-05-28T14:20:00',
-          createdAt: '2023-05-15'
-        }
-      ]);
-      setLoading(false);
-    }, 500);
+    fetchContracts();
   }, []);
 
-  const handleContractSigned = () => {
-    // Reload contracts after signing
-    alert('Hợp đồng đã được ký thành công!');
-    setSelectedContract(null);
-    // Refetch contracts
+  const fetchContracts = async () => {
+    try {
+      setLoading(true);
+      const response = await contractService.getUserContracts();
+      
+      if (response.success && response.data) {
+        const transformedContracts = response.data.map(contract => ({
+          id: contract.id || contract.contractId,
+          partyA: contract.partyA || contract.providerName || 'Công ty CP Xe Điện Xanh',
+          partyB: contract.partyB || contract.coownerName || 'Chủ xe',
+          status: contract.status || 'pending',
+          startDate: contract.startDate || contract.effectiveDate,
+          endDate: contract.endDate || contract.expiryDate,
+          content: contract.content || contract.contractText || '',
+          createdAt: contract.createdAt,
+          signedAt: contract.signedAt,
+          signature: contract.signature || contract.signatureData
+        }));
+        
+        setContracts(transformedContracts);
+      }
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching contracts:', error);
+      showErrorToast(error.response?.data?.message || 'Không thể tải danh sách hợp đồng');
+      setLoading(false);
+    }
+  };
+
+  const handleContractSigned = async (signatureData) => {
+    try {
+      if (!selectedContract) return;
+      
+      await contractService.signContract(selectedContract.id, signatureData);
+      showSuccessToast('Hợp đồng đã được ký thành công!');
+      setSelectedContract(null);
+      // Reload contracts
+      fetchContracts();
+    } catch (error) {
+      console.error('Error signing contract:', error);
+      showErrorToast(error.response?.data?.message || 'Không thể ký hợp đồng');
+    }
   };
 
   const filteredContracts = contracts.filter(contract => {

@@ -231,12 +231,27 @@ class CostService {
   }
 
   /**
+   * Backwards-compatible alias used by some UI components
+   * getUserSplits -> getMySplits
+   */
+  async getUserSplits(params = {}) {
+    return this.getMySplits(params);
+  }
+
+  /**
    * Pay split
    * POST /costs/splits/:splitId/pay
    */
   async paySplit(splitId) {
     const response = await apiClient.post(`/costs/splits/${splitId}/pay`);
     return response;
+  }
+
+  /**
+   * Backwards-compatible alias
+   */
+  async payBill(splitId, paymentData) {
+    return this.paySplit(splitId, paymentData);
   }
 
   // ==================== INVOICES ====================

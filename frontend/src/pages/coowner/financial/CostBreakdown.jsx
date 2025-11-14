@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import CoownerLayout from '../../../components/layout/CoownerLayout';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, PieChart, DollarSign, Users, Car, Battery, Shield, Calendar, Download, Filter, TrendingUp } from 'lucide-react';
-import Header from '../../../components/layout/Header';
-import Footer from '../../../components/layout/Footer';
 
 export default function CostBreakdown() {
   const [timeRange, setTimeRange] = useState('month'); 
@@ -105,10 +104,8 @@ export default function CostBreakdown() {
     : costData.categories.filter(cat => cat.id === parseInt(selectedCategory));
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50">
-      <Header />
-      
-      <main className="pt-20">
+    <CoownerLayout>
+      <div className="container mx-auto px-4 max-w-7xl">
         <div className="max-w-7xl mx-auto px-6 py-8">
           {/* Header */}
           <motion.div
@@ -398,9 +395,7 @@ export default function CostBreakdown() {
             </div>
           </div>
         </div>
-      </main>
-
-      <Footer />
-    </div>
+      </div>
+    </CoownerLayout>
   );
 }

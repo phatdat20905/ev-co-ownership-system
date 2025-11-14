@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
+import CoownerLayout from '../../../components/layout/CoownerLayout';
+import Header from '../../../components/layout/Header';
+import Footer from '../../../components/layout/Footer';
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Users, UserPlus, Settings, Mail, Phone, Calendar, Car, MoreVertical, Edit, Trash2, Shield, Crown, Check, X, Send, UserCheck, UserX, Search } from "lucide-react";
 import { Link } from "react-router-dom";
-import Header from "../../../components/layout/Header";
-import Footer from "../../../components/layout/Footer";
 import { userService } from "../../../services";
 import { showSuccessToast, showErrorToast } from "../../../utils/toast";
 
@@ -263,10 +264,8 @@ export default function GroupManagement() {
   const currentUserRole = "owner"; // Giả sử user hiện tại là owner
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      
-      <main className="pt-20">
+    <CoownerLayout>
+      <div className="container mx-auto px-4 max-w-7xl">
         <div className="max-w-7xl mx-auto px-6 py-8">
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
@@ -592,7 +591,7 @@ export default function GroupManagement() {
             </div>
           </div>
         </div>
-      </main>
+      </div>
 
       <Footer />
 
@@ -789,6 +788,6 @@ export default function GroupManagement() {
           </div>
         )}
       </AnimatePresence>
-    </div>
+    </CoownerLayout>
   );
 }

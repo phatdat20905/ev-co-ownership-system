@@ -77,24 +77,19 @@ export default function VotingSystem() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
-        <div className="pt-20">
-          <div className="max-w-7xl mx-auto px-6 py-8">
-            <div className="animate-pulse">
-              <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="bg-white rounded-2xl p-6 shadow-sm">
-                    <div className="h-6 bg-gray-200 rounded w-1/2 mb-4"></div>
-                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                  </div>
-                ))}
+      <CoownerLayout>
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl p-6 shadow-sm">
+                <div className="h-6 bg-gray-200 rounded w-1/2 mb-4"></div>
+                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
               </div>
-            </div>
+            ))}
           </div>
         </div>
-      </div>
+      </CoownerLayout>
     );
   }
 
@@ -119,11 +114,8 @@ export default function VotingSystem() {
   const displayedVotes = activeTab === 'active' ? (votingData?.activeVotes || []) : (votingData?.completedVotes || []);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      
-      <main className="pt-20">
-        <div className="max-w-7xl mx-auto px-6 py-8">
+    <CoownerLayout>
+      <div className="max-w-7xl mx-auto px-6 py-8">
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
@@ -156,9 +148,9 @@ export default function VotingSystem() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Phiếu đang mở</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-2">
-                    {votingData.activeVotes.length}
-                  </p>
+                      <p className="text-2xl font-bold text-gray-900 mt-2">
+                        {votingData?.activeVotes?.length ?? 0}
+                      </p>
                 </div>
                 <div className="p-3 bg-blue-100 rounded-xl">
                   <Vote className="w-6 h-6 text-blue-600" />
@@ -177,7 +169,7 @@ export default function VotingSystem() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Đã hoàn thành</p>
                   <p className="text-2xl font-bold text-gray-900 mt-2">
-                    {votingData.completedVotes.length}
+                    {votingData?.completedVotes?.length ?? 0}
                   </p>
                 </div>
                 <div className="p-3 bg-green-100 rounded-xl">
@@ -210,9 +202,9 @@ export default function VotingSystem() {
 
           {/* Tab Navigation */}
           <div className="flex items-center gap-4 mb-6">
-            {[
-              { id: 'active', name: 'Đang bỏ phiếu', count: votingData.activeVotes.length },
-              { id: 'completed', name: 'Đã hoàn thành', count: votingData.completedVotes.length }
+            {[{
+              id: 'active', name: 'Đang bỏ phiếu', count: votingData?.activeVotes?.length ?? 0 },
+              { id: 'completed', name: 'Đã hoàn thành', count: votingData?.completedVotes?.length ?? 0 }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -233,7 +225,7 @@ export default function VotingSystem() {
 
           {/* Votes Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {votes.map((vote) => (
+            {displayedVotes.map((vote) => (
               <motion.div
                 key={vote.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -333,7 +325,7 @@ export default function VotingSystem() {
           </div>
 
           {/* Empty State */}
-          {votes.length === 0 && (
+          {displayedVotes.length === 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -356,10 +348,7 @@ export default function VotingSystem() {
               )}
             </motion.div>
           )}
-        </div>
-      </main>
-
-      <Footer />
-    </div>
+      </div>
+    </CoownerLayout>
   );
 }

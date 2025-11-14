@@ -45,9 +45,10 @@ const FinancialReports = () => {
         adminService.getBookingAnalytics(startDate, endDate)
       ]);
 
-      setFinancialData(financial.data);
-      setUserAnalytics(users.data);
-      setBookingAnalytics(bookings.data);
+      // apiClient returns response.data via interceptor, so the service already returns the payload
+      setFinancialData(financial);
+      setUserAnalytics(users);
+      setBookingAnalytics(bookings);
     } catch (error) {
       console.error("Error fetching analytics:", error);
       toast.error("Không thể tải dữ liệu báo cáo");
@@ -86,15 +87,17 @@ const FinancialReports = () => {
       const { startDate, endDate } = getDateRangeValues(dateRange);
       const response = await adminService.exportAnalytics(reportType, startDate, endDate);
       
-      // Create download link
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      // response is a Blob returned by apiClient (interceptor returns response.data)
+      const blob = response instanceof Blob ? response : new Blob([response]);
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `report_${reportType}_${dateRange}.xlsx`);
       document.body.appendChild(link);
       link.click();
       link.remove();
-      
+      window.URL.revokeObjectURL(url);
+
       toast.success("Đã xuất báo cáo thành công");
     } catch (error) {
       console.error("Error exporting report:", error);
@@ -167,6 +170,7 @@ const FinancialReports = () => {
   const revenueBreakdown = financialData?.revenueBreakdown || [];
   const expenseBreakdown = financialData?.expenseBreakdown || [];
   const carPerformance = bookingAnalytics?.carPerformance || [];
+  const reports = financialData?.reports || [];
 
   const StatCard = ({ title, value, change, icon, color }) => (
     <motion.div

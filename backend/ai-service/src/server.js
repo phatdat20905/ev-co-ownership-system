@@ -1,6 +1,7 @@
 import app from './app.js';
 import database from './config/database.js';
 import eventService from './services/eventService.js';
+import aiEventPublisher from './events/publishers/aiEventPublisher.js';
 import aiService from './services/aiService.js';
 import {
   logger,
@@ -53,9 +54,25 @@ function startHealthMonitoring() {
       
       if (!health.healthy) {
         logger.warn('⚠️ AI Service health check failed', { health });
-        
-        // Publish health event
-        await eventService.publishAIServiceHealthUpdate(health);
+
+        // Publish health event using the specialized AIEventPublisher if available
+        try {
+          if (aiEventPublisher && typeof aiEventPublisher.publishAIServiceHealthUpdate === 'function') {
+            await aiEventPublisher.publishAIServiceHealthUpdate(health);
+          } else if (eventService && typeof eventService.publishEvent === 'function') {
+            // Fallback: publish a generic event
+            await eventService.publishEvent('ai.service.health_updated', {
+              service: 'ai-service',
+              healthy: health.healthy,
+              checks: health.checks,
+              timestamp: new Date().toISOString()
+            });
+          } else {
+            logger.warn('No publisher available to emit AI service health update');
+          }
+        } catch (err) {
+          logger.error('Failed to publish AI health update', { error: err?.message || err });
+        }
       } else {
         logger.debug('✅ AI Service health check passed', { 
           timestamp: new Date().toISOString() 
