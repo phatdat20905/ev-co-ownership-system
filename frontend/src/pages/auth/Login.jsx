@@ -5,12 +5,11 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Footer from "../../components/layout/Footer";
 import Header from "../../components/layout/Header";
-import { authService } from "../../services";
-import { getRememberedLogin, setRememberedLogin } from '../../utils/storage';
-import { showSuccessToast, showErrorToast } from "../../utils/toast";
+import { useAuthStore } from '../../stores/useAuthStore';
+import { useUserStore } from '../../stores/userStore';
+import { toast } from 'react-toastify';
 
 export default function Login() {
-  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
   const [loginType, setLoginType] = useState("email");
@@ -18,56 +17,58 @@ export default function Login() {
   const [password, setPassword] = useState("");
   
   const navigate = useNavigate();
+  const login = useAuthStore((state) => state.login);
+  const isLoading = useAuthStore((state) => state.isLoading);
+  const user = useUserStore((state) => state.user);
 
-  // Lấy dữ liệu từ localStorage khi load
+  // Load remembered login
   useEffect(() => {
-    const saved = getRememberedLogin();
-    if (saved) {
-      setIdentifier(saved.identifier);
-      setLoginType(saved.type);
-      setRemember(true);
+    const remembered = localStorage.getItem('remembered-login');
+    if (remembered) {
+      try {
+        const { identifier: savedId, type } = JSON.parse(remembered);
+        setIdentifier(savedId);
+        setLoginType(type);
+        setRemember(true);
+      } catch (error) {
+        console.error('Failed to parse remembered login:', error);
+      }
     }
   }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
 
     try {
-      // Gọi API login thực
-      const response = await authService.login({
-        email: loginType === "email" ? identifier : undefined,
-        phone: loginType === "phone" ? identifier : undefined,
+      const credentials = {
+        [loginType]: identifier,
         password: password,
-      });
+      };
 
-      // authService đã tự động lưu token và user data
+      const response = await login(credentials);
+
       if (response.success) {
-        showSuccessToast('Đăng nhập thành công!');
+        toast.success('Đăng nhập thành công!');
         
-        // Lưu remember login nếu được chọn
+        // Save remember login
         if (remember) {
-          setRememberedLogin({ identifier, type: loginType });
+          localStorage.setItem('remembered-login', JSON.stringify({ identifier, type: loginType }));
         } else {
-          setRememberedLogin(null);
+          localStorage.removeItem('remembered-login');
         }
         
-        // Điều hướng dựa trên role
-        const { role } = response.data.user;
-        if (role === 'admin') {
-          navigate('/admin');
-        } else if (role === 'staff') {
-          navigate('/staff');
+        // Navigate based on role
+        const userRole = response.data.user.role;
+        if (userRole === 'admin') {
+          navigate('/admin/dashboard');
+        } else if (userRole === 'staff') {
+          navigate('/staff/dashboard');
         } else {
-          // Co-owner goes directly to dashboard (no onboarding needed)
-          navigate('/dashboard/coowner');
+          navigate('/dashboard');
         }
       }
     } catch (error) {
-      // Error đã được xử lý bởi interceptor
-      showErrorToast(error.response?.data?.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
-    } finally {
-      setLoading(false);
+      toast.error(error.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
     }
   };
 
@@ -193,12 +194,12 @@ export default function Login() {
             {/* Nút đăng nhập */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={isLoading}
               className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-sky-500 to-sky-600 text-white hover:from-sky-600 hover:to-sky-700 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? (
+              {isLoading ? (
                 <>
-                  <LoadingSkeleton.Skeleton className="h-5 w-5" variant="circular" />
+                  <Loader2 className="h-5 w-5 animate-spin" />
                   Đang đăng nhập...
                 </>
               ) : (
