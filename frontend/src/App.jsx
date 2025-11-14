@@ -17,7 +17,7 @@ const VerifyEmail = lazy(() => import("./pages/auth/VerifyEmail"));
 
 // Dashboard Pages
 const CoownerDashboard = lazy(() => import("./pages/dashboard/CoownerDashboard"));
-const AdminDashboard = lazy(() => import("./pages/dashboard/AdminDashboard"));
+const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const StaffDashboard = lazy(() => import("./pages/dashboard/StaffDashboard"));
 
 // Group Pages
@@ -53,6 +53,7 @@ const AdminVehicles = lazy(() => import("./pages/admin/AdminVehicles"));
 const AdminReports = lazy(() => import("./pages/admin/AdminReports"));
 const AdminStaff = lazy(() => import("./pages/admin/AdminStaff"));
 const AdminDisputes = lazy(() => import("./pages/admin/AdminDisputes"));
+const AdminKYC = lazy(() => import("./pages/admin/AdminKYC"));
 
 export default function App() {
   return (
@@ -86,8 +87,8 @@ export default function App() {
 
               {/* Costs */}
               <Route path="/costs" element={<CostList />} />
+              <Route path="/costs/summary" element={<CostSummary />} />
               <Route path="/costs/:costId" element={<CostDetail />} />
-              <Route path="/costs/summary/:groupId" element={<CostSummary />} />
 
               {/* Vehicles */}
               <Route path="/vehicles" element={<VehicleList />} />
@@ -109,6 +110,7 @@ export default function App() {
               <Route path="/admin/reports" element={<AdminReports />} />
               <Route path="/admin/staff" element={<AdminStaff />} />
               <Route path="/admin/disputes" element={<AdminDisputes />} />
+              <Route path="/admin/kyc" element={<AdminKYC />} />
             </Route>
 
             {/* Protected Routes - Staff */}
