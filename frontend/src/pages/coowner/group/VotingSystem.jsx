@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Vote, Plus, Clock, Users, CheckCircle, XCircle, TrendingUp, BarChart3, Calendar, MoreVertical } from "lucide-react";
 import { Link } from "react-router-dom";
 import CoownerLayout from "../../../components/layout/CoownerLayout";
-import votingService from "../../../services/voting.service";
+import votingService from "../../../services/votingService";
 import { useVotingStore } from "../../../stores/useVotingStore";
 import { useGroupStore } from "../../../stores/useGroupStore";
 import { showSuccessToast, showErrorToast } from "../../../utils/toast";

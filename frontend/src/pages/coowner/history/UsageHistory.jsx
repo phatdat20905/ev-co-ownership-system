@@ -5,7 +5,7 @@ import Footer from '../../../components/layout/Footer';
 import { motion } from "framer-motion";
 import { ArrowLeft, Calendar, Clock, MapPin, Car, Download, Filter, Search, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
-import bookingService from "../../../services/booking.service";
+import bookingService from "../../../services/bookingService";
 import { useBookingStore } from "../../../stores/useBookingStore";
 import { showErrorToast } from "../../../utils/toast";
 

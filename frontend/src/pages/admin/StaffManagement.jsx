@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Users, UserPlus, Search, Filter, Edit, Trash2, Shield, Mail, Phone, Calendar, ArrowLeft, BarChart3, Car, FileText, QrCode, Wrench, Download, CheckCircle, XCircle, Eye, X, Menu, Bell, User, LogOut, PieChart, AlertTriangle, ChevronDown, MoreVertical } from "lucide-react";
-import adminService from "../../services/admin.service";
+import adminService from "../../services/adminService";
 import LoadingSkeleton from '../../components/LoadingSkeleton';
 import { toast } from "../../utils/toast";
 

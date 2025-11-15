@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import LoadingSkeleton from '../../components/LoadingSkeleton';
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { BarChart3, Download, Filter, Calendar, DollarSign, Users, Car, QrCode, TrendingUp, TrendingDown, Eye, FileText, PieChart, CreditCard, Wallet, ChevronDown, X, MoreVertical, Bell, User, LogOut, Menu, AlertTriangle, Wrench } from "lucide-react";
-import adminService from "../../services/admin.service";
+import adminService from "../../services/adminService";
 import { toast } from "../../utils/toast";
 
 const FinancialReports = () => {

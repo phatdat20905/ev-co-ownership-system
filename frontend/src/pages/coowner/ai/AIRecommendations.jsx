@@ -17,7 +17,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import LoadingSkeleton from '../../../components/LoadingSkeleton';
-import aiService from "../../../services/ai.service";
+import aiService from "../../../services/aiService";
 import { toast } from "../../../utils/toast";
 
 const AIRecommendations = () => {

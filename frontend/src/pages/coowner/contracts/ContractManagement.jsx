@@ -6,7 +6,7 @@ import { ArrowLeft, FileText, Plus, Filter } from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Footer from '../../../components/layout/Footer';
 import ContractSignature from '../../../components/contract/ContractSignature';
-import contractService from '../../../services/contract.service';
+import contractService from '../../../services/contractService';
 import { showErrorToast, showSuccessToast } from '../../../utils/toast';
 
 export default function ContractManagement() {

@@ -1,0 +1,56 @@
+name: CI - Run tests
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install root dependencies (if any)
+        run: |
+          if [ -f package.json ]; then
+            npm ci || true
+          fi
+
+      - name: Run tests in packages
+        env:
+          CI: true
+        run: |
+          set -euo pipefail
+          echo "::group::Finding package.json files"
+          # Find all package.json files excluding node_modules and .github
+          find . -name package.json -not -path "./node_modules/*" -not -path "./.github/*" -not -path "./.git/*" -print | sed 's|^./||' | sort -u | while read -r pkg; do
+            dir=$(dirname "$pkg")
+            echo "Checking $dir"
+            # Use node to check whether the package has a test script
+            has_test=$(node -e "try{ const p=require('./$pkg'); console.log(Boolean(p.scripts && p.scripts.test)) } catch(e){ console.log('false') }")
+            if [ "$has_test" = "true" ]; then
+              echo "::group::Running tests in $dir"
+              cd "$dir"
+              # Install and run tests. npm test will fail the job if tests fail.
+              npm ci
+              npm test --if-present
+              cd -
+              echo "::endgroup::"
+            else
+              echo "No test script in $dir, skipping"
+            fi
+          done
+          echo "::endgroup::"

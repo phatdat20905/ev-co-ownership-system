@@ -5,7 +5,7 @@ import Footer from '../../../components/layout/Footer';
 import { motion } from "framer-motion";
 import { ArrowLeft, DollarSign, TrendingUp, TrendingDown, Download, Filter, Plus, Users, Calendar, CreditCard, PiggyBank, BarChart3 } from "lucide-react";
 import { Link } from "react-router-dom";
-import userService from "../../../services/user.service";
+import userService from "../../../services/userService";
 import { useGroupStore } from "../../../stores/useGroupStore";
 import { showSuccessToast, showErrorToast } from "../../../utils/toast";
 

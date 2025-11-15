@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, BarChart3, TrendingUp, Calendar, Download, PieChart, Users, Clock, DollarSign } from "lucide-react";
 import { Link } from "react-router-dom";
 import CoownerLayout from "../../../components/layout/CoownerLayout";
-import bookingService from "../../../services/booking.service";
+import bookingService from "../../../services/bookingService";
 import { showErrorToast } from "../../../utils/toast";
 
 export default function UsageAnalytics() {

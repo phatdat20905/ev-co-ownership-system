@@ -9,7 +9,7 @@ import {
   XCircle as XCircleIcon,
   Settings as Cog6ToothIcon,
 } from 'lucide-react';
-import notificationService from '../../services/notification.service';
+import notificationService from '../../services/notificationService';
 import LoadingSkeleton from '../../components/LoadingSkeleton';
 
 const NotificationSettings = () => {

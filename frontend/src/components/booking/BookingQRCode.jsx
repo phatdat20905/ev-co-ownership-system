@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { QrCode, CheckCircle, XCircle, Clock, Car, Calendar, MapPin } from 'lucide-react';
 import QRCodeLib from 'qrcode';
-import bookingService from '../../services/booking.service';
+import bookingService from '../../services/bookingService';
 import LoadingSkeleton from '../../components/LoadingSkeleton';
 
 export default function BookingQRCode({ booking, onCheckIn, onCheckOut }) {

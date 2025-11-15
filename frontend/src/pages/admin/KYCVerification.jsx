@@ -8,7 +8,7 @@ import {
   X, Menu, Bell, LogOut, BarChart3, Car, Users, QrCode, 
   Wrench, PieChart 
 } from "lucide-react";
-import adminService from "../../services/admin.service";
+import adminService from "../../services/adminService";
 import { toast } from "../../utils/toast";
 
 const KYCVerification = () => {

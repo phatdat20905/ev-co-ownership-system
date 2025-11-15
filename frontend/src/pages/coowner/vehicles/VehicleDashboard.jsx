@@ -6,7 +6,7 @@ import { ArrowLeft, Car, Plus } from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Footer from '../../../components/layout/Footer';
 import VehicleStatus from '../../../components/vehicle/VehicleStatus';
-import vehicleService from '../../../services/vehicle.service';
+import vehicleService from '../../../services/vehicleService';
 import { useVehicleStore } from '../../../stores/useVehicleStore';
 import { showErrorToast } from '../../../utils/toast';
 

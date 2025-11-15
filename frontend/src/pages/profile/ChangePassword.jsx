@@ -12,7 +12,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../../components/layout/Header";
 import Footer from "../../components/layout/Footer";
-import authService from "../../services/auth.service";
+import authService from "../../services/authService";
 import { showSuccessToast, showErrorToast } from "../../utils/toast";
 import LoadingSkeleton from '../../components/LoadingSkeleton';
 

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { CreditCard, Wallet, QrCode, ArrowRight, Check, X, Loader2 } from 'lucide-react';
-import costService from '../../services/cost.service';
+import costService from '../../services/costService';
 import LoadingSkeleton from '../../components/LoadingSkeleton';
 import { showSuccessToast, showErrorToast } from '../../utils/toast';
 

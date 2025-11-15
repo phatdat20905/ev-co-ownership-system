@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import LoadingSkeleton from '../../components/LoadingSkeleton';
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { AlertTriangle, Search, Filter, MessageCircle, CheckCircle, XCircle, Clock, User, Car,QrCode, Calendar, Download, FileText, CreditCard, MapPin, Wrench, BarChart3, Send, ChevronDown, X, MoreVertical, Bell, LogOut, Menu, Plus, PieChart } from "lucide-react";
-import adminService from "../../services/admin.service";
+import adminService from "../../services/adminService";
 import { toast } from "../../utils/toast";
 
 const DisputeManagement = () => {

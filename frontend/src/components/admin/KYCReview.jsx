@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Shield, CheckCircle, XCircle, Clock, Eye, FileText, User, Calendar, AlertTriangle, Download } from 'lucide-react';
-import adminService from '../../services/admin.service';
+import adminService from '../../services/adminService';
 
 export default function KYCReview() {
   const [applications, setApplications] = useState([]);

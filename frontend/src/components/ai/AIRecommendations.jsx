@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, TrendingUp, DollarSign, Clock, MapPin, Battery, Car, ChevronRight, X, Lightbulb } from 'lucide-react';
-import aiService from '../../services/ai.service';
+import aiService from '../../services/aiService';
 
 export default function AIRecommendations({ userId, context = 'dashboard' }) {
   const [recommendations, setRecommendations] = useState([]);

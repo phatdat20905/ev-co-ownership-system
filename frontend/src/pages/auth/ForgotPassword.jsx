@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import Footer from "../../components/layout/Footer";
 import Header from "../../components/layout/Header";
-import authService from "../../services/auth.service";
+import authService from "../../services/authService";
 import { showSuccessToast, showErrorToast } from "../../utils/toast";
 
 export default function ForgotPassword() {

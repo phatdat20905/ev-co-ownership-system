@@ -22,9 +22,9 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import CoownerLayout from "../../components/layout/CoownerLayout";
 import AIRecommendations from "../../components/ai/AIRecommendations";
-import userService from "../../services/user.service";
-import bookingService from "../../services/booking.service";
-import vehicleService from "../../services/vehicle.service";
+import userService from "../../services/userService";
+import bookingService from "../../services/bookingService";
+import vehicleService from "../../services/vehicleService";
 import { useUserStore } from "../../stores/useUserStore";
 import { useAuthStore } from "../../stores/useAuthStore";
 import { showErrorToast } from "../../utils/toast";

@@ -18,7 +18,7 @@ import {
   Filter,
   Search,
 } from "lucide-react";
-import userService from "../../../services/user.service";
+import userService from "../../../services/userService";
 import { toast } from "../../../utils/toast";
 
 const VotingManagement = () => {

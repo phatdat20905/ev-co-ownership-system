@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, DollarSign, Clock, CheckCircle, XCircle, FileText } from 'lucide-react';
 import PaymentGateway from '../../../components/payment/PaymentGateway';
-import costService from '../../../services/cost.service';
+import costService from '../../../services/costService';
 import { useCostStore } from '../../../stores/useCostStore';
 import { showErrorToast, showSuccessToast } from '../../../utils/toast';
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import LoadingSkeleton from '../../components/LoadingSkeleton';
-import costService from '../../services/cost.service';
+import costService from '../../services/costService';
 import { showSuccessToast, showErrorToast } from '../../utils/toast';
 
 export default function PaymentCallback() {

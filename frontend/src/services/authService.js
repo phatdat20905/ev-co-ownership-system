@@ -1,4 +1,4 @@
-import apiClient from '../lib/api/client.js';
+import apiClient from './api/interceptors.js';
 
 /**
  * Authentication Service

@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { FileText, CheckCircle, XCircle, Download, Eye, PenTool, User, Calendar, Shield } from 'lucide-react';
-import contractService from '../../services/contract.service';
+import contractService from '../../services/contractService';
 import LoadingSkeleton from '../../components/LoadingSkeleton';
 
 export default function ContractSignature({ contract, onSuccess }) {

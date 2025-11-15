@@ -3,7 +3,7 @@ import CoownerLayout from '../../../components/layout/CoownerLayout';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, Car, MapPin, Users, DollarSign, Battery, TrendingUp, Filter, Download, Eye } from 'lucide-react';
-import bookingService from '../../../services/booking.service';
+import bookingService from '../../../services/bookingService';
 import { showErrorToast } from '../../../utils/toast';
 
 export default function ScheduleView() {

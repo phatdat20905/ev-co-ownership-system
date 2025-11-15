@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { User, Mail, Phone, MapPin, Calendar, Shield, Bell, CreditCard, FileText, Camera, Save, Edit, CheckCircle, X, Users, Building, Badge, Key } from "lucide-react";
-import userService from "../../services/user.service";
+import userService from "../../services/userService";
 import { useUserStore } from "../../stores/useUserStore";
 import { useAuthStore } from "../../stores/useAuthStore";
 import { showSuccessToast, showErrorToast } from "../../utils/toast";

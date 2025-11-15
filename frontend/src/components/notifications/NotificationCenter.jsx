@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell, X, Check, Eye, Trash2, Mail, Phone, Calendar, DollarSign, FileText, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import notificationService from '../../services/notification.service';
+import notificationService from '../../services/notificationService';
 import { useUserStore } from '../../stores/useUserStore';
 import LoadingSkeleton from '../../components/LoadingSkeleton';
 import { showSuccessToast, showErrorToast } from '../../utils/toast';

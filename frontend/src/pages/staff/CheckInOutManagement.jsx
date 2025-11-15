@@ -3,8 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { QrCode, Camera, Upload, FileText, AlertCircle, CheckCircle, Image as ImageIcon, Clipboard } from 'lucide-react';
 import { showSuccessToast, showErrorToast } from '../../utils/toast';
-import checkInOutService from '../../services/checkinout.service';
-import bookingService from '../../services/booking.service';
+import checkInOutService from '../../services/checkinoutService';
+import bookingService from '../../services/bookingService';
 import Html5QrcodePlugin from '../../components/Html5QrcodePlugin';
 
 export default function CheckInOutManagement() {
