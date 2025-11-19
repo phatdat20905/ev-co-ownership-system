@@ -11,6 +11,11 @@ module.exports = {
       description: group.description,
       created_by: group.created_by,
       group_fund_balance: group.fund_balance,
+      vehicle_id: idx === 0
+        ? MASTER_SEED_DATA.vehicles.tesla.id
+        : idx === 1
+        ? MASTER_SEED_DATA.vehicles.vinfast.id
+        : MASTER_SEED_DATA.vehicles.ioniq5.id, // Fixed: ioniq5 not hyundai
       is_active: true,
       created_at: idx === 0
         ? MASTER_SEED_DATA.dates.group1Created
@@ -35,6 +40,21 @@ module.exports = {
       console.log(`✅ Seeded ${groupsToInsert.length} co-ownership groups`);
     } else {
       console.log('⏩ Co-ownership groups already exist — nothing to do');
+    }
+
+    // Also ensure existing groups have vehicle_id set (idempotent update)
+    try {
+      for (const g of groups) {
+        if (!g.vehicle_id) continue;
+        await queryInterface.sequelize.query(
+          `UPDATE co_ownership_groups SET vehicle_id = :vehicleId, updated_at = :updatedAt
+           WHERE id = :id AND (vehicle_id IS NULL OR vehicle_id::text = '')`,
+          { replacements: { vehicleId: g.vehicle_id, id: g.id, updatedAt: MASTER_SEED_DATA.dates.now }, type: Sequelize.QueryTypes.UPDATE }
+        );
+      }
+      console.log('🔁 Ensured vehicle_id assigned for existing groups where missing');
+    } catch (updateError) {
+      console.error('Failed to update existing groups vehicle_id:', updateError.message || updateError);
     }
   },
 

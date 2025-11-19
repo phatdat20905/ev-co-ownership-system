@@ -1,7 +1,8 @@
 import db from '../models/index.js';
 import { 
   logger, 
-  AppError
+  AppError,
+  redisClient
 } from '@ev-coownership/shared';
 import eventService from './eventService.js';
 
@@ -70,6 +71,19 @@ export class GroupService {
 
   async getGroupById(groupId, userId) {
     try {
+      const cacheKey = `group:${groupId}`;
+      // Try cache first
+      try {
+        const cached = await redisClient.get(cacheKey);
+        if (cached) {
+          logger.debug('Group cache hit', { groupId });
+          return JSON.parse(cached);
+        }
+      } catch (cacheErr) {
+        logger.debug('Failed to read group cache', { error: cacheErr.message, groupId });
+      }
+
+      const t0 = Date.now();
       const userMembership = await db.GroupMember.findOne({
         where: { 
           groupId, 
@@ -77,11 +91,14 @@ export class GroupService {
           isActive: true 
         }
       });
+      const t1 = Date.now();
+      logger.debug('User membership lookup', { groupId, userId, durationMs: t1 - t0 });
 
       if (!userMembership) {
         throw new AppError('You are not a member of this group', 403, 'ACCESS_DENIED');
       }
 
+      const t2 = Date.now();
       const group = await db.CoOwnershipGroup.findByPk(groupId, {
         include: [{
           model: db.GroupMember,
@@ -95,13 +112,54 @@ export class GroupService {
         }]
       });
 
+      const t3 = Date.now();
+      logger.debug('Group DB fetch', { groupId, durationMs: t3 - t2 });
+
       if (!group) {
         throw new AppError('Group not found', 404, 'GROUP_NOT_FOUND');
       }
 
-      logger.debug('Group retrieved by ID', { groupId, userId });
+      // Fetch vehicle info from vehicle-service if vehicleId exists — with timeout and non-blocking cache set
+      let groupJson = group.toJSON();
+      if (groupJson.vehicleId) {
+        const vehicleUrl = `http://vehicle-service:3006/api/v1/vehicles/${groupJson.vehicleId}`;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2000);
+        try {
+          const vStart = Date.now();
+          const vehicleResponse = await fetch(vehicleUrl, {
+            headers: {
+              'Authorization': `Bearer ${process.env.INTERNAL_SERVICE_TOKEN || 'internal-service-token'}`
+            },
+            signal: controller.signal
+          });
+          clearTimeout(timeout);
+          const vDuration = Date.now() - vStart;
+          logger.debug('Vehicle fetch', { vehicleId: groupJson.vehicleId, durationMs: vDuration, status: vehicleResponse.status });
 
-      return group;
+          if (vehicleResponse.ok) {
+            const vehicleData = await vehicleResponse.json();
+            groupJson.Vehicle = vehicleData.data;
+          } else {
+            logger.warn('Failed to fetch vehicle info', { vehicleId: groupJson.vehicleId, status: vehicleResponse.status });
+          }
+        } catch (vehicleError) {
+          clearTimeout(timeout);
+          logger.error('Error fetching vehicle info', { error: vehicleError.message, vehicleId: groupJson.vehicleId });
+          // Continue without vehicle data rather than failing
+        }
+      }
+
+      // Cache the serialized group for short time to speed up subsequent requests
+      try {
+        await redisClient.set(cacheKey, JSON.stringify(groupJson), 300);
+      } catch (cacheErr) {
+        logger.debug('Failed to write group cache', { error: cacheErr.message, groupId });
+      }
+
+  logger.debug('Group retrieved by ID', { groupId, userId });
+
+  return groupJson;
     } catch (error) {
       logger.error('Failed to get group by ID', { error: error.message, groupId, userId });
       throw error;
@@ -301,18 +359,22 @@ export class GroupService {
     }
   }
 
-  async getGroupMembers(groupId, userId) {
+  async getGroupMembers(groupId, userId, userRole = 'user') {
     try {
-      const userMembership = await db.GroupMember.findOne({
-        where: { 
-          groupId, 
-          userId,
-          isActive: true 
-        }
-      });
+      // Admin và staff có thể xem tất cả group members
+      if (userRole !== 'admin' && userRole !== 'staff') {
+        // User thường phải check membership
+        const userMembership = await db.GroupMember.findOne({
+          where: { 
+            groupId, 
+            userId,
+            isActive: true 
+          }
+        });
 
-      if (!userMembership) {
-        throw new AppError('You are not a member of this group', 403, 'ACCESS_DENIED');
+        if (!userMembership) {
+          throw new AppError('You are not a member of this group', 403, 'ACCESS_DENIED');
+        }
       }
 
       const members = await db.GroupMember.findAll({
@@ -421,6 +483,161 @@ export class GroupService {
     } catch (error) {
       await transaction.rollback();
       logger.error('Failed to delete group', { error: error.message, groupId, userId });
+      throw error;
+    }
+  }
+
+  async getActiveGroup(userId) {
+    try {
+      // Get user's first active group (sorted by most recent join date)
+      const membership = await db.GroupMember.findOne({
+        where: { 
+          userId,
+          isActive: true 
+        },
+        include: [{
+          model: db.CoOwnershipGroup,
+          as: 'group',
+          where: { isActive: true }
+        }],
+        order: [['joinedAt', 'DESC']]
+      });
+
+      if (!membership || !membership.group) {
+        return null;
+      }
+
+      logger.debug('Active group retrieved', { userId, groupId: membership.group.id });
+
+      return membership.group;
+    } catch (error) {
+      logger.error('Failed to get active group', { error: error.message, userId });
+      throw error;
+    }
+  }
+
+  async getGroupMemberCount(groupId) {
+    try {
+      const count = await db.GroupMember.count({
+        where: { 
+          groupId,
+          isActive: true 
+        }
+      });
+
+      logger.debug('Group member count retrieved', { groupId, count });
+
+      return count;
+    } catch (error) {
+      logger.error('Failed to get group member count', { error: error.message, groupId });
+      throw error;
+    }
+  }
+
+  async updateMemberRole(groupId, userId, requestUserId, newRole) {
+    try {
+      // Check if request user has permission (must be owner or admin)
+      const requestMember = await db.GroupMember.findOne({
+        where: { 
+          groupId, 
+          userId: requestUserId,
+          isActive: true 
+        }
+      });
+
+      if (!requestMember || !['owner', 'admin'].includes(requestMember.role)) {
+        throw new AppError('You do not have permission to update member roles', 403, 'PERMISSION_DENIED');
+      }
+
+      // Cannot change owner role unless you are the owner
+      const targetMember = await db.GroupMember.findOne({
+        where: { 
+          groupId, 
+          userId,
+          isActive: true 
+        }
+      });
+
+      if (!targetMember) {
+        throw new AppError('Member not found in this group', 404, 'MEMBER_NOT_FOUND');
+      }
+
+      if (targetMember.role === 'owner' && requestMember.role !== 'owner') {
+        throw new AppError('Only the owner can change the owner role', 403, 'PERMISSION_DENIED');
+      }
+
+      // Cannot assign owner role unless you are the owner
+      if (newRole === 'owner' && requestMember.role !== 'owner') {
+        throw new AppError('Only the owner can assign the owner role', 403, 'PERMISSION_DENIED');
+      }
+
+      // Update the role
+      await targetMember.update({ role: newRole });
+
+      // Re-fetch with user profile
+      const updatedMember = await db.GroupMember.findOne({
+        where: { 
+          groupId, 
+          userId,
+          isActive: true 
+        },
+        include: [{
+          model: db.UserProfile,
+          as: 'userProfile',
+          attributes: ['id', 'fullName', 'avatarUrl']
+        }]
+      });
+
+      eventService.publishGroupMemberRoleUpdated({
+        groupId,
+        userId,
+        newRole,
+        updatedBy: requestUserId
+      }).catch(error => logger.error('Failed to publish member role updated event', { error: error.message, groupId, userId }));
+
+      logger.info('Member role updated successfully', { groupId, userId, newRole, updatedBy: requestUserId });
+
+      return updatedMember;
+    } catch (error) {
+      logger.error('Failed to update member role', { error: error.message, groupId, userId, requestUserId });
+      throw error;
+    }
+  }
+
+  async updateGroupRules(groupId, userId, rules) {
+    try {
+      // Check if user has permission (must be owner or admin)
+      const member = await db.GroupMember.findOne({
+        where: { 
+          groupId, 
+          userId,
+          isActive: true 
+        }
+      });
+
+      if (!member || !['owner', 'admin'].includes(member.role)) {
+        throw new AppError('You do not have permission to update group rules', 403, 'PERMISSION_DENIED');
+      }
+
+      // Update the group rules
+      const group = await db.CoOwnershipGroup.findByPk(groupId);
+
+      if (!group) {
+        throw new AppError('Group not found', 404, 'GROUP_NOT_FOUND');
+      }
+
+      await group.update({ groupRules: rules });
+
+      eventService.publishGroupRulesUpdated({
+        groupId,
+        updatedBy: userId
+      }).catch(error => logger.error('Failed to publish group rules updated event', { error: error.message, groupId }));
+
+      logger.info('Group rules updated successfully', { groupId, updatedBy: userId });
+
+      return group;
+    } catch (error) {
+      logger.error('Failed to update group rules', { error: error.message, groupId, userId });
       throw error;
     }
   }

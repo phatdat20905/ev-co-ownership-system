@@ -22,6 +22,14 @@ export const groupValidators = {
     ownershipPercentage: Joi.number().min(0.01).max(100).precision(2).required()
   }),
 
+  updateRole: Joi.object({
+    role: Joi.string().valid('owner', 'admin', 'member').required()
+  }),
+
+  updateRules: Joi.object({
+    rules: Joi.string().max(5000).required()
+  }),
+
   createVote: Joi.object({
     title: Joi.string().min(5).max(255).required(),
     description: Joi.string().max(1000).optional(),

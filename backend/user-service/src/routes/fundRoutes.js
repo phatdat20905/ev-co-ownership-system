@@ -16,5 +16,6 @@ router.post('/:groupId/deposit', groupAccess, validate(fundValidators.deposit), 
 router.post('/:groupId/withdraw', groupAccess, validate(fundValidators.withdraw), fundController.withdraw);
 router.get('/:groupId/balance', groupAccess, fundController.getBalance);
 router.get('/:groupId/transactions', groupAccess, fundController.getTransactions);
+router.get('/:groupId/summary', groupAccess, fundController.getSummary);
 
 export default router;

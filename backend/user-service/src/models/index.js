@@ -42,6 +42,19 @@ db.GroupMember.belongsTo(db.CoOwnershipGroup, {
   as: 'group' 
 });
 
+// GroupMember -> UserProfile association
+// GroupMember.userId references UserProfile.userId (not UserProfile.id)
+db.GroupMember.belongsTo(db.UserProfile, {
+  foreignKey: 'userId',
+  targetKey: 'userId', // References user_profiles.user_id instead of user_profiles.id
+  as: 'userProfile'
+});
+db.UserProfile.hasMany(db.GroupMember, {
+  foreignKey: 'userId',
+  sourceKey: 'userId', // Use user_profiles.user_id as the source
+  as: 'groupMemberships'
+});
+
 db.CoOwnershipGroup.hasMany(db.GroupFundTransaction, { 
   foreignKey: 'groupId', 
   as: 'fundTransactions' 

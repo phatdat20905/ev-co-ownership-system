@@ -52,9 +52,11 @@ export default (sequelize, DataTypes) => {
     avatarUrl: {
       type: DataTypes.STRING(500),
       field: 'avatar_url',
-      validate: {
-        isUrl: true
-      }
+      allowNull: true,
+      // Store avatar path/URL as a plain string. Validation is intentionally
+      // relaxed here so local/dev hosts (eg. http://localhost:3002/...) or
+      // plain stored filenames will be accepted. Higher-level code (controllers
+      // or gateways) should ensure produced URLs are reachable if needed.
     },
     bio: {
       type: DataTypes.TEXT,

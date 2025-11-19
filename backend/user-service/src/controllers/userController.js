@@ -94,7 +94,11 @@ export class UserController {
       }
 
       // Generate avatar URL
-      const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+      // Build absolute URL so it passes Joi "uri" validation in the profile validator.
+      // Use request host/protocol to construct a public URL for the uploaded file.
+      const host = req.get('host');
+      const protocol = req.protocol || 'http';
+      const avatarUrl = `${protocol}://${host}/uploads/avatars/${req.file.filename}`;
       
       const updatedProfile = await userService.updateUserProfile(userId, { avatarUrl });
 

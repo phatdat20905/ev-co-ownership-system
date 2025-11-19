@@ -199,6 +199,77 @@ export class FundService {
       throw error;
     }
   }
+
+  async getSummary(groupId, userId) {
+    try {
+      const membership = await db.GroupMember.findOne({
+        where: { groupId, userId, isActive: true }
+      });
+
+      if (!membership) {
+        throw new AppError('You are not a member of this group', 403, 'ACCESS_DENIED');
+      }
+
+      const group = await db.CoOwnershipGroup.findByPk(groupId);
+      if (!group) {
+        throw new AppError('Group not found', 404, 'GROUP_NOT_FOUND');
+      }
+
+      // Get all transactions
+      const transactions = await db.GroupFundTransaction.findAll({
+        where: { groupId },
+        order: [['createdAt', 'DESC']]
+      });
+
+      // Calculate totals
+      const totalContributions = transactions
+        .filter(t => t.transactionType === 'deposit')
+        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+
+      const totalExpenses = transactions
+        .filter(t => t.transactionType === 'withdrawal')
+        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+
+      // Get members with their contributions
+      const members = await db.GroupMember.findAll({
+        where: { groupId, isActive: true },
+        attributes: ['userId', 'ownershipPercentage']
+      });
+
+      const memberContributions = await Promise.all(
+        members.map(async (member) => {
+          const memberTransactions = await db.GroupFundTransaction.findAll({
+            where: { 
+              groupId, 
+              createdBy: member.userId,
+              transactionType: 'deposit'
+            }
+          });
+
+          const contribution = memberTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+
+          return {
+            userId: member.userId,
+            ownershipPercentage: member.ownershipPercentage,
+            contribution,
+            status: contribution > 0 ? 'paid' : 'pending'
+          };
+        })
+      );
+
+      return {
+        balance: parseFloat(group.groupFundBalance),
+        totalContributions,
+        totalExpenses,
+        monthlyContribution: totalContributions / Math.max(1, transactions.filter(t => t.transactionType === 'deposit').length),
+        transactions: transactions.slice(0, 10),
+        members: memberContributions
+      };
+    } catch (error) {
+      logger.error('Failed to get fund summary', { error: error.message, groupId, userId });
+      throw error;
+    }
+  }
 }
 
 export default new FundService();

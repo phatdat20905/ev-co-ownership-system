@@ -15,7 +15,9 @@ router.use(authenticate);
 // Group management routes
 router.post('/', validate(groupValidators.createGroup), groupController.createGroup);
 router.get('/', groupController.getUserGroups);
+router.get('/active', groupController.getActiveGroup);
 router.get('/:groupId', groupAccess, groupController.getGroupById);
+router.get('/:groupId/count', groupController.getGroupMemberCount);
 router.put('/:groupId', groupAccess, validate(groupValidators.updateGroup), groupController.updateGroup);
 router.delete('/:groupId', groupAccess, groupController.deleteGroup);
 
@@ -24,5 +26,9 @@ router.post('/:groupId/members', groupAccess, validate(groupValidators.addMember
 router.get('/:groupId/members', groupAccess, groupController.getGroupMembers);
 router.delete('/:groupId/members/:userId', groupAccess, groupController.removeMember);
 router.put('/:groupId/members/:userId/ownership', groupAccess, validate(groupValidators.updateOwnership), groupController.updateOwnership);
+router.put('/:groupId/members/:userId/role', groupAccess, validate(groupValidators.updateRole), groupController.updateMemberRole);
+
+// Group rules route
+router.put('/:groupId/rules', groupAccess, validate(groupValidators.updateRules), groupController.updateGroupRules);
 
 export default router;

@@ -26,7 +26,13 @@ config();
 const app = express();
 
 // 🛡️ Security middleware
-app.use(helmet());
+// Configure helmet to allow cross-origin resource loading for uploaded files
+// (static files under /uploads). By default helmet may set
+// Cross-Origin-Resource-Policy: same-origin which prevents images served
+// from this service being embedded in a different origin (frontend).
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
 app.use(createCorsMiddleware());
 
 // 📦 Body parsers

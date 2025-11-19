@@ -14,8 +14,11 @@ export const userValidators = {
     phone: Joi.string().max(20).optional().allow(null, ''),
     email: Joi.string().email().max(255).optional().allow(null, ''),
     address: Joi.string().max(1000).optional().allow(null, ''),
-    avatarUrl: Joi.string().uri().max(500).optional().allow(null, ''),
-    avatar_url: Joi.string().uri().max(500).optional().allow(null, ''),
+  // avatar can be a full URL, localhost URL or a stored filename/path. We
+  // accept it as a plain string (max 500) instead of enforcing URI format
+  // so local/dev hosts and relative paths are allowed.
+  avatarUrl: Joi.string().max(500).optional().allow(null, ''),
+  avatar_url: Joi.string().max(500).optional().allow(null, ''),
     bio: Joi.string().max(1000).optional().allow(null, ''),
     preferences: Joi.object().optional()
   }),
@@ -31,8 +34,8 @@ export const userValidators = {
     phone: Joi.string().max(20).optional(),
     email: Joi.string().email().max(255).optional(),
     address: Joi.string().max(1000).optional(),
-    avatarUrl: Joi.string().uri().max(500).optional(),
-    avatar_url: Joi.string().uri().max(500).optional(),
+  avatarUrl: Joi.string().max(500).optional(),
+  avatar_url: Joi.string().max(500).optional(),
     bio: Joi.string().max(1000).optional(),
     preferences: Joi.object().optional()
   })

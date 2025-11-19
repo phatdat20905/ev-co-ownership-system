@@ -34,6 +34,12 @@ export default (sequelize, DataTypes) => {
         min: 0
       }
     },
+    vehicleId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'vehicle_id',
+      comment: 'Reference to vehicle in vehicle-service'
+    },
     isActive: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,

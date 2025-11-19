@@ -26,6 +26,10 @@ export default {
         type: DataTypes.TEXT,
         allowNull: true
       },
+      // avatar_url stores the uploaded avatar filename or full URL as a string
+      // (we intentionally store as a plain STRING to allow local URLs or
+      // stored filenames). Validation is done by higher-level code when
+      // necessary.
       avatar_url: {
         type: DataTypes.STRING(500),
         allowNull: true

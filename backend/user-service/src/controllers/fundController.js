@@ -98,6 +98,26 @@ export class FundController {
       next(error);
     }
   }
+
+  async getSummary(req, res, next) {
+    try {
+      const { groupId } = req.params;
+      const userId = req.user.id;
+
+      const summary = await fundService.getSummary(groupId, userId);
+
+      logger.info('Fund summary retrieved successfully', { groupId, userId });
+
+      return successResponse(res, 'Summary retrieved successfully', summary);
+    } catch (error) {
+      logger.error('Failed to get fund summary', { 
+        error: error.message, 
+        groupId: req.params.groupId,
+        userId: req.user?.id 
+      });
+      next(error);
+    }
+  }
 }
 
 export default new FundController();
