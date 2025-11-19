@@ -1,14 +1,22 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import LoadingSkeleton from '../../components/LoadingSkeleton';
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { AlertTriangle, Search, Filter, MessageCircle, CheckCircle, XCircle, Clock, User, Car,QrCode, Calendar, Download, FileText, CreditCard, MapPin, Wrench, BarChart3, Send, ChevronDown, X, MoreVertical, Bell, LogOut, Menu, Plus, PieChart } from "lucide-react";
-import adminService from "../../services/adminService";
-import { toast } from "../../utils/toast";
+import { AlertTriangle, Search, Filter, MessageCircle, CheckCircle, XCircle, Clock, User, Car,QrCode, Calendar, Download, FileText, CreditCard, MapPin, Wrench, BarChart3, Send, ChevronDown, X, MoreVertical, Bell, LogOut, Menu, Plus, PieChart, Loader2 } from "lucide-react";
+import { useAdminStore } from "../../store/adminStore";
+import { adminAPI } from "../../api/admin";
+import { useStaffStore } from "../../store/staffStore";
+import { useAuthStore } from "../../store/authStore";
+import LoadingSpinner from "../../components/common/LoadingSpinner";
 
 const DisputeManagement = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout } = useAuthStore();
+  const { disputes, loading, error, fetchDisputes, resolveDispute: resolveDisputeAction } = useAdminStore();
+  const { addDisputeMessage } = useAdminStore();
+  const { pauseDispute } = useAdminStore();
+  const { staff, fetchStaff } = useStaffStore();
+  
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -16,10 +24,8 @@ const DisputeManagement = () => {
   const [selectedDispute, setSelectedDispute] = useState(null);
   const [newMessage, setNewMessage] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-
-  // API State
-  const [disputes, setDisputes] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [resolving, setResolving] = useState(false);
+  const [selectedLoading, setSelectedLoading] = useState(false);
 
   // Thêm state cho dropdown menus
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -36,12 +42,16 @@ const DisputeManagement = () => {
     { id: 3, title: "Tranh chấp đã giải quyết", message: "Tranh chấp thanh toán đã được giải quyết", time: "1 ngày trước", type: "success", read: true }
   ]);
 
+  // Fetch disputes on mount
+  useEffect(() => {
+    const filters = statusFilter !== 'all' ? { status: statusFilter } : {};
+    fetchDisputes(filters);
+  }, [fetchDisputes, statusFilter]);
+
   // Hàm xử lý đăng xuất
   const handleLogout = () => {
-    const { clearAuth } = require('../../utils/storage');
-    clearAuth();
-    window.dispatchEvent(new Event('storage'));
-    navigate('/');
+    logout();
+    navigate("/");
   };
 
   // useEffect để đóng dropdown khi click ra ngoài
@@ -81,57 +91,8 @@ const DisputeManagement = () => {
 
   const activeTab = getActiveTab();
 
-  // Load disputes on mount
-  useEffect(() => {
-    fetchDisputes();
-  }, []);
-
-  const fetchDisputes = async () => {
-    try {
-      setLoading(true);
-      const response = await adminService.listDisputes();
-      setDisputes(response.data || []);
-    } catch (error) {
-      console.error("Error fetching disputes:", error);
-      toast.error("Không thể tải danh sách tranh chấp");
-      setDisputes([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAssignDispute = async (disputeId, staffId) => {
-    try {
-      await adminService.assignDispute(disputeId, { staffId });
-      toast.success("Phân công xử lý tranh chấp thành công");
-      fetchDisputes();
-    } catch (error) {
-      console.error("Error assigning dispute:", error);
-      toast.error("Không thể phân công tranh chấp");
-    }
-  };
-
-  const handleResolveDispute = async (disputeId, resolution) => {
-    try {
-      await adminService.resolveDispute(disputeId, { resolution });
-      toast.success("Giải quyết tranh chấp thành công");
-      fetchDisputes();
-      setSelectedDispute(null);
-    } catch (error) {
-      console.error("Error resolving dispute:", error);
-      toast.error("Không thể giải quyết tranh chấp");
-    }
-  };
-
-  const disputeStats = {
-    total: disputes.length,
-    pending: disputes.filter(d => d.status === 'pending').length,
-    inProgress: disputes.filter(d => d.status === 'in_progress').length,
-    resolved: disputes.filter(d => d.status === 'resolved').length,
-    totalFinancialImpact: disputes.reduce((sum, dispute) => sum + (dispute.financialImpact || 0), 0)
-  };
-
-  const unreadNotifications = notifications.filter(n => !n.read).length;
+  // Use disputes from store
+  const disputesList = disputes || [];
 
   const statusOptions = [
     { value: "all", label: "Tất cả trạng thái", color: "gray" },
@@ -155,9 +116,9 @@ const DisputeManagement = () => {
     { value: "other", label: "Khác", icon: <AlertTriangle className="w-4 h-4" /> }
   ];
 
-  const filteredDisputes = disputes.filter(dispute => {
-    const matchesSearch = dispute.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         dispute.description.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredDisputes = disputesList.filter(dispute => {
+    const matchesSearch = dispute.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         dispute.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || dispute.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -186,24 +147,144 @@ const DisputeManagement = () => {
     return option ? option.icon : <AlertTriangle className="w-4 h-4" />;
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedDispute) return;
+    try {
+      const resp = await addDisputeMessage(selectedDispute.id, { message: newMessage, messageType: 'text', isInternal: false });
+      // The store action may return different shapes depending on the API wrapper.
+      // Normalize to obtain the created message object.
+      const created = resp?.data?.data || resp?.data || resp || null;
 
-    const newMsg = {
-      user: "Admin System",
-      message: newMessage,
-      time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-      role: "Admin"
-    };
+      // Optimistically update selectedDispute.messages so the UI reflects the new message immediately.
+      setSelectedDispute(prev => {
+        const prevMsgs = Array.isArray(prev?.messages) ? prev.messages : [];
+        const newMsg = created && created.id ? created : (created && created.data ? created.data : null);
+        // If we couldn't determine a proper created message, fall back to building one locally
+        const built = newMsg || {
+          id: `local-${Date.now()}`,
+          disputeId: prev?.id || selectedDispute?.id,
+          senderId: null,
+          messageType: 'text',
+          message: newMessage,
+          attachments: null,
+          isInternal: false,
+          createdAt: new Date().toISOString()
+        };
 
-    const updatedDispute = {
-      ...selectedDispute,
-      messages: [...(selectedDispute.messages || []), newMsg]
-    };
+        return { ...(prev || {}), messages: [...prevMsgs, built] };
+      });
 
-    setSelectedDispute(updatedDispute);
-    setNewMessage("");
+      // Also attempt to refresh the dispute from server to get canonical data (non-blocking)
+      try {
+        const detailResp = await adminAPI.getDisputeById(selectedDispute.id);
+        const detailPayload = detailResp?.data || detailResp;
+        const canonical = detailPayload?.data || detailPayload || null;
+        if (canonical) {
+          setSelectedDispute(canonical);
+          // Refresh disputes list so counts/statistics update immediately
+          fetchDisputes();
+        } else {
+          // still refresh list to pick up new message count in list cards
+          fetchDisputes();
+        }
+      } catch (e) {
+        // non-fatal - we already updated the UI optimistically; still try to refresh list
+        console.warn('Failed to refresh dispute after sending message', e);
+        try { fetchDisputes(); } catch (__) {}
+      }
+
+      setNewMessage("");
+    } catch (err) {
+      console.error('Failed to send message', err);
+    }
   };
+
+  // Resolve dispute via store action
+  const handleResolve = async () => {
+    if (!selectedDispute) return;
+    try {
+      setResolving(true);
+      // Build payload: include resolution text and staffId if assigned
+      const payload = {
+        resolution: selectedDispute.resolution || 'Đã xử lý bởi quản trị viên',
+      };
+      if (selectedDispute.assigned_to) payload.staffId = selectedDispute.assigned_to;
+
+      await resolveDisputeAction(selectedDispute.id, payload);
+      // optimistic update
+      setSelectedDispute(prev => ({ ...(prev || {}), status: 'resolved' }));
+      // refresh list
+      fetchDisputes();
+    } catch (err) {
+      console.error('Failed to resolve dispute', err);
+    } finally {
+      setResolving(false);
+    }
+  };
+
+  // Assign dispute to staff
+  const handleAssign = async (staffId) => {
+    if (!selectedDispute) return;
+    try {
+      setResolving(true);
+      const updated = await useAdminStore.getState().assignDispute(selectedDispute.id, staffId);
+      setSelectedDispute(prev => ({ ...(prev || {}), assigned_to: updated.assigned_to || updated.assignedTo, assignedStaff: updated.assignedStaff || updated.assigned_staff || null }));
+      fetchDisputes();
+    } catch (err) {
+      console.error('Assign failed', err);
+    } finally {
+      setResolving(false);
+    }
+  };
+
+  // Parse financial impact from dispute fields (fallback to resolution string)
+  const parseFinancialImpact = (d) => {
+    const candidates = [d.financialImpact, d.financial_impact, d.estimatedCost, d.cost];
+    for (const c of candidates) {
+      if (typeof c === 'number' && !Number.isNaN(c)) return c;
+    }
+    // try to extract number from resolution text like "500,000" or "500000"
+    const text = (d.resolution || d.description || '').toString();
+    const match = text.match(/(\d{1,3}(?:[\.,]\d{3})*(?:[\.,]\d+)?)/);
+    if (match) {
+      // normalize number string
+      const numStr = match[0].replace(/[,\.]/g, '');
+      const n = parseInt(numStr, 10);
+      if (!Number.isNaN(n)) return n;
+    }
+    return null;
+  };
+
+  const getVehicleDisplay = (d) => {
+    // Try common places where vehicle info might appear on the dispute object
+    if (!d) return '-';
+    // If backend included a nested vehicle object
+    if (d.vehicle && typeof d.vehicle === 'object') {
+      return d.vehicle.vehicleName || d.vehicle.name || d.vehicle.license || d.vehicle.model || JSON.stringify(d.vehicle);
+    }
+    // Common flattened fields
+    if (d.vehicleName) return d.vehicleName;
+    if (d.car) return d.car;
+    if (d.licensePlate) return d.licensePlate;
+    // Fallback to group id (may represent vehicle group)
+    if (d.groupId || d.group_id) return d.groupId || d.group_id;
+    return '-';
+  };
+
+  const disputeStats = {
+    total: disputesList.length,
+    pending: disputesList.filter(d => d.status === 'pending' || d.status === 'open').length,
+    inProgress: disputesList.filter(d => d.status === 'in_progress' || d.status === 'investigating').length,
+    resolved: disputesList.filter(d => d.status === 'resolved' || d.status === 'closed').length,
+    totalFinancialImpact: disputesList.reduce((sum, dispute) => sum + (parseFinancialImpact(dispute) || 0), 0)
+  };
+
+  const unreadNotifications = notifications.filter(n => !n.read).length;
+
+  // Show loading state
+  if (loading && disputesList.length === 0) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -526,15 +607,7 @@ const DisputeManagement = () => {
                 </div>
               </div>
 
-              {/* Loading State */}
-              {loading && (
-                <div className="py-6">
-                  <LoadingSkeleton.ListSkeleton items={4} />
-                </div>
-              )}
-
               {/* Mobile Filters Modal */}
-              {!loading && (
               <AnimatePresence>
                 {mobileFiltersOpen && (
                   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end lg:hidden z-40">
@@ -582,10 +655,8 @@ const DisputeManagement = () => {
                   </div>
                 )}
               </AnimatePresence>
-              )}
 
               {/* Disputes Grid */}
-              {!loading && (
               <div className="space-y-4">
                 {filteredDisputes.map((dispute) => (
                   <motion.div
@@ -594,7 +665,23 @@ const DisputeManagement = () => {
                     animate={{ opacity: 1, y: 0 }}
                     whileHover={{ y: -2 }}
                     className="bg-white rounded-xl p-4 lg:p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all cursor-pointer group"
-                    onClick={() => setSelectedDispute(dispute)}
+                    onClick={async () => {
+                      // When a dispute card is clicked, fetch full detail (including messages)
+                      try {
+                        setSelectedLoading(true);
+                        const resp = await adminAPI.getDisputeById(dispute.id);
+                        const payload = resp?.data || resp;
+                        const canonical = payload?.data || payload || null;
+                        setSelectedDispute(canonical || dispute);
+                        // refresh list counts to reflect any differences (best-effort)
+                        fetchDisputes();
+                      } catch (e) {
+                        console.warn('Failed to load dispute detail, falling back to list item', e);
+                        setSelectedDispute(dispute);
+                      } finally {
+                        setSelectedLoading(false);
+                      }
+                    }}
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex-1">
@@ -608,14 +695,18 @@ const DisputeManagement = () => {
                         <p className="text-gray-600 mb-3">{dispute.description}</p>
                         
                         <div className="flex flex-wrap gap-3 lg:gap-4 text-sm text-gray-600">
-                          <div className="flex items-center space-x-1">
-                            <User className="w-4 h-4" />
-                            <span className="text-xs lg:text-sm">{dispute.users.join(", ")}</span>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <Car className="w-4 h-4" />
-                            <span className="text-xs lg:text-sm">{dispute.car}</span>
-                          </div>
+                            <div className="flex items-center space-x-1">
+                              <User className="w-4 h-4" />
+                              <span className="text-xs lg:text-sm">{dispute.filedBy || dispute.filed_by || '-'}</span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <User className="w-4 h-4" />
+                              <span className="text-xs lg:text-sm">{dispute.againstUser || dispute.against_user || '-'}</span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <Car className="w-4 h-4" />
+                              <span className="text-xs lg:text-sm">{getVehicleDisplay(dispute)}</span>
+                            </div>
                           <div className="flex items-center space-x-1">
                             <Calendar className="w-4 h-4" />
                             <span className="text-xs lg:text-sm">{dispute.createdAt}</span>
@@ -642,13 +733,28 @@ const DisputeManagement = () => {
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4 text-sm text-gray-600">
-                        <div className="flex items-center space-x-1">
-                          <MessageCircle className="w-4 h-4" />
-                          <span className="text-xs lg:text-sm">{dispute.messages.length} tin nhắn</span>
-                        </div>
+                        <div className="flex items-center space-x-4 text-sm text-gray-600">
+                          {/* <div className="flex items-center space-x-1">
+                            <MessageCircle className="w-4 h-4" />
+                            <span className="text-xs lg:text-sm">{Array.isArray(dispute.messages) ? dispute.messages.length : 0} tin nhắn</span>
+                        </div> */}
                       </div>
-                      <button className="text-blue-600 hover:text-blue-700 font-medium text-sm">
+                      <button className="text-blue-600 hover:text-blue-700 font-medium text-sm" onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          setSelectedLoading(true);
+                          const resp = await adminAPI.getDisputeById(dispute.id);
+                          const payload = resp?.data || resp;
+                          const canonical = payload?.data || payload || null;
+                          setSelectedDispute(canonical || dispute);
+                          fetchDisputes();
+                        } catch (err) {
+                          console.warn('Failed to load dispute detail', err);
+                          setSelectedDispute(dispute);
+                        } finally {
+                          setSelectedLoading(false);
+                        }
+                      }}>
                         Xem chi tiết
                       </button>
                     </div>
@@ -667,13 +773,15 @@ const DisputeManagement = () => {
                   </motion.div>
                 )}
               </div>
-              )}
             </div>
 
             {/* Dispute Detail Sidebar */}
-            {!loading && (
             <div className="lg:col-span-1">
-              {selectedDispute ? (
+              {selectedLoading && selectedDispute ? (
+                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 sticky top-8 flex items-center justify-center">
+                  <LoadingSpinner />
+                </div>
+              ) : selectedDispute ? (
                 <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm border border-gray-100 sticky top-8">
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-lg lg:text-xl font-semibold text-gray-900">Chi tiết tranh chấp</h3>
@@ -699,17 +807,29 @@ const DisputeManagement = () => {
                         </div>
                         <div>
                           <label className="text-sm text-gray-600">Thành viên liên quan</label>
-                          <p className="font-medium text-sm lg:text-base">{selectedDispute.users.join(", ")}</p>
+                          <p className="font-medium text-sm lg:text-base">{selectedDispute.filedBy || selectedDispute.filed_by || '-'}{selectedDispute.againstUser || selectedDispute.against_user ? ` — ${selectedDispute.againstUser || selectedDispute.against_user}` : ''}</p>
                         </div>
                         <div>
                           <label className="text-sm text-gray-600">Xe</label>
-                          <p className="font-medium text-sm lg:text-base">{selectedDispute.car}</p>
+                          <p className="font-medium text-sm lg:text-base">{getVehicleDisplay(selectedDispute)}</p>
                         </div>
-                        {selectedDispute.financialImpact > 0 && (
+                        <div>
+                          <label className="text-sm text-gray-600">Đang xử lý</label>
+                          <p className="font-medium text-sm lg:text-base">{
+                            selectedDispute.assignedStaff
+                              ? `${selectedDispute.assignedStaff.employeeId} — ${selectedDispute.assignedStaff.position}`
+                              : (selectedDispute.assigned_to ? selectedDispute.assigned_to : 'Chưa phân công')
+                          }</p>
+                        </div>
+                        <div>
+                          <label className="text-sm text-gray-600">Số tin nhắn</label>
+                          <p className="font-medium text-sm lg:text-base">{Array.isArray(selectedDispute.messages) ? selectedDispute.messages.length : 0}</p>
+                        </div>
+                        {parseFinancialImpact(selectedDispute) > 0 && (
                           <div>
                             <label className="text-sm text-gray-600">Thiệt hại tài chính</label>
                             <p className="font-medium text-red-600 text-sm lg:text-base">
-                              {selectedDispute.financialImpact.toLocaleString('vi-VN')} VND
+                              {parseFinancialImpact(selectedDispute).toLocaleString('vi-VN')} VND
                             </p>
                           </div>
                         )}
@@ -719,29 +839,29 @@ const DisputeManagement = () => {
                     <div>
                       <h4 className="font-medium text-gray-900 mb-3">Lịch sử tin nhắn</h4>
                       <div className="space-y-3 max-h-60 overflow-y-auto">
-                        {selectedDispute.messages.map((message, index) => (
-                          <div key={index} className={`rounded-lg p-3 ${
-                            message.role === 'Admin' ? 'bg-blue-50 border border-blue-200' :
-                            message.role === 'Staff' ? 'bg-green-50 border border-green-200' :
+                        {(selectedDispute?.messages || []).map((message) => (
+                          <div key={message.id || message._id || message.createdAt} className={`rounded-lg p-3 ${
+                            (message.role === 'Admin') ? 'bg-blue-50 border border-blue-200' :
+                            (message.role === 'Staff') ? 'bg-green-50 border border-green-200' :
                             'bg-gray-50 border border-gray-200'
                           }`}>
                             <div className="flex justify-between items-start mb-1">
                               <div className="flex items-center space-x-2">
                                 <span className={`font-medium text-sm ${
-                                  message.role === 'Admin' ? 'text-blue-900' :
-                                  message.role === 'Staff' ? 'text-green-900' : 'text-gray-900'
+                                  (message.role === 'Admin') ? 'text-blue-900' :
+                                  (message.role === 'Staff') ? 'text-green-900' : 'text-gray-900'
                                 }`}>
-                                  {message.user}
+                                  {message.user || message.senderName || message.senderId || 'System'}
                                 </span>
                                 <span className={`px-2 py-1 rounded-full text-xs ${
-                                  message.role === 'Admin' ? 'bg-blue-100 text-blue-800' :
-                                  message.role === 'Staff' ? 'bg-green-100 text-green-800' :
+                                  (message.role === 'Admin') ? 'bg-blue-100 text-blue-800' :
+                                  (message.role === 'Staff') ? 'bg-green-100 text-green-800' :
                                   'bg-gray-100 text-gray-800'
                                 }`}>
-                                  {message.role}
+                                  {message.role || (message.senderId ? 'Staff' : 'System')}
                                 </span>
                               </div>
-                              <span className="text-xs text-gray-500">{message.time}</span>
+                              <span className="text-xs text-gray-500">{message.time || message.createdAt}</span>
                             </div>
                             <p className="text-gray-700 text-sm">{message.message}</p>
                           </div>
@@ -753,6 +873,7 @@ const DisputeManagement = () => {
                       <h4 className="font-medium text-gray-900 mb-3">Phản hồi</h4>
                       <div className="flex space-x-2">
                         <input
+                          id="dispute-message-input"
                           type="text"
                           value={newMessage}
                           onChange={(e) => setNewMessage(e.target.value)}
@@ -772,19 +893,80 @@ const DisputeManagement = () => {
                     <div>
                       <h4 className="font-medium text-gray-900 mb-3">Hành động</h4>
                       <div className="grid grid-cols-2 gap-2">
-                        <button className="bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 text-sm">
+                        <button
+                          onClick={() => document.getElementById('dispute-message-input')?.focus()}
+                          className="bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 text-sm"
+                        >
                           <MessageCircle className="w-4 h-4" />
                           <span>Phản hồi</span>
                         </button>
-                        <button className="bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 text-sm">
-                          <CheckCircle className="w-4 h-4" />
-                          <span>Giải quyết</span>
-                        </button>
-                        <button className="bg-amber-600 text-white py-2 rounded-lg hover:bg-amber-700 transition-colors flex items-center justify-center space-x-2 text-sm">
+
+                        {/* If not assigned, show staff dropdown assign control */}
+                        {selectedDispute && !selectedDispute.assigned_to ? (
+                          <div className="flex">
+                            <select
+                              onFocus={() => fetchStaff()}
+                              onChange={(e) => handleAssign(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                              defaultValue=""
+                            >
+                              <option key="placeholder" value="">Chuyển cho nhân viên...</option>
+                              {staff.map(s => (
+                                <option key={s.id} value={s.id}>{s.employeeId} — {s.position}</option>
+                              ))}
+                            </select>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={handleResolve}
+                            disabled={resolving}
+                            className={`py-2 rounded-lg transition-colors flex items-center justify-center space-x-2 text-sm ${resolving ? 'bg-green-400 text-white' : 'bg-green-600 text-white hover:bg-green-700'}`}
+                          >
+                            {resolving ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <CheckCircle className="w-4 h-4" />
+                            )}
+                            <span>{resolving ? 'Đang xử lý...' : 'Giải quyết'}</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={async () => {
+                            try {
+                              await pauseDispute(selectedDispute.id);
+                              // refresh selected dispute
+                              const resp = await adminAPI.getDisputeById(selectedDispute.id);
+                              const payload = resp?.data || resp;
+                              setSelectedDispute(payload?.data || payload || selectedDispute);
+                            } catch (err) {
+                              console.error('Pause failed', err);
+                            }
+                          }}
+                          className="bg-amber-600 text-white py-2 rounded-lg hover:bg-amber-700 transition-colors flex items-center justify-center space-x-2 text-sm"
+                        >
                           <Clock className="w-4 h-4" />
                           <span>Tạm dừng</span>
                         </button>
-                        <button className="bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center space-x-2 text-sm">
+                        <button
+                          onClick={async () => {
+                            try {
+                              // Export single dispute (BP)
+                              const res = await adminAPI.exportDisputePDF(selectedDispute.id, { period: '30' });
+                              // res is axios response with blob
+                              const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+                              const link = document.createElement('a');
+                              link.href = url;
+                              const filename = `dispute-${selectedDispute.disputeNumber || selectedDispute.id}.pdf`;
+                              link.setAttribute('download', filename);
+                              document.body.appendChild(link);
+                              link.click();
+                              link.parentNode.removeChild(link);
+                            } catch (err) {
+                              console.error('Export failed', err);
+                            }
+                          }}
+                          className="bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center space-x-2 text-sm"
+                        >
                           <FileText className="w-4 h-4" />
                           <span>Xuất BP</span>
                         </button>
@@ -800,7 +982,6 @@ const DisputeManagement = () => {
                 </div>
               )}
             </div>
-            )}
           </div>
         </main>
       </div>

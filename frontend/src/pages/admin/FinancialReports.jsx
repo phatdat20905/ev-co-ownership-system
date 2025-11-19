@@ -1,25 +1,37 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import LoadingSkeleton from '../../components/LoadingSkeleton';
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { BarChart3, Download, Filter, Calendar, DollarSign, Users, Car, QrCode, TrendingUp, TrendingDown, Eye, FileText, PieChart, CreditCard, Wallet, ChevronDown, X, MoreVertical, Bell, User, LogOut, Menu, AlertTriangle, Wrench } from "lucide-react";
-import adminService from "../../services/adminService";
-import { toast } from "../../utils/toast";
+import { useFinancialStore } from "../../store/financialStore";
+import { useAdminStore } from "../../store/adminStore";
+import { useAuthStore } from "../../store/authStore";
+import showToast, { getErrorMessage } from '../../utils/toast';
+import LoadingSpinner from "../../components/common/LoadingSpinner";
 
 const FinancialReports = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout } = useAuthStore();
+  const { 
+    financialOverview, 
+    revenueReport, 
+    expenseReport, 
+    carPerformance: storeCarPerformance,
+    loading, 
+    error,
+    fetchFinancialOverview, 
+    fetchRevenueReport, 
+    fetchExpenseReport,
+    fetchCarPerformance,
+    exportFinancialReport 
+  } = useFinancialStore();
+  const { notifications: storeNotifications, fetchNotifications } = useAdminStore();
+  
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dateRange, setDateRange] = useState("month");
   const [selectedReport, setSelectedReport] = useState(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-
-  // API State
-  const [financialData, setFinancialData] = useState(null);
-  const [userAnalytics, setUserAnalytics] = useState(null);
-  const [bookingAnalytics, setBookingAnalytics] = useState(null);
-  const [loading, setLoading] = useState(true);
 
   // Thêm state cho dropdown menus
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -29,95 +41,21 @@ const FinancialReports = () => {
   const userMenuRef = useRef(null);
   const notificationsRef = useRef(null);
 
-  // Fetch data when dateRange changes
+  // Fetch financial data on mount
   useEffect(() => {
-    fetchAnalyticsData();
-  }, [dateRange]);
-
-  const fetchAnalyticsData = async () => {
-    try {
-      setLoading(true);
-      const { startDate, endDate } = getDateRangeValues(dateRange);
-      
-      const [financial, users, bookings] = await Promise.all([
-        adminService.getFinancialAnalytics(startDate, endDate),
-        adminService.getUserAnalytics(startDate, endDate),
-        adminService.getBookingAnalytics(startDate, endDate)
-      ]);
-
-      // apiClient returns response.data via interceptor, so the service already returns the payload
-      setFinancialData(financial);
-      setUserAnalytics(users);
-      setBookingAnalytics(bookings);
-    } catch (error) {
-      console.error("Error fetching analytics:", error);
-      toast.error("Không thể tải dữ liệu báo cáo");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getDateRangeValues = (range) => {
-    const now = new Date();
-    let startDate, endDate = now.toISOString();
-
-    switch (range) {
-      case "week":
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-        break;
-      case "month":
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-        break;
-      case "quarter":
-        const quarter = Math.floor(now.getMonth() / 3);
-        startDate = new Date(now.getFullYear(), quarter * 3, 1).toISOString();
-        break;
-      case "year":
-        startDate = new Date(now.getFullYear(), 0, 1).toISOString();
-        break;
-      default:
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    }
-
-    return { startDate, endDate };
-  };
-
-  const handleExportReport = async (reportType) => {
-    try {
-      const { startDate, endDate } = getDateRangeValues(dateRange);
-      const response = await adminService.exportAnalytics(reportType, startDate, endDate);
-      
-      // response is a Blob returned by apiClient (interceptor returns response.data)
-      const blob = response instanceof Blob ? response : new Blob([response]);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `report_${reportType}_${dateRange}.xlsx`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-
-      toast.success("Đã xuất báo cáo thành công");
-    } catch (error) {
-      console.error("Error exporting report:", error);
-      toast.error("Không thể xuất báo cáo");
-    }
-  };
-
-  // Notifications data
-  const [notifications, setNotifications] = useState([
-    { id: 1, title: "Báo cáo mới", message: "Báo cáo tháng 11 đã sẵn sàng", time: "5 phút trước", type: "info", read: false },
-    { id: 2, title: "Cập nhật hệ thống", message: "Cập nhật hệ thống lúc 02:00", time: "2 giờ trước", type: "info", read: true },
-    { id: 3, title: "Báo cáo tài chính", message: "Báo cáo quý 4 đang được xử lý", time: "1 ngày trước", type: "warning", read: true }
-  ]);
+    const params = { period: dateRange };
+    fetchFinancialOverview(params);
+    fetchRevenueReport(params);
+  fetchExpenseReport(params);
+  // Fetch vehicle/car performance metrics
+  fetchCarPerformance(params);
+    fetchNotifications({ limit: 20 });
+  }, [dateRange, fetchFinancialOverview, fetchRevenueReport, fetchExpenseReport, fetchCarPerformance, fetchNotifications]);
 
   // Hàm xử lý đăng xuất
   const handleLogout = () => {
-    const { clearAuth } = require('../../utils/storage');
-    clearAuth();
-    window.dispatchEvent(new Event('storage'));
-    navigate('/');
+    logout();
+    navigate("/");
   };
 
   // useEffect để đóng dropdown khi click ra ngoài
@@ -157,20 +95,115 @@ const FinancialReports = () => {
 
   const activeTab = getActiveTab();
 
-  const unreadNotifications = notifications.filter(n => !n.read).length;
-
-  // Extract data từ API responses với safe defaults
-  const safeFinancialData = financialData || {
+  // Use data from store or fallback to default
+  const notifications = storeNotifications || [];
+  const financialData = financialOverview || {
     revenue: { current: 0, previous: 0, growth: 0 },
     expenses: { current: 0, previous: 0, growth: 0 },
     profit: { current: 0, previous: 0, growth: 0 },
     utilization: { current: 0, previous: 0, growth: 0 }
   };
 
-  const revenueBreakdown = financialData?.revenueBreakdown || [];
-  const expenseBreakdown = financialData?.expenseBreakdown || [];
-  const carPerformance = bookingAnalytics?.carPerformance || [];
-  const reports = financialData?.reports || [];
+  const revenueBreakdown = revenueReport?.breakdown || [];
+  const expenseBreakdown = expenseReport?.breakdown || [];
+
+  // Reports list derived from real API data (financialOverview, revenueReport, expenseReport)
+  const [reportsList, setReportsList] = useState([]);
+
+  // Utility to estimate a "size" string from an object (approximate)
+  const estimateSize = (obj) => {
+    try {
+      const bytes = new TextEncoder().encode(JSON.stringify(obj || {})).length;
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    } catch (e) {
+      return '-';
+    }
+  };
+
+  useEffect(() => {
+    const list = [];
+    const dateLabel = (() => {
+      if (dateRange === 'week') return 'Tuần này';
+      if (dateRange === 'month') return 'Tháng này';
+      if (dateRange === 'quarter') return 'Quý này';
+      if (dateRange === 'year') return 'Năm nay';
+      return dateRange;
+    })();
+
+    if (revenueReport) {
+      list.push({
+        id: `revenue_${dateRange}`,
+        title: `Báo cáo doanh thu - ${dateLabel}`,
+        type: 'Doanh thu',
+        period: dateLabel,
+        generatedDate: (revenueReport.generatedAt || new Date()).toString().split('T')[0],
+        size: estimateSize(revenueReport),
+        status: 'completed',
+        raw: revenueReport,
+      });
+    }
+
+    if (expenseReport) {
+      list.push({
+        id: `expense_${dateRange}`,
+        title: `Báo cáo chi phí - ${dateLabel}`,
+        type: 'Chi phí',
+        period: dateLabel,
+        generatedDate: (expenseReport.generatedAt || new Date()).toString().split('T')[0],
+        size: estimateSize(expenseReport),
+        status: 'completed',
+        raw: expenseReport,
+      });
+    }
+
+    if (financialOverview) {
+      list.unshift({
+        id: `overview_${dateRange}`,
+        title: `Tổng quan tài chính - ${dateLabel}`,
+        type: 'Tổng hợp',
+        period: dateLabel,
+        generatedDate: (financialOverview.generatedAt || new Date()).toString().split('T')[0],
+        size: estimateSize(financialOverview),
+        status: 'completed',
+        raw: financialOverview,
+      });
+    }
+
+    setReportsList(list);
+  }, [revenueReport, expenseReport, financialOverview, dateRange]);
+
+  // Prefer dedicated carPerformance from store; fallback to financialOverview.carPerformance
+  const carPerformance = (storeCarPerformance && storeCarPerformance.length) ? storeCarPerformance : (financialOverview?.carPerformance || []);
+
+  const unreadNotifications = notifications.filter(n => !n.read).length;
+
+  // Handle export report (supports format: 'pdf' or 'xlsx')
+  const handleExportReport = async (reportType, format = 'xlsx') => {
+    try {
+      await exportFinancialReport(reportType, { period: dateRange, format });
+      showToast.success(`Đã export báo cáo (${format.toUpperCase()}) thành công`);
+    } catch (error) {
+      const msg = getErrorMessage(error) || 'Không thể export báo cáo';
+      showToast.error(msg);
+    }
+  };
+
+  // Map human-friendly report types to backend export types
+  const mapReportType = (label) => {
+    if (!label) return 'overview';
+    const lower = label.toString().toLowerCase();
+    if (lower.includes('doanh thu') || lower.includes('revenue')) return 'revenue';
+    if (lower.includes('chi phí') || lower.includes('chi phi') || lower.includes('expenses')) return 'expenses';
+    if (lower.includes('tổng hợp') || lower.includes('tong hop')) return 'overview';
+    return 'overview';
+  };
+
+  // Show loading spinner
+  if (loading && !financialOverview) {
+    return <LoadingSpinner />;
+  }
 
   const StatCard = ({ title, value, change, icon, color }) => (
     <motion.div
@@ -445,7 +478,7 @@ const FinancialReports = () => {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => handleExportReport('financial')}
+                onClick={() => handleExportReport('overview')}
                 className="bg-blue-600 text-white px-4 lg:px-6 py-2 lg:py-3 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors shadow-sm text-sm lg:text-base"
               >
                 <Download className="w-4 h-4 lg:w-5 lg:h-5" />
@@ -520,42 +553,33 @@ const FinancialReports = () => {
             )}
           </AnimatePresence>
 
-          {/* Loading State */}
-          {loading && (
-            <div className="py-6">
-              <LoadingSkeleton.ListSkeleton items={4} />
-            </div>
-          )}
-
           {/* Financial Overview */}
-          {!loading && (
-          <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-6 lg:mb-8">
             <StatCard
               title="Tổng doanh thu"
-              value={safeFinancialData.revenue.current}
-              change={safeFinancialData.revenue.growth}
+              value={financialData.revenue.current}
+              change={financialData.revenue.growth}
               icon={<DollarSign className="w-4 h-4 lg:w-6 lg:h-6" />}
               color="bg-green-500"
             />
             <StatCard
               title="Tổng chi phí"
-              value={safeFinancialData.expenses.current}
-              change={safeFinancialData.expenses.growth}
+              value={financialData.expenses.current}
+              change={financialData.expenses.growth}
               icon={<CreditCard className="w-4 h-4 lg:w-6 lg:h-6" />}
               color="bg-red-500"
             />
             <StatCard
               title="Lợi nhuận"
-              value={safeFinancialData.profit.current}
-              change={safeFinancialData.profit.growth}
+              value={financialData.profit.current}
+              change={financialData.profit.growth}
               icon={<TrendingUp className="w-4 h-4 lg:w-6 lg:h-6" />}
               color="bg-blue-500"
             />
             <StatCard
               title="Tỷ lệ sử dụng"
-              value={safeFinancialData.utilization.current + '%'}
-              change={safeFinancialData.utilization.growth}
+              value={financialData.utilization.current + '%'}
+              change={financialData.utilization.growth}
               icon={<BarChart3 className="w-4 h-4 lg:w-6 lg:h-6" />}
               color="bg-purple-500"
             />
@@ -639,6 +663,16 @@ const FinancialReports = () => {
               <Car className="w-5 h-5 text-gray-600" />
             </div>
             <div className="overflow-x-auto">
+              <div className="flex items-center justify-between mb-4">
+                <div />
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => fetchCarPerformance({ period: dateRange })}
+                    className="px-3 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 text-sm"
+                  >Làm mới</button>
+                </div>
+              </div>
+
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
@@ -651,40 +685,63 @@ const FinancialReports = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {carPerformance.map((car, index) => (
-                    <tr key={index} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center space-x-3">
-                          <Car className="w-4 h-4 lg:w-5 lg:h-5 text-blue-600" />
-                          <span className="font-medium text-gray-900 text-sm lg:text-base">{car.name}</span>
+                  {(!carPerformance || carPerformance.length === 0) ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 lg:px-6 py-8 text-center text-sm text-gray-500">
+                        Không có dữ liệu hiệu suất xe cho khoảng thời gian này.
+                        <div className="mt-3">
+                          <button
+                            onClick={() => fetchCarPerformance({ period: dateRange })}
+                            className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm"
+                          >Thử làm mới</button>
                         </div>
-                      </td>
-                      <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
-                        {(car.revenue / 1000000).toFixed(1)}M
-                      </td>
-                      <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center space-x-2">
-                          <ProgressBar percentage={car.utilization} color="bg-blue-500" />
-                          <span className="text-sm text-gray-900">{car.utilization}%</span>
-                        </div>
-                      </td>
-                      <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-red-600">
-                        {(car.cost / 1000000).toFixed(1)}M
-                      </td>
-                      <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
-                        {(car.profit / 1000000).toFixed(1)}M
-                      </td>
-                      <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 lg:px-3 py-1 rounded-full text-xs font-medium ${
-                          car.profit / car.revenue > 0.7 ? 'bg-green-100 text-green-800 border border-green-200' :
-                          car.profit / car.revenue > 0.5 ? 'bg-amber-100 text-amber-800 border border-amber-200' :
-                          'bg-red-100 text-red-800 border border-red-200'
-                        }`}>
-                          {((car.profit / car.revenue) * 100).toFixed(0)}%
-                        </span>
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    carPerformance.map((car, index) => {
+                      const revenue = Number(car.revenue || 0);
+                      const cost = Number(car.cost || 0);
+                      const profit = Number(car.profit || (revenue - cost));
+                      const utilization = Number(car.utilization || 0);
+                      const profitPct = revenue > 0 ? (profit / revenue) : 0;
+                      const key = car.vehicleId || car.id || car.vehicleName || index;
+
+                      return (
+                        <tr key={key} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center space-x-3">
+                              <Car className="w-4 h-4 lg:w-5 lg:h-5 text-blue-600" />
+                              <span className="font-medium text-gray-900 text-sm lg:text-base">{car.vehicleName || car.name || '—'}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
+                            {(revenue / 1000000).toFixed(1)}M
+                          </td>
+                          <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center space-x-2">
+                              <ProgressBar percentage={Math.min(Math.max(utilization, 0), 100)} color="bg-blue-500" />
+                              <span className="text-sm text-gray-900">{Math.round(utilization)}%</span>
+                            </div>
+                          </td>
+                          <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-red-600">
+                            {(cost / 1000000).toFixed(1)}M
+                          </td>
+                          <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
+                            {(profit / 1000000).toFixed(1)}M
+                          </td>
+                          <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 lg:px-3 py-1 rounded-full text-xs font-medium ${
+                              profitPct > 0.7 ? 'bg-green-100 text-green-800 border border-green-200' :
+                              profitPct > 0.5 ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                              'bg-red-100 text-red-800 border border-red-200'
+                            }`}>
+                              {Math.round(profitPct * 100)}%
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
@@ -721,7 +778,7 @@ const FinancialReports = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {reports.map((report) => (
+                  {reportsList.map((report) => (
                     <tr key={report.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 lg:px-6 py-4">
                         <div className="flex items-center space-x-3">
@@ -754,7 +811,10 @@ const FinancialReports = () => {
                             <Eye className="w-4 h-4" />
                             <span>Xem</span>
                           </button>
-                          <button className="text-green-600 hover:text-green-900 flex items-center space-x-1 text-xs lg:text-sm">
+                          <button 
+                            onClick={() => handleExportReport(mapReportType(report.type), 'xlsx')}
+                            className="text-green-600 hover:text-green-900 flex items-center space-x-1 text-xs lg:text-sm"
+                          >
                             <Download className="w-4 h-4" />
                             <span>Tải</span>
                           </button>
@@ -766,8 +826,6 @@ const FinancialReports = () => {
               </table>
             </div>
           </div>
-          </>
-          )}
         </main>
       </div>
 
@@ -849,11 +907,17 @@ const FinancialReports = () => {
 
                 {/* Action Buttons */}
                 <div className="flex flex-col lg:flex-row space-y-3 lg:space-y-0 lg:space-x-3 pt-6 border-t border-gray-200">
-                  <button className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 text-sm lg:text-base">
+                  <button
+                    onClick={() => handleExportReport(mapReportType(selectedReport.type), 'pdf')}
+                    className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 text-sm lg:text-base"
+                  >
                     <Download className="w-4 h-4 lg:w-5 lg:h-5" />
                     <span>Tải PDF</span>
                   </button>
-                  <button className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 text-sm lg:text-base">
+                  <button
+                    onClick={() => handleExportReport(mapReportType(selectedReport.type), 'xlsx')}
+                    className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 text-sm lg:text-base"
+                  >
                     <FileText className="w-4 h-4 lg:w-5 lg:h-5" />
                     <span>Tải Excel</span>
                   </button>

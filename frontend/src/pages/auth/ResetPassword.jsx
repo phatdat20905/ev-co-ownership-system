@@ -1,34 +1,34 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle, Circle, Eye, EyeOff, Loader2, Lock } from "lucide-react";
-import LoadingSkeleton from '../../components/LoadingSkeleton';
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Footer from "../../components/layout/Footer";
 import Header from "../../components/layout/Header";
-import authService from "../../services/authService";
-import { showSuccessToast, showErrorToast } from "../../utils/toast";
+import { authAPI } from "../../api";
+
 
 export default function ResetPassword() {
-  const [searchParams] = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState("");
+  const [token, setToken] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isFocused, setIsFocused] = useState(false);
-  const [token, setToken] = useState("");
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
+  // Get token from URL query params
   useEffect(() => {
-    const resetToken = searchParams.get('token');
-    if (!resetToken) {
-      showErrorToast('Token không hợp lệ');
-      navigate('/forgot-password');
+    const tokenParam = searchParams.get("token");
+    if (!tokenParam) {
+      setError("Link đặt lại mật khẩu không hợp lệ. Vui lòng yêu cầu link mới.");
     } else {
-      setToken(resetToken);
+      setToken(tokenParam);
     }
-  }, [searchParams, navigate]);
+  }, [searchParams]);
 
   // Các điều kiện mật khẩu
   const conditions = [
@@ -58,27 +58,35 @@ export default function ResetPassword() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (password !== confirmPassword) {
-      showErrorToast('Mật khẩu xác nhận không khớp');
-      return;
-    }
-
-    if (!conditions.every(c => c.valid)) {
-      showErrorToast('Mật khẩu không đáp ứng yêu cầu');
-      return;
-    }
-
     setLoading(true);
+    setError("");
+
+    // Validation
+    if (!token) {
+      setError("Link đặt lại mật khẩu không hợp lệ!");
+      setLoading(false);
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Mật khẩu xác nhận không khớp!");
+      setLoading(false);
+      return;
+    }
+
+    if (strength < 3) {
+      setError("Mật khẩu chưa đủ mạnh!");
+      setLoading(false);
+      return;
+    }
 
     try {
-      await authService.resetPassword(token, password);
+      await authAPI.resetPassword(token, password);
+
       setSuccess(true);
-      showSuccessToast('Đặt lại mật khẩu thành công!');
-      setTimeout(() => navigate("/login"), 2000);
-    } catch (error) {
-      showErrorToast(error.message || 'Đặt lại mật khẩu thất bại');
-    } finally {
+      setTimeout(() => navigate("/login"), 3000);
+    } catch (err) {
+      setError(err.response?.data?.message || "Đặt lại mật khẩu thất bại. Link có thể đã hết hạn!");
       setLoading(false);
     }
   };
@@ -101,6 +109,17 @@ export default function ResetPassword() {
               <h2 className="text-3xl font-bold text-center text-sky-700 mb-8 tracking-tight">
                 Đặt lại mật khẩu
               </h2>
+
+              {/* Error message */}
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm"
+                >
+                  {error}
+                </motion.div>
+              )}
 
               <form className="space-y-6" onSubmit={handleSubmit}>
                 {/* Mật khẩu mới */}
@@ -210,16 +229,16 @@ export default function ResetPassword() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-sky-500 to-sky-600 text-white hover:from-sky-600 hover:to-sky-700 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+                  className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-sky-500 to-sky-600 text-white hover:from-sky-600 hover:to-sky-700 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? (
-                      <>
-                        <LoadingSkeleton.Skeleton className="h-5 w-5" variant="circular" />
-                        Đang cập nhật...
-                      </>
-                    ) : (
-                      "Đặt lại mật khẩu"
-                    )}
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Đang cập nhật...
+                    </>
+                  ) : (
+                    "Đặt lại mật khẩu"
+                  )}
                 </button>
               </form>
             </>

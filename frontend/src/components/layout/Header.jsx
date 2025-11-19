@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Search, Bell, Menu, X, Car, User, LogOut, Settings, ChevronDown } from "lucide-react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import NotificationCenter from "../notifications/NotificationCenter";
-import { useUserStore } from '../../stores/useUserStore';
-import { useAuthStore } from '../../stores/useAuthStore';
-import { clearAuth, getUserData, getAuthToken } from '../../utils/storage';
+import { useAuthStore } from "../../store";
+import { socketClient } from "../../services/socketClient";
+import { toast } from 'react-toastify';
 
 // Hàm cuộn 
 const smoothScrollTo = (targetPosition, duration = 600) => {
@@ -31,35 +30,18 @@ export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userData, setUserData] = useState(null);
-  const user = useUserStore(state => state.user);
-  const token = useAuthStore(state => state.token);
+  // Auth state comes from Zustand store
+  const { isAuthenticated, user } = useAuthStore();
+  const [notifCount, setNotifCount] = useState(0);
   const [openDropdown, setOpenDropdown] = useState(null);
   const [activeSection, setActiveSection] = useState("");
   
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout } = useAuthStore();
 
-  // Kiểm tra trạng thái đăng nhập
-  useEffect(() => {
-    // Subscribe to zustand stores via local selectors
-    setIsLoggedIn(!!token && !!user);
-    setUserData(user || null);
-
-    const onStorage = () => {
-      // fallback for legacy listeners that still write to localStorage
-      try {
-        const storedUser = getUserData();
-        setUserData(storedUser);
-        setIsLoggedIn(!!getAuthToken() && !!storedUser);
-      } catch (e) {}
-    };
-
-    window.addEventListener('storage', onStorage);
-
-    return () => window.removeEventListener('storage', onStorage);
-  }, [token, user]);
+  // Header now derives auth state directly from Zustand (`isAuthenticated` and `user`)
+  // This avoids polling localStorage and keeps UI in sync with the global store.
 
   useEffect(() => {
     const handleScroll = () => {
@@ -106,6 +88,28 @@ export default function Header() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
+  // Subscribe to in-app notifications when authenticated
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const handler = (payload) => {
+      try {
+        const title = payload.title || 'Thông báo mới';
+        const body = payload.message || payload.body || '';
+        toast.info(<div><strong>{title}</strong><div>{body}</div></div>);
+        setNotifCount(c => c + 1);
+      } catch (err) {
+        console.warn('Error handling notification', err);
+      }
+    };
+
+    socketClient.onNotification(handler);
+
+    return () => {
+      socketClient.offNotification(handler);
+    };
+  }, [isAuthenticated]);
+
   // Xử lý active 
   useEffect(() => {
     const contactPages = [
@@ -120,12 +124,22 @@ export default function Header() {
   }, [location.pathname]);
 
   const handleLogout = () => {
-    clearAuth();
-    setIsLoggedIn(false);
-    setUserData(null);
-    setIsUserMenuOpen(false);
-    navigate('/');
-    window.dispatchEvent(new Event('storage'));
+    // Use the auth store logout so Zustand state and persisted storage are cleared
+    // and other parts of the app observing the auth store update correctly.
+    (async () => {
+      try {
+        await logout();
+      } catch (err) {
+        // ignore logout errors, still proceed to navigate
+        console.error('Logout failed', err);
+      } finally {
+        setIsUserMenuOpen(false);
+        // navigate to home after logout
+        navigate('/');
+        // trigger storage event for any legacy listeners
+        window.dispatchEvent(new Event('storage'));
+      }
+    })();
   };
 
   // Các nhóm chức năng cho Co-owner
@@ -348,11 +362,11 @@ export default function Header() {
             
             {/* Desktop Navigation */}
             <nav className="hidden lg:flex items-center gap-1">
-              {isLoggedIn ? (
+              {isAuthenticated ? (
                 <>
                   {/* Dashboard Link */}
                   <Link
-                    to="/coowner"
+                    to="/dashboard/coowner"
                     className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-300 hover:text-sky-600 hover:scale-105 ${
                       isDashboardActive() ? 'text-sky-600 bg-sky-50' : 'text-gray-600'
                     }`}
@@ -427,20 +441,29 @@ export default function Header() {
             </button>
 
             {/* Notification icon - CHỈ hiển thị khi đã login */}
-            {isLoggedIn && <NotificationCenter />}
+            {isAuthenticated && (
+              <button className="relative flex items-center justify-center w-10 h-10 bg-gray-100 rounded-full hover:bg-gray-200 cursor-pointer transition-all duration-300 hover:scale-110">
+                  <Bell className="h-5 w-5 text-gray-600" />
+                  {notifCount > 0 ? (
+                    <span className="absolute top-0 -right-0 text-[10px] min-w-[16px] h-4 leading-4 px-1 bg-red-500 text-white rounded-full flex items-center justify-center">{notifCount}</span>
+                  ) : (
+                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" />
+                  )}
+                </button>
+            )}
 
             {/* Auth Buttons hoặc User Menu */}
-            {isLoggedIn ? (
+            {isAuthenticated ? (
               <div className="relative user-menu-container">
                 <button
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                   className="flex items-center gap-3 px-4 py-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-all duration-300"
                 >
                   <div className="w-8 h-8 bg-sky-600 rounded-full flex items-center justify-center text-white font-medium">
-                    {userData?.name?.charAt(0) || 'U'}
+                    {user?.name?.charAt(0) || 'U'}
                   </div>
                   <span className="text-sm text-gray-700 font-medium">
-                    {userData?.name || 'User'}
+                    {user?.name || 'User'}
                   </span>
                 </button>
 
@@ -448,8 +471,8 @@ export default function Header() {
                 {isUserMenuOpen && (
                   <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-200 py-2 z-50">
                     <div className="px-4 py-3 border-b border-gray-100">
-                      <p className="text-sm font-medium text-gray-900">{userData?.name}</p>
-                      <p className="text-xs text-gray-500 truncate">{userData?.email}</p>
+                      <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+                      <p className="text-xs text-gray-500 truncate">{user?.email}</p>
                     </div>
                     {userMenuItems.map((item, index) => (
                       <button
@@ -506,11 +529,11 @@ export default function Header() {
             : "max-h-0 opacity-0"
         }`}>
           <div className="px-6 py-4 space-y-2">
-            {isLoggedIn ? (
+            {isAuthenticated ? (
               <>
                 {/* Dashboard Link */}
                 <Link
-                  to="/coowner"
+                  to="/dashboard/coowner"
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={`block w-full text-left py-3 px-4 text-sm font-medium rounded-lg transition-colors ${
                     isDashboardActive() 
@@ -621,7 +644,7 @@ export default function Header() {
                 </button>
                 
                 {/* Notification icon - CHỈ hiển thị khi đã login */}
-                {isLoggedIn && (
+                {isAuthenticated && (
                   <button className="flex-1 p-3 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors relative">
                     <Bell className="w-5 h-5 mx-auto" />
                     <span className="absolute top-2 right-6 w-2 h-2 bg-red-500 rounded-full"></span>
@@ -629,14 +652,14 @@ export default function Header() {
                 )}
               </div>
               
-              {isLoggedIn ? (
+              {isAuthenticated ? (
                 <div className="space-y-2">
                   <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                     <div className="w-10 h-10 bg-sky-600 rounded-full flex items-center justify-center text-white font-medium">
-                      {userData?.name?.charAt(0) || 'U'}
+                      {user?.name?.charAt(0) || 'U'}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{userData?.name}</p>
+                      <p className="text-sm font-medium text-gray-900">{user?.name}</p>
                       <p className="text-xs text-gray-500">Co-owner</p>
                     </div>
                   </div>

@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { getUserData } from '../../utils/storage';
-import { useUserStore } from '../../stores/useUserStore';
 import {
   Wrench,
   Plus,
@@ -37,7 +35,12 @@ import {
   Building,
   Map,
   Key,
+  Loader2,
 } from "lucide-react";
+import { useMaintenanceStore } from "../../store/maintenanceStore";
+import { useAuthStore } from "../../store/authStore";
+import { showToast } from "../../utils/toast";
+import { vehicleAPI } from "../../api";
 
 const ServiceManagement = () => {
   const navigate = useNavigate();
@@ -51,7 +54,34 @@ const ServiceManagement = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedService, setSelectedService] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
+  const [showCompleteForm, setShowCompleteForm] = useState(false);
+  const [serviceToDelete, setServiceToDelete] = useState(null);
+  const [serviceToComplete, setServiceToComplete] = useState(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [completeFormData, setCompleteFormData] = useState({
+    odometerReading: '',
+    cost: '',
+    serviceProvider: '',
+    description: ''
+  });
+
+  // Zustand stores
+  const { 
+    schedules, 
+    loading, 
+    error, 
+    fetchAllSchedules, 
+    createSchedule,
+    updateSchedule,
+    deleteSchedule,
+    completeMaintenance,
+    clearError 
+  } = useMaintenanceStore();
+
+  const { user } = useAuthStore();
 
   // State cho user data
   const [userRole, setUserRole] = useState("staff");
@@ -60,19 +90,124 @@ const ServiceManagement = () => {
     role: "staff",
   });
 
-  const currentUser = useUserStore(state => state.user);
+  // Notifications mock data
+  const [notifications] = useState([
+    {
+      id: 1,
+      title: "Dịch vụ hoàn thành",
+      message: "Bảo dưỡng định kỳ cho xe VF e34 đã hoàn thành",
+      time: "5 phút trước",
+      read: false,
+    },
+    {
+      id: 2,
+      title: "Lịch mới",
+      message: "Đã lên lịch thay pin cho VF 9",
+      time: "1 giờ trước",
+      read: false,
+    },
+  ]);
+
+  // Load schedules on mount
+  useEffect(() => {
+    loadSchedules();
+  }, []);
+
+  const loadSchedules = async () => {
+    await fetchAllSchedules();
+  };
+
+  // Local cache for vehicle info keyed by vehicleId
+  const [vehicleMap, setVehicleMap] = useState({});
+  const [formData, setFormData] = useState({
+    vehicleId: "",
+    maintenanceType: "",
+    scheduledDate: "",
+    odometerAtSchedule: "",
+    estimatedCost: "",
+    notes: "",
+  });
+
+  // When schedules change, fetch vehicle info for referenced vehicle_ids
+  useEffect(() => {
+    const loadVehicles = async () => {
+      if (!schedules || schedules.length === 0) return;
+
+      // Start from any embedded vehicle data in schedules to avoid extra API calls
+      const map = { ...vehicleMap };
+      const missingIds = new Set();
+
+      schedules.forEach((s) => {
+        if (s.vehicle && s.vehicle.id) {
+          // backend may embed a vehicle object on each schedule
+          map[s.vehicle.id] = {
+            name: s.vehicle.vehicleName || s.vehicle.name || s.vehicle.model || 'Xe điện',
+            plate: s.vehicle.licensePlate || s.vehicle.plate || s.vehicle.plate_number || 'N/A',
+          };
+        } else if (s.vehicleId) {
+          if (!map[s.vehicleId]) missingIds.add(s.vehicleId);
+        }
+      });
+
+      // Fetch only vehicle ids that we still don't have
+      await Promise.all(Array.from(missingIds).map(async (vid) => {
+        try {
+          const res = await vehicleAPI.getVehicleById(vid);
+          if (res.success && res.data) {
+            map[vid] = {
+              name: res.data.name || res.data.title || res.data.model || 'Xe điện',
+              plate: res.data.plate || res.data.license_plate || res.data.plate_number || 'N/A'
+            };
+          }
+        } catch (e) {
+          // ignore individual failures
+        }
+      }));
+
+      setVehicleMap(map);
+    };
+
+    loadVehicles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schedules]);
+
+  // Handle errors
+  useEffect(() => {
+    if (error) {
+      showToast.error(error);
+      clearError();
+    }
+  }, [error, clearError]);
 
   useEffect(() => {
-    const storedUserData = currentUser || getUserData();
-    if (storedUserData) {
-      const cleanRole = (storedUserData.role || 'staff').trim().toLowerCase();
-      setUserData(storedUserData);
-      setUserRole(cleanRole);
+    // Lấy và xử lý thông tin user từ localStorage hoặc authStore
+    if (user) {
+      setUserData({
+        name: user.name || user.fullName || "User",
+        role: user.role || "staff",
+      });
+      setUserRole((user.role || "staff").trim().toLowerCase());
     } else {
-      setUserData({ name: 'Nguyễn Văn B', role: 'staff' });
-      setUserRole('staff');
+      const storedUserData = localStorage.getItem("userData");
+      if (storedUserData) {
+        try {
+          const parsedData = JSON.parse(storedUserData);
+          setUserData(parsedData);
+          const cleanRole = (parsedData.role || "staff").trim().toLowerCase();
+          setUserRole(cleanRole);
+        } catch (error) {
+          console.error("Lỗi khi parse userData:", error);
+          setUserRole("staff");
+        }
+      } else {
+        setUserData({
+          name: "Nguyễn Văn B",
+          role: "staff",
+        });
+        setUserRole("staff");
+      }
     }
-  }, [currentUser]);
+  }, [user]);
 
   // Menu items cho Admin
   const adminMenuItems = [
@@ -90,39 +225,39 @@ const ServiceManagement = () => {
     },
     {
       id: "contracts",
-      label: "Hợp đồng",
+      label: "Quản lý hợp đồng",
       icon: <FileText className="w-5 h-5" />,
       link: "/admin/contracts",
     },
     {
-      id: "staff",
-      label: "Nhân viên",
-      icon: <Users className="w-5 h-5" />,
-      link: "/admin/staff",
-    },
-    {
       id: "services",
-      label: "Dịch vụ xe",
+      label: "Quản lý dịch vụ",
       icon: <Wrench className="w-5 h-5" />,
       link: "/admin/services",
     },
     {
-      id: "checkin", 
+      id: "checkinout",
       label: "Check-in/out",
       icon: <QrCode className="w-5 h-5" />,
-      link: "/admin/checkin",
+      link: "/admin/checkinout",
     },
     {
-      id: "disputes",
-      label: "Tranh chấp",
-      icon: <AlertCircle className="w-5 h-5" />,
-      link: "/admin/disputes",
+      id: "users",
+      label: "Quản lý người dùng",
+      icon: <Users className="w-5 h-5" />,
+      link: "/admin/users",
+    },
+    {
+      id: "groups",
+      label: "Quản lý nhóm",
+      icon: <Building className="w-5 h-5" />,
+      link: "/admin/groups",
     },
     {
       id: "reports",
-      label: "Báo cáo TC",
+      label: "Báo cáo",
       icon: <PieChart className="w-5 h-5" />,
-      link: "/admin/financial-reports",
+      link: "/admin/reports",
     },
   ];
 
@@ -142,135 +277,25 @@ const ServiceManagement = () => {
     },
     {
       id: "contracts",
-      label: "Hợp đồng",
+      label: "Quản lý hợp đồng",
       icon: <FileText className="w-5 h-5" />,
       link: "/staff/contracts",
     },
     {
       id: "services",
-      label: "Dịch vụ xe",
+      label: "Quản lý dịch vụ",
       icon: <Wrench className="w-5 h-5" />,
       link: "/staff/services",
     },
     {
-      id: "checkin",
+      id: "checkinout",
       label: "Check-in/out",
       icon: <QrCode className="w-5 h-5" />,
-      link: "/staff/checkin",
+      link: "/staff/checkinout",
     },
   ];
 
-  // Chọn menu items dựa trên role
   const menuItems = userRole === "admin" ? adminMenuItems : staffMenuItems;
-
-  // Thông báo
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      title: "Bảo dưỡng định kỳ",
-      message: "Xe VF e34 cần bảo dưỡng tháng 12",
-      time: "2 giờ trước",
-      type: "warning",
-      read: false,
-    },
-    {
-      id: 2,
-      title: "Dịch vụ hoàn thành",
-      message: "Sửa chữa phanh VF 8 đã hoàn thành",
-      time: "5 giờ trước",
-      type: "success",
-      read: true,
-    },
-    {
-      id: 3,
-      title: "Vật tư cần nhập",
-      message: "Cần nhập thêm lốp dự phòng",
-      time: "1 ngày trước",
-      type: "info",
-      read: true,
-    },
-  ]);
-
-  const services = [
-    {
-      id: 1,
-      type: "Bảo dưỡng định kỳ",
-      car: "VF e34 - 29A-123.45",
-      scheduledDate: "15/12/2024",
-      completedDate: "",
-      status: "scheduled",
-      cost: 2500000,
-      technician: "Lê Văn C",
-      description: "Bảo dưỡng định kỳ 10,000km",
-      parts: ["Dầu phanh", "Lọc gió", "Kiểm tra pin"],
-      priority: "medium",
-    },
-    {
-      id: 2,
-      type: "Sửa chữa phanh",
-      car: "VinFast VF 8 - 29A-678.90",
-      scheduledDate: "12/11/2024",
-      completedDate: "14/11/2024",
-      status: "completed",
-      cost: 8500000,
-      technician: "Nguyễn Văn A",
-      description: "Thay thế hệ thống phanh trước",
-      parts: ["Má phanh trước", "Dầu phanh", "Rotor"],
-      priority: "high",
-    },
-    {
-      id: 3,
-      type: "Thay pin",
-      car: "VF 9 - 29B-123.45",
-      scheduledDate: "20/12/2024",
-      completedDate: "",
-      status: "scheduled",
-      cost: 12000000,
-      technician: "Trần Thị B",
-      description: "Thay thế pin chính",
-      parts: ["Pin lithium 75kWh", "Hệ thống làm mát"],
-      priority: "high",
-    },
-    {
-      id: 4,
-      type: "Vệ sinh nội thất",
-      car: "VF e34 - 30A-543.21",
-      scheduledDate: "18/11/2024",
-      completedDate: "18/11/2024",
-      status: "completed",
-      cost: 800000,
-      technician: "Phạm Thị D",
-      description: "Vệ sinh toàn bộ nội thất",
-      parts: ["Chất tẩy rửa", "Bộ vệ sinh"],
-      priority: "low",
-    },
-    {
-      id: 5,
-      type: "Bảo dưỡng điều hòa",
-      car: "VF 8 Eco - 30B-987.65",
-      scheduledDate: "22/11/2024",
-      completedDate: "",
-      status: "in_progress",
-      cost: 1500000,
-      technician: "Lê Văn C",
-      description: "Vệ sinh và bảo dưỡng hệ thống điều hòa",
-      parts: ["Gas lạnh", "Lọc gió điều hòa"],
-      priority: "medium",
-    },
-    {
-      id: 6,
-      type: "Thay lốp",
-      car: "VF e34 Plus - 29C-111.22",
-      scheduledDate: "25/11/2024",
-      completedDate: "",
-      status: "scheduled",
-      cost: 4500000,
-      technician: "Nguyễn Văn A",
-      description: "Thay thế 4 lốp mới",
-      parts: ["Lốp 235/45R18", "Cân bằng lốp"],
-      priority: "medium",
-    },
-  ];
 
   const statusOptions = [
     { value: "all", label: "Tất cả trạng thái", color: "gray" },
@@ -285,6 +310,36 @@ const ServiceManagement = () => {
     { value: "medium", label: "Trung bình", color: "amber" },
     { value: "high", label: "Cao", color: "red" },
   ];
+
+  // Transform backend data to frontend format
+  const services = (schedules || []).map(schedule => {
+    // Prefer embedded vehicle object when backend provides it
+    const embedded = schedule.vehicle;
+    const cached = schedule.vehicleId ? vehicleMap[schedule.vehicleId] : null;
+
+    const name = embedded?.vehicleName || embedded?.name || cached?.name || schedule.vehicleInfo || `Xe #${(schedule.vehicleId || '')?.slice?.(0,8) || 'N/A'}`;
+    const plate = embedded?.licensePlate || embedded?.plate || cached?.plate || '';
+
+    const carDisplay = plate ? `${name} (${plate})` : name;
+
+    return {
+      id: schedule.id,
+      type: schedule.maintenanceType || schedule.type || "Bảo dưỡng định kỳ",
+      maintenanceType: schedule.maintenanceType,
+      car: carDisplay,
+      scheduledDate: schedule.scheduledDate ? new Date(schedule.scheduledDate).toLocaleDateString('vi-VN') : "",
+      scheduledDateRaw: schedule.scheduledDate, // Keep raw date for editing
+      completedDate: schedule.completedDate ? new Date(schedule.completedDate).toLocaleDateString('vi-VN') : "",
+      status: schedule.status || "scheduled",
+      cost: Number(schedule.estimatedCost ?? schedule.cost ?? 0) || 0,
+      estimatedCost: schedule.estimatedCost,
+      odometerAtSchedule: schedule.odometerAtSchedule,
+      notes: schedule.notes || "",
+      description: schedule.notes || "",
+      technician: schedule.serviceProvider || "Chưa phân công",
+      vehicleId: schedule.vehicleId || embedded?.id,
+    };
+  });
 
   const filteredServices = services.filter((service) => {
     const matchesSearch =
@@ -360,13 +415,156 @@ const ServiceManagement = () => {
 
   const activeTab = getActiveTab();
 
+  // CRUD Handlers
+  const handleAddService = async (e) => {
+    e?.preventDefault();
+    if (!formData.vehicleId || !formData.maintenanceType || !formData.scheduledDate) {
+      showToast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
+      return;
+    }
+
+    const result = await createSchedule(formData.vehicleId, {
+      maintenanceType: formData.maintenanceType,
+      scheduledDate: formData.scheduledDate,
+      odometerAtSchedule: formData.odometerAtSchedule ? parseInt(formData.odometerAtSchedule) : undefined,
+      estimatedCost: formData.estimatedCost ? parseFloat(formData.estimatedCost) : undefined,
+      notes: formData.notes || undefined,
+    });
+
+    if (result.success) {
+      showToast.success(result.message || "Thêm dịch vụ thành công");
+      setShowAddForm(false);
+      setFormData({
+        vehicleId: "",
+        maintenanceType: "",
+        scheduledDate: "",
+        odometerAtSchedule: "",
+        estimatedCost: "",
+        notes: "",
+      });
+      loadSchedules();
+    }
+  };
+
+  const handleEditService = async (e) => {
+    e?.preventDefault();
+    if (!selectedService) return;
+
+    const updateData = {};
+    
+    // Only include fields that have actual values (not empty strings)
+    if (formData.maintenanceType && formData.maintenanceType.trim()) {
+      updateData.maintenanceType = formData.maintenanceType;
+    }
+    if (formData.scheduledDate && formData.scheduledDate.trim()) {
+      updateData.scheduledDate = formData.scheduledDate;
+    }
+    if (formData.odometerAtSchedule && formData.odometerAtSchedule.toString().trim()) {
+      updateData.odometerAtSchedule = parseInt(formData.odometerAtSchedule);
+    }
+    if (formData.estimatedCost && formData.estimatedCost.toString().trim()) {
+      updateData.estimatedCost = parseFloat(formData.estimatedCost);
+    }
+    if (formData.notes && formData.notes.trim()) {
+      updateData.notes = formData.notes;
+    }
+    if (formData.status && formData.status.trim()) {
+      updateData.status = formData.status;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      showToast.error("Vui lòng thay đổi ít nhất một trường");
+      return;
+    }
+
+    const result = await updateSchedule(selectedService.id, updateData);
+
+    if (result.success) {
+      showToast.success(result.message || "Cập nhật dịch vụ thành công");
+      setShowEditForm(false);
+      setSelectedService(null);
+      setFormData({
+        vehicleId: "",
+        maintenanceType: "",
+        scheduledDate: "",
+        odometerAtSchedule: "",
+        estimatedCost: "",
+        notes: "",
+      });
+      loadSchedules();
+    }
+  };
+
+  const handleDeleteClick = (service) => {
+    setServiceToDelete(service);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!serviceToDelete) return;
+    
+    const result = await deleteSchedule(serviceToDelete.id);
+    if (result.success) {
+      showToast.success(result.message || "Xóa dịch vụ thành công");
+      setShowDeleteConfirm(false);
+      setServiceToDelete(null);
+      setSelectedService(null);
+      loadSchedules();
+    }
+  };
+
+  const handleCompleteClick = (service) => {
+    setServiceToComplete(service);
+    setShowCompleteForm(true);
+    // Pre-fill cost from schedule if available
+    setCompleteFormData({
+      odometerReading: '',
+      cost: service.cost || '',
+      serviceProvider: service.technician || '',
+      description: service.description || ''
+    });
+  };
+
+  const handleCompleteConfirm = async (e) => {
+    e?.preventDefault();
+    if (!serviceToComplete) return;
+    
+    // Validate required fields
+    if (!completeFormData.odometerReading || !completeFormData.cost) {
+      showToast.error("Vui lòng điền đầy đủ số Odo và chi phí");
+      return;
+    }
+    
+    const result = await completeMaintenance(serviceToComplete.id, {
+      odometerReading: parseInt(completeFormData.odometerReading),
+      cost: parseFloat(completeFormData.cost),
+      serviceProvider: completeFormData.serviceProvider || undefined,
+      description: completeFormData.description || undefined,
+    });
+    
+    if (result.success) {
+      showToast.success(result.message || "Đánh dấu hoàn thành thành công");
+      setShowCompleteForm(false);
+      setServiceToComplete(null);
+      setSelectedService(null);
+      setCompleteFormData({
+        odometerReading: '',
+        cost: '',
+        serviceProvider: '',
+        description: ''
+      });
+      loadSchedules();
+    }
+  };
+
   // Hàm xử lý logout
   const handleLogout = () => {
-    // Use central clearAuth helper
-    const { clearAuth } = require('../../utils/storage');
-    clearAuth();
-    window.dispatchEvent(new Event('storage'));
-    navigate('/');
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("userData");
+    localStorage.removeItem("authExpires");
+    localStorage.removeItem("rememberedLogin");
+    window.dispatchEvent(new Event("storage"));
+    navigate("/");
   };
 
   // Đóng menu khi click ra ngoài
@@ -491,35 +689,30 @@ const ServiceManagement = () => {
               >
                 <Menu className="w-5 h-5 text-gray-600" />
               </button>
-              <h2 className="text-xl font-semibold text-gray-900">
-                {menuItems.find((item) => item.id === activeTab)?.label ||
-                  "Quản lý dịch vụ"}
-              </h2>
+              <div>
+                <h2 className="text-lg lg:text-xl font-bold text-gray-900">
+                  Quản lý dịch vụ
+                </h2>
+                <p className="text-xs lg:text-sm text-gray-600">
+                  Theo dõi và quản lý các dịch vụ bảo dưỡng
+                </p>
+              </div>
             </div>
 
-            <div className="flex items-center space-x-3">
-              {/* Search Bar */}
-              <div className="relative hidden md:block">
-                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm dịch vụ..."
-                  className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64 text-sm bg-gray-50 focus:bg-white transition-colors"
-                />
-              </div>
-
+            <div className="flex items-center space-x-2 lg:space-x-4">
               {/* Notifications */}
               <div className="relative">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setNotificationsOpen(!notificationsOpen);
+                    setUserMenuOpen(false);
                   }}
                   className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative"
                 >
                   <Bell className="w-5 h-5 text-gray-600" />
                   {unreadNotifications > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white text-xs text-white flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
                       {unreadNotifications}
                     </span>
                   )}
@@ -528,10 +721,10 @@ const ServiceManagement = () => {
                 <AnimatePresence>
                   {notificationsOpen && (
                     <motion.div
-                      initial={{ opacity: 0, y: 10 }}
+                      initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-10"
+                      exit={{ opacity: 0, y: -10 }}
+                      className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden z-50"
                     >
                       <div className="p-4 border-b border-gray-100">
                         <h3 className="font-semibold text-gray-900">
@@ -539,44 +732,24 @@ const ServiceManagement = () => {
                         </h3>
                       </div>
                       <div className="max-h-96 overflow-y-auto">
-                        {notifications.map((notification) => (
+                        {notifications.map((notif) => (
                           <div
-                            key={notification.id}
+                            key={notif.id}
                             className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${
-                              !notification.read ? "bg-blue-50" : ""
+                              !notif.read ? "bg-blue-50" : ""
                             }`}
                           >
-                            <div className="flex items-start space-x-3">
-                              <div
-                                className={`w-2 h-2 rounded-full mt-2 ${
-                                  notification.type === "success"
-                                    ? "bg-green-500"
-                                    : notification.type === "warning"
-                                    ? "bg-amber-500"
-                                    : notification.type === "info"
-                                    ? "bg-blue-500"
-                                    : "bg-red-500"
-                                }`}
-                              />
-                              <div className="flex-1">
-                                <p className="font-medium text-gray-900 text-sm">
-                                  {notification.title}
-                                </p>
-                                <p className="text-gray-600 text-sm mt-1">
-                                  {notification.message}
-                                </p>
-                                <p className="text-gray-400 text-xs mt-2">
-                                  {notification.time}
-                                </p>
-                              </div>
-                            </div>
+                            <p className="font-medium text-sm text-gray-900">
+                              {notif.title}
+                            </p>
+                            <p className="text-xs text-gray-600 mt-1">
+                              {notif.message}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-2">
+                              {notif.time}
+                            </p>
                           </div>
                         ))}
-                      </div>
-                      <div className="p-4 border-t border-gray-100">
-                        <button className="text-blue-600 text-sm font-medium w-full text-center hover:text-blue-800 transition-colors">
-                          Xem tất cả thông báo
-                        </button>
                       </div>
                     </motion.div>
                   )}
@@ -589,55 +762,45 @@ const ServiceManagement = () => {
                   onClick={(e) => {
                     e.stopPropagation();
                     setUserMenuOpen(!userMenuOpen);
+                    setNotificationsOpen(false);
                   }}
-                  className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="flex items-center space-x-2 lg:space-x-3 p-2 rounded-lg hover:bg-gray-100 transition-colors"
                 >
-                  <div className="text-right hidden md:block">
-                    <p className="text-sm font-medium text-gray-900">
-                      {userData.name}
-                    </p>
-                    <p className="text-xs text-gray-600">
-                      {userRole === "admin"
-                        ? "Quản trị viên"
-                        : "Nhân viên vận hành"}
-                    </p>
-                  </div>
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-sm">
+                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
                     <User className="w-4 h-4 text-white" />
                   </div>
-                  <ChevronDown
-                    className={`w-4 h-4 text-gray-600 transition-transform ${
-                      userMenuOpen ? "rotate-180" : ""
-                    }`}
-                  />
+                  <span className="text-sm font-medium text-gray-900 hidden lg:block">
+                    {userData.name}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-gray-600 hidden lg:block" />
                 </button>
 
                 <AnimatePresence>
                   {userMenuOpen && (
                     <motion.div
-                      initial={{ opacity: 0, y: 10 }}
+                      initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute right-0 top-12 w-48 bg-white rounded-xl shadow-lg border border-gray-200 z-10"
+                      exit={{ opacity: 0, y: -10 }}
+                      className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden z-50"
                     >
+                      <div className="p-4 border-b border-gray-100">
+                        <p className="font-semibold text-gray-900">
+                          {userData.name}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {userRole === "admin"
+                            ? "Quản trị viên"
+                            : "Nhân viên"}
+                        </p>
+                      </div>
                       <div className="p-2">
-                        <button
-                          onClick={() =>
-                            navigate(
-                              userRole === "admin"
-                                ? "/admin/profile"
-                                : "/staff/profile"
-                            )
-                          }
-                          className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm text-gray-700"
-                        >
+                        <button className="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3">
                           <User className="w-4 h-4" />
-                          <span>Hồ sơ cá nhân</span>
+                          <span>Thông tin cá nhân</span>
                         </button>
-                        <div className="border-t border-gray-100 my-1" />
                         <button
                           onClick={handleLogout}
-                          className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors text-sm text-red-600"
+                          className="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3 text-red-600"
                         >
                           <LogOut className="w-4 h-4" />
                           <span>Đăng xuất</span>
@@ -653,41 +816,6 @@ const ServiceManagement = () => {
 
         {/* Service Management Content */}
         <div className="p-4 lg:p-8">
-          {/* Header Section */}
-          <div className="bg-white shadow-sm border-b border-gray-100 mb-6 lg:mb-8">
-            <div className="px-4 lg:px-8 py-6">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">
-                    Quản lý dịch vụ
-                  </h1>
-                  <p className="text-gray-600 mt-2">
-                    Quản lý thực hiện các dịch vụ xe và bảo dưỡng
-                  </p>
-                </div>
-                <div className="mt-4 lg:mt-0 flex gap-3">
-                  {canExport && (
-                    <button className="hidden lg:flex items-center space-x-2 px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm">
-                      <Download className="w-4 h-4" />
-                      <span>Xuất danh sách</span>
-                    </button>
-                  )}
-                  {canAddService && (
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => setShowAddForm(true)}
-                      className="bg-blue-600 text-white px-6 py-3 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors shadow-sm"
-                    >
-                      <Plus className="w-5 h-5" />
-                      <span className="font-medium">Thêm dịch vụ</span>
-                    </motion.button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Stats Overview */}
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 lg:gap-6 mb-6 lg:mb-8">
             <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm border border-gray-100">
@@ -791,7 +919,7 @@ const ServiceManagement = () => {
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-full px-3 lg:px-4 py-2 lg:py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm lg:text-base bg-gray-50 focus:bg-white appearance-none"
+                    className="w-full lg:w-48 appearance-none px-4 py-2 lg:py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm lg:text-base bg-gray-50 focus:bg-white transition-colors"
                   >
                     {statusOptions.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -799,214 +927,141 @@ const ServiceManagement = () => {
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none" />
                 </div>
-                <button
-                  onClick={() => setMobileFiltersOpen(true)}
-                  className="lg:hidden flex items-center space-x-2 px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <Filter className="w-4 h-4 text-gray-600" />
-                </button>
-                <button className="hidden lg:flex items-center space-x-2 px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm">
-                  <Filter className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600" />
-                  <span>Lọc nâng cao</span>
-                </button>
-                {canExport && (
-                  <button className="lg:hidden flex items-center space-x-2 px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                    <Download className="w-4 h-4 text-gray-600" />
-                  </button>
+                {canAddService && (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setShowAddForm(true)}
+                    className="bg-blue-600 text-white px-4 lg:px-6 py-2 lg:py-3 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors shadow-sm text-sm lg:text-base"
+                  >
+                    <Plus className="w-4 h-4 lg:w-5 lg:h-5" />
+                    <span className="hidden lg:inline font-medium">Thêm dịch vụ</span>
+                    <span className="lg:hidden">Thêm</span>
+                  </motion.button>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Mobile Filters Modal */}
-          <AnimatePresence>
-            {mobileFiltersOpen && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end lg:hidden z-40">
-                <motion.div
-                  initial={{ y: "100%" }}
-                  animate={{ y: 0 }}
-                  exit={{ y: "100%" }}
-                  className="bg-white rounded-t-2xl w-full p-6 max-h-[80vh] overflow-y-auto"
-                >
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Bộ lọc
-                    </h3>
-                    <button
-                      onClick={() => setMobileFiltersOpen(false)}
-                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Trạng thái
-                      </label>
-                      <select
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        {statusOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex gap-3 pt-4">
-                      <button
-                        onClick={() => {
-                          setStatusFilter("all");
-                          setSearchTerm("");
-                        }}
-                        className="flex-1 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        Đặt lại
-                      </button>
-                      <button
-                        onClick={() => setMobileFiltersOpen(false)}
-                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        Áp dụng
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              </div>
-            )}
-          </AnimatePresence>
-
-          {/* Add Service Button for Mobile */}
-          {canAddService && (
-            <div className="lg:hidden mb-6">
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setShowAddForm(true)}
-                className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-blue-700 transition-colors shadow-sm"
-              >
-                <Plus className="w-5 h-5" />
-                <span className="font-medium">Thêm dịch vụ</span>
-              </motion.button>
+          {/* Loading State */}
+          {loading && (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
             </div>
           )}
 
           {/* Services Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
-            {filteredServices.map((service) => (
-              <motion.div
-                key={service.id}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                whileHover={{ y: -4 }}
-                className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all overflow-hidden group"
-              >
-                <div className="p-4 lg:p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 text-lg mb-2 group-hover:text-blue-600 transition-colors">
-                        {service.type}
-                      </h3>
-                      <div className="flex items-center space-x-2 text-sm text-gray-600 mb-3">
-                        <Car className="w-4 h-4" />
-                        <span>{service.car}</span>
+          {!loading && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+              {filteredServices.map((service) => (
+                <motion.div
+                  key={service.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all"
+                >
+                  <div className="p-4 lg:p-6">
+                    <div className="flex items-start justify-between mb-3 lg:mb-4">
+                      <div className="flex-1">
+                        <h3 className="text-base lg:text-lg font-bold text-gray-900 mb-1 lg:mb-2">
+                          {service.type}
+                        </h3>
+                        <div className="flex items-center space-x-2 text-xs lg:text-sm text-gray-600">
+                          <Car className="w-3 h-3 lg:w-4 lg:h-4" />
+                          <span>{service.car}</span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex flex-col items-end space-y-2">
-                      <span
-                        className={`px-2 lg:px-3 py-1 rounded-full text-xs font-medium border ${getPriorityColor(
-                          service.priority
-                        )}`}
-                      >
-                        {
-                          priorityOptions.find(
-                            (p) => p.value === service.priority
-                          )?.label
-                        }
-                      </span>
-                      <div className="flex items-center space-x-2">
-                        {getStatusIcon(service.status)}
+                      <div className="flex flex-col items-end space-y-2">
                         <span
-                          className={`text-xs font-medium border px-2 py-1 rounded-full ${getStatusColor(
+                          className={`px-2 lg:px-3 py-1 rounded-full text-xs font-medium border flex items-center space-x-1 ${getStatusColor(
                             service.status
                           )}`}
                         >
-                          {
-                            statusOptions.find(
-                              (s) => s.value === service.status
-                            )?.label
-                          }
+                          {getStatusIcon(service.status)}
+                          <span>
+                            {
+                              statusOptions.find(
+                                (s) => s.value === service.status
+                              )?.label
+                            }
+                          </span>
                         </span>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-2 lg:space-y-3 mb-4 lg:mb-6">
-                    <div className="flex justify-between text-xs lg:text-sm">
-                      <span className="text-gray-600">Kỹ thuật viên:</span>
-                      <span className="font-medium">{service.technician}</span>
-                    </div>
-                    <div className="flex justify-between text-xs lg:text-sm">
-                      <span className="text-gray-600">Ngày lên lịch:</span>
-                      <span className="font-medium">
-                        {service.scheduledDate}
-                      </span>
-                    </div>
-                    {service.completedDate && (
+                    <div className="space-y-2 lg:space-y-3 mb-4 lg:mb-6">
                       <div className="flex justify-between text-xs lg:text-sm">
-                        <span className="text-gray-600">Ngày hoàn thành:</span>
-                        <span className="font-medium text-green-600">
-                          {service.completedDate}
+                        <span className="text-gray-600">Kỹ thuật viên:</span>
+                        <span className="font-medium">{service.technician}</span>
+                      </div>
+                      <div className="flex justify-between text-xs lg:text-sm">
+                        <span className="text-gray-600">Ngày lên lịch:</span>
+                        <span className="font-medium">
+                          {service.scheduledDate}
                         </span>
                       </div>
-                    )}
-                    <div className="flex justify-between text-xs lg:text-sm">
-                      <span className="text-gray-600">Chi phí:</span>
-                      <span className="font-semibold text-green-600">
-                        {(service.cost / 1000000).toFixed(1)}M VND
-                      </span>
+                      {service.completedDate && (
+                        <div className="flex justify-between text-xs lg:text-sm">
+                          <span className="text-gray-600">Ngày hoàn thành:</span>
+                          <span className="font-medium text-green-600">
+                            {service.completedDate}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-xs lg:text-sm">
+                        <span className="text-gray-600">Chi phí:</span>
+                        <span className="font-semibold text-green-600">
+                          {(service.cost / 1000000).toFixed(1)}M VND
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mb-4 lg:mb-6">
+                      <p className="text-sm text-gray-600 line-clamp-2">
+                        {service.description}
+                      </p>
+                    </div>
+
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => setSelectedService(service)}
+                        className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg flex items-center justify-center space-x-1 hover:bg-gray-200 transition-colors text-xs lg:text-sm"
+                      >
+                        <Eye className="w-3 h-3 lg:w-4 lg:h-4" />
+                        <span>Chi tiết</span>
+                      </button>
+                      {canEditService && service.status !== "completed" && (
+                        <button 
+                          onClick={() => {
+                            setSelectedService(service);
+                            setShowEditForm(true);
+                          }}
+                          className="flex-1 bg-blue-100 text-blue-700 py-2 rounded-lg flex items-center justify-center space-x-1 hover:bg-blue-200 transition-colors text-xs lg:text-sm"
+                        >
+                          <Edit className="w-3 h-3 lg:w-4 lg:h-4" />
+                          <span>Sửa</span>
+                        </button>
+                      )}
+                      {canDeleteService && (
+                        <button 
+                          onClick={() => handleDeleteClick(service)}
+                          className="flex-1 bg-red-100 text-red-700 py-2 rounded-lg flex items-center justify-center space-x-1 hover:bg-red-200 transition-colors text-xs lg:text-sm"
+                        >
+                          <Trash2 className="w-3 h-3 lg:w-4 lg:h-4" />
+                          <span>Xóa</span>
+                        </button>
+                      )}
                     </div>
                   </div>
-
-                  <div className="mb-4 lg:mb-6">
-                    <p className="text-sm text-gray-600 line-clamp-2">
-                      {service.description}
-                    </p>
-                  </div>
-
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => setSelectedService(service)}
-                      className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg flex items-center justify-center space-x-1 hover:bg-gray-200 transition-colors text-xs lg:text-sm"
-                    >
-                      <Eye className="w-3 h-3 lg:w-4 lg:h-4" />
-                      <span>Chi tiết</span>
-                    </button>
-                    {canEditService && (
-                      <button className="flex-1 bg-blue-100 text-blue-700 py-2 rounded-lg flex items-center justify-center space-x-1 hover:bg-blue-200 transition-colors text-xs lg:text-sm">
-                        <Edit className="w-3 h-3 lg:w-4 lg:h-4" />
-                        <span>Sửa</span>
-                      </button>
-                    )}
-                    {canDeleteService && (
-                      <button className="flex-1 bg-red-100 text-red-700 py-2 rounded-lg flex items-center justify-center space-x-1 hover:bg-red-200 transition-colors text-xs lg:text-sm">
-                        <Trash2 className="w-3 h-3 lg:w-4 lg:h-4" />
-                        <span>Xóa</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
 
           {/* Empty State */}
-          {filteredServices.length === 0 && (
+          {!loading && filteredServices.length === 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1033,7 +1088,7 @@ const ServiceManagement = () => {
 
         {/* Service Detail Modal */}
         <AnimatePresence>
-          {selectedService && (
+          {selectedService && !showEditForm && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
@@ -1136,7 +1191,7 @@ const ServiceManagement = () => {
                             Chi phí dịch vụ:
                           </span>
                           <span className="font-semibold text-green-600">
-                            {selectedService.cost.toLocaleString("vi-VN")} VND
+                            {(Number(selectedService.cost) || 0).toLocaleString("vi-VN")} VND
                           </span>
                         </div>
                         <div className="flex justify-between text-sm lg:text-base">
@@ -1169,50 +1224,587 @@ const ServiceManagement = () => {
                   </div>
 
                   {/* Parts List */}
-                  <div className="mb-6 lg:mb-8">
-                    <h4 className="text-lg font-semibold text-gray-900 mb-4">
-                      Vật tư sử dụng
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {selectedService.parts.map((part, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between p-3 lg:p-4 border border-gray-200 rounded-xl"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <Wrench className="w-4 h-4 lg:w-5 lg:h-5 text-blue-600" />
-                            <span className="text-gray-900 text-sm lg:text-base">
-                              {part}
+                  {selectedService.parts && selectedService.parts.length > 0 && (
+                    <div className="mb-6 lg:mb-8">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-4">
+                        Vật tư sử dụng
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {selectedService.parts.map((part, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-3 lg:p-4 border border-gray-200 rounded-xl"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <Wrench className="w-4 h-4 lg:w-5 lg:h-5 text-blue-600" />
+                              <span className="text-gray-900 text-sm lg:text-base">
+                                {part}
+                              </span>
+                            </div>
+                            <span className="text-xs lg:text-sm text-gray-500">
+                              Đã sử dụng
                             </span>
                           </div>
-                          <span className="text-xs lg:text-sm text-gray-500">
-                            Đã sử dụng
-                          </span>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Action Buttons */}
                   <div className="flex flex-col lg:flex-row space-y-3 lg:space-y-0 lg:space-x-3 pt-6 border-t border-gray-200">
                     {selectedService.status !== "completed" && (
-                      <button className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 text-sm lg:text-base">
+                      <button 
+                        onClick={() => handleCompleteClick(selectedService)}
+                        className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 text-sm lg:text-base"
+                      >
                         <CheckCircle className="w-4 h-4 lg:w-5 lg:h-5" />
                         <span>Đánh dấu hoàn thành</span>
                       </button>
                     )}
-                    {canEditService && (
-                      <button className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 text-sm lg:text-base">
+                    {canEditService && selectedService.status !== "completed" && (
+                      <button 
+                        onClick={() => setShowEditForm(true)}
+                        className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 text-sm lg:text-base"
+                      >
                         <Edit className="w-4 h-4 lg:w-5 lg:h-5" />
                         <span>Cập nhật tiến độ</span>
                       </button>
                     )}
-                    <button className="flex-1 bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center space-x-2 text-sm lg:text-base">
-                      <BarChart3 className="w-4 h-4 lg:w-5 lg:h-5" />
-                      <span>Báo cáo chi phí</span>
-                    </button>
+                    {canDeleteService && (
+                      <button 
+                        onClick={() => {
+                          handleDeleteClick(selectedService);
+                        }}
+                        className="flex-1 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center space-x-2 text-sm lg:text-base"
+                      >
+                        <Trash2 className="w-4 h-4 lg:w-5 lg:h-5" />
+                        <span>Xóa dịch vụ</span>
+                      </button>
+                    )}
                   </div>
                 </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Delete Confirmation Modal */}
+        <AnimatePresence>
+          {showDeleteConfirm && serviceToDelete && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="bg-white rounded-xl p-6 w-full max-w-md"
+              >
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="p-3 bg-red-100 rounded-full">
+                    <AlertTriangle className="w-6 h-6 text-red-600" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900">
+                    Xác nhận xóa
+                  </h3>
+                </div>
+                <p className="text-gray-600 mb-6">
+                  Bạn có chắc chắn muốn xóa dịch vụ "{serviceToDelete.type}" không? 
+                  Hành động này không thể hoàn tác.
+                </p>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => {
+                      setShowDeleteConfirm(false);
+                      setServiceToDelete(null);
+                    }}
+                    className="flex-1 px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    onClick={handleDeleteConfirm}
+                    disabled={loading}
+                    className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  >
+                    {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                    <span>Xóa</span>
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Complete Maintenance Form Modal */}
+        <AnimatePresence>
+          {showCompleteForm && serviceToComplete && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-3 bg-green-100 rounded-full">
+                      <CheckCircle className="w-6 h-6 text-green-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">
+                      Hoàn thành bảo trì
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowCompleteForm(false);
+                      setServiceToComplete(null);
+                      setCompleteFormData({
+                        odometerReading: '',
+                        cost: '',
+                        serviceProvider: '',
+                        description: ''
+                      });
+                    }}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5 text-gray-600" />
+                  </button>
+                </div>
+
+                <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-blue-900">
+                    <strong>Dịch vụ:</strong> {serviceToComplete.type}
+                  </p>
+                  <p className="text-sm text-blue-900">
+                    <strong>Xe:</strong> {serviceToComplete.car}
+                  </p>
+                </div>
+
+                <form onSubmit={handleCompleteConfirm} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Số Odo hiện tại (km) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        value={completeFormData.odometerReading}
+                        onChange={(e) => setCompleteFormData({...completeFormData, odometerReading: e.target.value})}
+                        placeholder="15000"
+                        min="0"
+                        max="1000000"
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Chi phí thực tế (VND) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        value={completeFormData.cost}
+                        onChange={(e) => setCompleteFormData({...completeFormData, cost: e.target.value})}
+                        placeholder="2000000"
+                        min="0"
+                        max="1000000000"
+                        step="0.01"
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        required
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Nhà cung cấp dịch vụ
+                      </label>
+                      <input
+                        type="text"
+                        value={completeFormData.serviceProvider}
+                        onChange={(e) => setCompleteFormData({...completeFormData, serviceProvider: e.target.value})}
+                        placeholder="VD: Xưởng bảo dưỡng ABC"
+                        maxLength="255"
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Mô tả công việc đã thực hiện
+                    </label>
+                    <textarea
+                      value={completeFormData.description}
+                      onChange={(e) => setCompleteFormData({...completeFormData, description: e.target.value})}
+                      placeholder="Nhập mô tả chi tiết về công việc đã thực hiện..."
+                      rows="4"
+                      maxLength="1000"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div className="flex space-x-3 mt-6">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCompleteForm(false);
+                        setServiceToComplete(null);
+                        setCompleteFormData({
+                          odometerReading: '',
+                          cost: '',
+                          serviceProvider: '',
+                          description: ''
+                        });
+                      }}
+                      className="flex-1 px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                    >
+                      {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                      <span>Hoàn thành</span>
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Add Service Form Modal */}
+        <AnimatePresence>
+          {showAddForm && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-3 bg-blue-100 rounded-full">
+                      <Plus className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">
+                      Thêm dịch vụ mới
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowAddForm(false);
+                      setFormData({
+                        vehicleId: "",
+                        maintenanceType: "",
+                        scheduledDate: "",
+                        odometerAtSchedule: "",
+                        estimatedCost: "",
+                        notes: "",
+                      });
+                    }}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5 text-gray-600" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleAddService} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        ID Xe <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.vehicleId}
+                        onChange={(e) => setFormData({...formData, vehicleId: e.target.value})}
+                        placeholder="88888888-8888-8888-8888-888888888881"
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Loại bảo trì <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={formData.maintenanceType}
+                        onChange={(e) => setFormData({...formData, maintenanceType: e.target.value})}
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                      >
+                        <option value="">Chọn loại bảo trì</option>
+                        <option value="Bảo dưỡng định kỳ">Bảo dưỡng định kỳ</option>
+                        <option value="Thay pin">Thay pin</option>
+                        <option value="Sửa chữa">Sửa chữa</option>
+                        <option value="Kiểm tra kỹ thuật">Kiểm tra kỹ thuật</option>
+                        <option value="Rửa xe">Rửa xe</option>
+                        <option value="Thay lốp">Thay lốp</option>
+                        <option value="Khác">Khác</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Ngày lên lịch <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.scheduledDate}
+                        onChange={(e) => setFormData({...formData, scheduledDate: e.target.value})}
+                        min={new Date().toISOString().split('T')[0]}
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Số Odo dự kiến (km)
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.odometerAtSchedule}
+                        onChange={(e) => setFormData({...formData, odometerAtSchedule: e.target.value})}
+                        placeholder="15000"
+                        min="0"
+                        max="1000000"
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Chi phí dự tính (VND)
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.estimatedCost}
+                        onChange={(e) => setFormData({...formData, estimatedCost: e.target.value})}
+                        placeholder="2000000"
+                        min="0"
+                        max="1000000000"
+                        step="0.01"
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Ghi chú
+                    </label>
+                    <textarea
+                      value={formData.notes}
+                      onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                      placeholder="Nhập ghi chú về lịch bảo trì..."
+                      rows="4"
+                      maxLength="1000"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div className="flex space-x-3 mt-6">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddForm(false);
+                        setFormData({
+                          vehicleId: "",
+                          maintenanceType: "",
+                          scheduledDate: "",
+                          odometerAtSchedule: "",
+                          estimatedCost: "",
+                          notes: "",
+                        });
+                      }}
+                      className="flex-1 px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                    >
+                      {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                      <span>Thêm dịch vụ</span>
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Edit Service Form Modal */}
+        <AnimatePresence>
+          {showEditForm && selectedService && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-3 bg-blue-100 rounded-full">
+                      <Edit className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">
+                      Cập nhật dịch vụ
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowEditForm(false);
+                      setSelectedService(null);
+                      setFormData({
+                        vehicleId: "",
+                        maintenanceType: "",
+                        scheduledDate: "",
+                        odometerAtSchedule: "",
+                        estimatedCost: "",
+                        notes: "",
+                      });
+                    }}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5 text-gray-600" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleEditService} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Loại bảo trì
+                      </label>
+                      <select
+                        value={formData.maintenanceType || selectedService.maintenanceType}
+                        onChange={(e) => setFormData({...formData, maintenanceType: e.target.value})}
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Giữ nguyên</option>
+                        <option value="Bảo dưỡng định kỳ">Bảo dưỡng định kỳ</option>
+                        <option value="Thay pin">Thay pin</option>
+                        <option value="Sửa chữa">Sửa chữa</option>
+                        <option value="Kiểm tra kỹ thuật">Kiểm tra kỹ thuật</option>
+                        <option value="Rửa xe">Rửa xe</option>
+                        <option value="Thay lốp">Thay lốp</option>
+                        <option value="Khác">Khác</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Ngày lên lịch
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.scheduledDate || (selectedService.scheduledDateRaw ? new Date(selectedService.scheduledDateRaw).toISOString().split('T')[0] : '')}
+                        onChange={(e) => setFormData({...formData, scheduledDate: e.target.value})}
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Số Odo dự kiến (km)
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.odometerAtSchedule || selectedService.odometerAtSchedule || ''}
+                        onChange={(e) => setFormData({...formData, odometerAtSchedule: e.target.value})}
+                        placeholder="15000"
+                        min="0"
+                        max="1000000"
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Chi phí dự tính (VND)
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.estimatedCost || selectedService.estimatedCost || ''}
+                        onChange={(e) => setFormData({...formData, estimatedCost: e.target.value})}
+                        placeholder="2000000"
+                        min="0"
+                        max="1000000000"
+                        step="0.01"
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Trạng thái
+                      </label>
+                      <select
+                        value={formData.status || selectedService.status}
+                        onChange={(e) => setFormData({...formData, status: e.target.value})}
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="scheduled">Đã lên lịch</option>
+                        <option value="in_progress">Đang thực hiện</option>
+                        <option value="completed">Hoàn thành</option>
+                        <option value="cancelled">Đã hủy</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Ghi chú
+                    </label>
+                    <textarea
+                      value={formData.notes || selectedService.notes || ''}
+                      onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                      placeholder="Nhập ghi chú về lịch bảo trì..."
+                      rows="4"
+                      maxLength="1000"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div className="flex space-x-3 mt-6">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowEditForm(false);
+                        setSelectedService(null);
+                        setFormData({
+                          vehicleId: "",
+                          maintenanceType: "",
+                          scheduledDate: "",
+                          odometerAtSchedule: "",
+                          estimatedCost: "",
+                          notes: "",
+                        });
+                      }}
+                      className="flex-1 px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                    >
+                      {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                      <span>Cập nhật</span>
+                    </button>
+                  </div>
+                </form>
               </motion.div>
             </div>
           )}
