@@ -23,9 +23,19 @@ router.get('/stats',
   bookingController.getBookingStats
 );
 
+router.get('/analytics',
+  validate(bookingValidators.getBookingHistory), // Reuse same validator
+  bookingController.getBookingAnalytics
+);
+
 router.get('/history', 
   validate(bookingValidators.getBookingHistory), 
   bookingController.getBookingHistory
+);
+
+router.get('/revenue/vehicle/:vehicleId',
+  validate(bookingValidators.getVehicleRevenue),
+  bookingController.getVehicleRevenue
 );
 
 router.get('/:bookingId', 

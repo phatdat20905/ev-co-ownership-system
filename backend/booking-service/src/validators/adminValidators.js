@@ -4,14 +4,15 @@ import { uuidSchema } from '@ev-coownership/shared';
 export const adminValidators = {
   getBookings: {
     query: Joi.object({
-      status: Joi.string().valid('pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'conflict'),
-      groupId: uuidSchema,
-      vehicleId: uuidSchema,
-      userId: uuidSchema,
-      startDate: Joi.date().iso(),
-      endDate: Joi.date().iso().greater(Joi.ref('startDate')),
+      status: Joi.string().valid('pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'conflict').optional(),
+      groupId: uuidSchema.optional(),
+      vehicleId: uuidSchema.optional(),
+      userId: uuidSchema.optional(),
+      startDate: Joi.date().iso().optional(),
+      endDate: Joi.date().iso().greater(Joi.ref('startDate')).optional(),
       page: Joi.number().integer().min(1).default(1),
-      limit: Joi.number().integer().min(1).max(100).default(20)
+      // Allow larger limits for admin queries used by analytics and exports
+      limit: Joi.number().integer().min(1).max(10000).default(20)
     })
   },
 

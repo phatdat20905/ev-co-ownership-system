@@ -41,7 +41,7 @@ router.get('/updates/subscribe',
 
 // 🔌 NEW: Admin broadcast endpoint
 router.post('/broadcast', 
-  authorize(['staff', 'admin']),
+  authorize('staff', 'admin'),
   validate(calendarValidators.broadcastUpdate),
   calendarController.broadcastCalendarUpdate
 );

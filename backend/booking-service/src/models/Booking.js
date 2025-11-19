@@ -42,6 +42,32 @@ export default (sequelize, DataTypes) => {
     purpose: {
       type: DataTypes.STRING(500)
     },
+    destination: {
+      type: DataTypes.STRING(500),
+      allowNull: true
+    },
+    estimatedDistance: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      field: 'estimated_distance',
+      comment: 'Estimated distance in kilometers'
+    },
+    actualDistance: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      field: 'actual_distance',
+      comment: 'Actual distance traveled in kilometers (from check-out)'
+    },
+    efficiency: {
+      type: DataTypes.DECIMAL(5, 2),
+      allowNull: true,
+      comment: 'Efficiency in km/kWh (calculated after completion)'
+    },
+    cost: {
+      type: DataTypes.DECIMAL(15, 2),
+      allowNull: true,
+      comment: 'Total cost in VND (calculated after completion)'
+    },
     notes: {
       type: DataTypes.TEXT
     },

@@ -6,7 +6,7 @@ import { adminValidators } from '../validators/adminValidators.js';
 const router = express.Router();
 
 router.use(authenticate);
-router.use(authorize(['staff', 'admin']));
+router.use(authorize('staff', 'admin'));
 
 // Admin Booking Management
 router.get('/', 

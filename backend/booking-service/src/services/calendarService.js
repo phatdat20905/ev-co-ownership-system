@@ -273,7 +273,8 @@ export class CalendarService {
         include: [{
           model: db.Vehicle,
           as: 'vehicle',
-          attributes: ['id', 'vehicleName', 'licensePlate', 'brand', 'model']
+          attributes: ['id', 'vehicleName', 'licensePlate', 'brand', 'model'],
+          required: false  // LEFT JOIN to handle missing vehicles
         }],
         order: [['startTime', 'ASC']]
       });

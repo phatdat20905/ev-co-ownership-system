@@ -3,6 +3,7 @@ import { logger, AppError, redisClient } from '@ev-coownership/shared';
 import db from '../models/index.js';
 import eventService from './eventService.js';
 import crypto from 'crypto';
+import QRCode from 'qrcode';
 
 export class CheckInOutService {
   constructor() {
@@ -10,7 +11,7 @@ export class CheckInOutService {
     this.qrCodeSecret = process.env.QR_CODE_SECRET || 'your_qr_secret_here';
   }
 
-  async checkIn(bookingId, userId, checkInData) {
+  async checkIn(bookingId, userId, userRole, checkInData) {
     const transaction = await db.sequelize.transaction();
 
     try {
@@ -27,7 +28,7 @@ export class CheckInOutService {
       }
 
       // Validate check-in conditions
-      await this.validateCheckIn(booking, userId, checkInData);
+      await this.validateCheckIn(booking, userId, userRole, checkInData);
 
       // Create check-in log
       const checkInLog = await db.CheckInOutLog.create({
@@ -59,11 +60,17 @@ export class CheckInOutService {
 
       await transaction.commit();
 
-      // Publish events
-      await eventService.publishCheckInSuccess(booking, checkInLog);
-      
-      // 🔌 NEW: Real-time check-in notification
-      socketService.publishCheckInSuccess(booking, checkInLog);
+      // Publish events (non-blocking, errors logged but don't fail the request)
+      try {
+        await eventService.publishCheckInSuccess(booking, checkInLog);
+        socketService.publishCheckInSuccess(booking, checkInLog);
+      } catch (eventError) {
+        logger.warn('Failed to publish check-in events', {
+          error: eventError.message,
+          bookingId,
+          userId
+        });
+      }
 
       logger.info('Check-in completed successfully', {
         bookingId,
@@ -73,7 +80,9 @@ export class CheckInOutService {
 
       return checkInLog;
     } catch (error) {
-      await transaction.rollback();
+      if (transaction && !transaction.finished) {
+        await transaction.rollback();
+      }
       logger.error('Failed to process check-in', {
         error: error.message,
         bookingId,
@@ -83,7 +92,7 @@ export class CheckInOutService {
     }
   }
 
-  async checkOut(bookingId, userId, checkOutData) {
+  async checkOut(bookingId, userId, userRole, checkOutData) {
     const transaction = await db.sequelize.transaction();
 
     try {
@@ -100,7 +109,7 @@ export class CheckInOutService {
       }
 
       // Validate check-out conditions
-      await this.validateCheckOut(booking, userId, checkOutData);
+      await this.validateCheckOut(booking, userId, userRole, checkOutData);
 
       // Create check-out log
       const checkOutLog = await db.CheckInOutLog.create({
@@ -131,14 +140,20 @@ export class CheckInOutService {
 
       await transaction.commit();
 
-      // Publish events
-      await eventService.publishCheckOutSuccess(booking, checkOutLog);
-      
-      // 🔌 NEW: Real-time check-out notification
-      socketService.publishCheckOutSuccess(booking, checkOutLog);
-
-      // Calculate usage statistics
-      await this.calculateUsageStatistics(booking, checkOutData);
+      // Publish events (non-blocking, errors logged but don't fail the request)
+      try {
+        await eventService.publishCheckOutSuccess(booking, checkOutLog);
+        socketService.publishCheckOutSuccess(booking, checkOutLog);
+        
+        // Calculate usage statistics
+        await this.calculateUsageStatistics(booking, checkOutData);
+      } catch (eventError) {
+        logger.warn('Failed to publish check-out events or calculate stats', {
+          error: eventError.message,
+          bookingId,
+          userId
+        });
+      }
 
       logger.info('Check-out completed successfully', {
         bookingId,
@@ -148,7 +163,9 @@ export class CheckInOutService {
 
       return checkOutLog;
     } catch (error) {
-      await transaction.rollback();
+      if (transaction && !transaction.finished) {
+        await transaction.rollback();
+      }
       logger.error('Failed to process check-out', {
         error: error.message,
         bookingId,
@@ -158,7 +175,7 @@ export class CheckInOutService {
     }
   }
 
-  async getCheckLogs(bookingId, userId) {
+  async getCheckLogs(bookingId, userId, userRole) {
     try {
       const booking = await db.Booking.findByPk(bookingId);
       
@@ -166,13 +183,10 @@ export class CheckInOutService {
         throw new AppError('Booking not found', 404, 'BOOKING_NOT_FOUND');
       }
 
-      // Check permission
-      if (booking.userId !== userId) {
-        // Verify if user has permission to view this booking's logs
-        const hasPermission = await this.checkLogViewPermission(bookingId, userId);
-        if (!hasPermission) {
-          throw new AppError('Permission denied to view check logs', 403, 'PERMISSION_DENIED');
-        }
+      // Admin and staff can view any booking's logs
+      // Co-owners can only view their own booking logs
+      if (!['admin', 'staff'].includes(userRole) && booking.userId !== userId) {
+        throw new AppError('Permission denied to view check logs', 403, 'PERMISSION_DENIED');
       }
 
       const logs = await db.CheckInOutLog.findAll({
@@ -194,7 +208,7 @@ export class CheckInOutService {
     }
   }
 
-  async generateQRCode(bookingId, userId) {
+  async generateQRCode(bookingId, userId, userRole) {
     try {
       const booking = await db.Booking.findByPk(bookingId, {
         include: [{
@@ -208,7 +222,9 @@ export class CheckInOutService {
         throw new AppError('Booking not found', 404, 'BOOKING_NOT_FOUND');
       }
 
-      if (booking.userId !== userId) {
+      // Admin and staff can generate QR codes for any booking
+      // Co-owners can only generate QR codes for their own bookings
+      if (!['admin', 'staff'].includes(userRole) && booking.userId !== userId) {
         throw new AppError('Permission denied to generate QR code', 403, 'PERMISSION_DENIED');
       }
 
@@ -242,13 +258,28 @@ export class CheckInOutService {
       const cacheKey = `qr_code:${bookingId}:${signature}`;
       await redisClient.set(cacheKey, JSON.stringify(qrCode), this.qrCodeExpiry / 1000);
 
+      // Generate QR code image as data URL
+      const qrCodeString = JSON.stringify(qrCode);
+      const qrImageDataURL = await QRCode.toDataURL(qrCodeString, {
+        errorCorrectionLevel: 'H',
+        type: 'image/png',
+        quality: 0.92,
+        margin: 1,
+        width: 300,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+
       logger.info('QR code generated successfully', {
         bookingId,
         userId
       });
 
       return {
-        qrCode: Buffer.from(JSON.stringify(qrCode)).toString('base64'),
+        qrCode: Buffer.from(JSON.stringify(qrCode)).toString('base64'), // For validation
+        qrImage: qrImageDataURL, // Actual QR code image
         expiresAt: qrCode.expiresAt,
         bookingInfo: {
           id: booking.id,
@@ -339,9 +370,10 @@ export class CheckInOutService {
   }
 
   // Private methods
-  async validateCheckIn(booking, userId, checkInData) {
-    // Check if user has permission
-    if (booking.userId !== userId) {
+  async validateCheckIn(booking, userId, userRole, checkInData) {
+    // Admin and staff can check in any booking
+    // Co-owners can only check in their own bookings
+    if (!['admin', 'staff'].includes(userRole) && booking.userId !== userId) {
       throw new AppError('Permission denied to check in this booking', 403, 'PERMISSION_DENIED');
     }
 
@@ -350,24 +382,41 @@ export class CheckInOutService {
       throw new AppError('Booking must be confirmed to check in', 400, 'INVALID_BOOKING_STATUS');
     }
 
-    // Check time window (allow check-in 15 minutes before start time)
-    const now = new Date();
-    const startTime = new Date(booking.startTime);
-    const earliestCheckIn = new Date(startTime.getTime() - 15 * 60 * 1000);
+    // Check time window only for co-owners (staff/admin can check-in anytime)
+    if (!['admin', 'staff'].includes(userRole)) {
+      const now = new Date();
+      const startTime = new Date(booking.startTime);
+      const earliestCheckIn = new Date(startTime.getTime() - 15 * 60 * 1000);
 
-    if (now < earliestCheckIn) {
-      throw new AppError('Too early to check in', 400, 'CHECK_IN_TOO_EARLY');
-    }
+      if (now < earliestCheckIn) {
+        throw new AppError('Too early to check in', 400, 'CHECK_IN_TOO_EARLY');
+      }
 
-    if (now > new Date(booking.endTime)) {
-      throw new AppError('Booking has expired', 400, 'BOOKING_EXPIRED');
+      if (now > new Date(booking.endTime)) {
+        throw new AppError('Booking has expired', 400, 'BOOKING_EXPIRED');
+      }
     }
 
     // Validate odometer reading
     if (checkInData.odometerReading) {
       const vehicle = await db.Vehicle.findByPk(booking.vehicleId);
-      if (checkInData.odometerReading < vehicle.currentOdometer) {
-        throw new AppError('Odometer reading cannot be less than current vehicle odometer', 400, 'INVALID_ODOMETER');
+      
+      // For co-owners: strict validation
+      // For staff/admin: allow override (they may need to correct errors)
+      if (!['admin', 'staff'].includes(userRole)) {
+        if (checkInData.odometerReading < vehicle.currentOdometer) {
+          throw new AppError('Odometer reading cannot be less than current vehicle odometer', 400, 'INVALID_ODOMETER');
+        }
+      } else {
+        // For staff/admin: just log warning if odometer seems wrong
+        if (checkInData.odometerReading < vehicle.currentOdometer) {
+          logger.warn('Staff/admin check-in with lower odometer', {
+            bookingId: booking.id,
+            vehicleId: vehicle.id,
+            currentOdometer: vehicle.currentOdometer,
+            checkInOdometer: checkInData.odometerReading
+          });
+        }
       }
     }
 
@@ -384,9 +433,10 @@ export class CheckInOutService {
     }
   }
 
-  async validateCheckOut(booking, userId, checkOutData) {
-    // Check if user has permission
-    if (booking.userId !== userId) {
+  async validateCheckOut(booking, userId, userRole, checkOutData) {
+    // Admin and staff can check out any booking
+    // Co-owners can only check out their own bookings
+    if (!['admin', 'staff'].includes(userRole) && booking.userId !== userId) {
       throw new AppError('Permission denied to check out this booking', 403, 'PERMISSION_DENIED');
     }
 
@@ -459,8 +509,28 @@ export class CheckInOutService {
       });
 
       if (checkInLog && checkOutData.odometerReading) {
-        const distance = checkOutData.odometerReading - checkInLog.odometerReading;
+        const actualDistance = checkOutData.odometerReading - checkInLog.odometerReading;
         const duration = (new Date() - new Date(checkInLog.performedAt)) / (1000 * 60 * 60); // hours
+        const energyConsumed = checkInLog.fuelLevel - (checkOutData.fuelLevel || 0); // Battery % consumed
+        
+        // Calculate efficiency (km/kWh)
+        // Assuming vehicle has ~60kWh battery capacity (adjust as needed)
+        const batteryCapacityKWh = 60;
+        const kWhConsumed = (energyConsumed / 100) * batteryCapacityKWh;
+        const efficiency = kWhConsumed > 0 ? (actualDistance / kWhConsumed) : null;
+
+        // Calculate cost (VND)
+        // Base rate: 60,000 VND/hour + 5,000 VND/km
+        const hourlyRate = 60000;
+        const kmRate = 5000;
+        const cost = (duration * hourlyRate) + (actualDistance * kmRate);
+
+        // Update booking with calculated values
+        await booking.update({
+          actualDistance: actualDistance,
+          efficiency: efficiency ? parseFloat(efficiency.toFixed(2)) : null,
+          cost: parseFloat(cost.toFixed(2))
+        });
 
         // Store usage statistics (could be sent to analytics service)
         const usageStats = {
@@ -468,9 +538,11 @@ export class CheckInOutService {
           userId: booking.userId,
           vehicleId: booking.vehicleId,
           groupId: booking.groupId,
-          distanceKm: distance,
+          distanceKm: actualDistance,
           durationHours: duration,
-          fuelConsumed: checkInLog.fuelLevel - (checkOutData.fuelLevel || 0),
+          energyConsumed: energyConsumed,
+          efficiency: efficiency,
+          cost: cost,
           checkInTime: checkInLog.performedAt,
           checkOutTime: new Date()
         };
@@ -478,9 +550,11 @@ export class CheckInOutService {
         // Publish usage statistics event
         await eventService.publishUsageStatistics(usageStats);
 
-        logger.debug('Usage statistics calculated', {
+        logger.info('Usage statistics calculated and booking updated', {
           bookingId: booking.id,
-          distance,
+          actualDistance,
+          efficiency,
+          cost,
           duration
         });
       }

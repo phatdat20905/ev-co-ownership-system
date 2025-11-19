@@ -31,6 +31,15 @@ export const bookingValidators = {
           'any.required': 'Purpose is required',
           'string.max': 'Purpose cannot exceed 500 characters'
         }),
+      destination: Joi.string().max(500).optional()
+        .messages({
+          'string.max': 'Destination cannot exceed 500 characters'
+        }),
+      estimatedDistance: Joi.number().positive().max(9999.99).optional()
+        .messages({
+          'number.positive': 'Estimated distance must be positive',
+          'number.max': 'Estimated distance cannot exceed 9999.99 km'
+        }),
       notes: Joi.string().max(1000).optional()
         .messages({
           'string.max': 'Notes cannot exceed 1000 characters'
@@ -63,10 +72,10 @@ export const bookingValidators = {
           'number.min': 'Page must be at least 1',
           'number.integer': 'Page must be an integer'
         }),
-      limit: Joi.number().integer().min(1).max(100).default(10)
+      limit: Joi.number().integer().min(1).max(10000).default(10)
         .messages({
           'number.min': 'Limit must be at least 1',
-          'number.max': 'Limit cannot exceed 100',
+          'number.max': 'Limit cannot exceed 10000',
           'number.integer': 'Limit must be an integer'
         }),
       startDate: Joi.date().iso()
@@ -83,9 +92,10 @@ export const bookingValidators = {
 
   getBookingHistory: {
     query: Joi.object({
-      period: Joi.string().valid('7d', '30d', '90d', '1y').default('30d')
+      // Accept a wider set of period values from frontend (including 'all' and '365d')
+      period: Joi.string().valid('7d', '30d', '90d', '1y', '365d', 'all').default('30d')
         .messages({
-          'any.only': 'Period must be one of: 7d, 30d, 90d, 1y'
+          'any.only': 'Period must be one of: 7d, 30d, 90d, 1y, 365d, all'
         }),
       page: Joi.number().integer().min(1).default(1),
       limit: Joi.number().integer().min(1).max(50).default(20)
@@ -130,6 +140,16 @@ export const bookingValidators = {
         .messages({
           'any.required': 'Cancellation reason is required',
           'string.max': 'Reason cannot exceed 500 characters'
+        })
+    })
+  },
+
+  getVehicleRevenue: {
+    params: Joi.object({
+      vehicleId: uuidSchema.required()
+        .messages({
+          'any.required': 'Vehicle ID is required',
+          'string.guid': 'Vehicle ID must be a valid UUID'
         })
     })
   }

@@ -6,11 +6,12 @@ export class CheckInOutController {
     try {
       const { bookingId } = req.params;
       const userId = req.user.id;
+      const userRole = req.user.role;
       const checkInData = req.body;
 
-      logger.info('Processing check-in', { bookingId, userId });
+      logger.info('Processing check-in', { bookingId, userId, userRole });
 
-      const checkInLog = await checkInOutService.checkIn(bookingId, userId, checkInData);
+      const checkInLog = await checkInOutService.checkIn(bookingId, userId, userRole, checkInData);
 
       return successResponse(res, 'Check-in completed successfully', checkInLog);
     } catch (error) {
@@ -27,11 +28,12 @@ export class CheckInOutController {
     try {
       const { bookingId } = req.params;
       const userId = req.user.id;
+      const userRole = req.user.role;
       const checkOutData = req.body;
 
-      logger.info('Processing check-out', { bookingId, userId });
+      logger.info('Processing check-out', { bookingId, userId, userRole });
 
-      const checkOutLog = await checkInOutService.checkOut(bookingId, userId, checkOutData);
+      const checkOutLog = await checkInOutService.checkOut(bookingId, userId, userRole, checkOutData);
 
       return successResponse(res, 'Check-out completed successfully', checkOutLog);
     } catch (error) {
@@ -48,10 +50,11 @@ export class CheckInOutController {
     try {
       const { bookingId } = req.params;
       const userId = req.user.id;
+      const userRole = req.user.role;
 
-      logger.debug('Getting check logs', { bookingId, userId });
+      logger.debug('Getting check logs', { bookingId, userId, userRole });
 
-      const logs = await checkInOutService.getCheckLogs(bookingId, userId);
+      const logs = await checkInOutService.getCheckLogs(bookingId, userId, userRole);
 
       return successResponse(res, 'Check logs retrieved successfully', logs);
     } catch (error) {
@@ -68,10 +71,11 @@ export class CheckInOutController {
     try {
       const { bookingId } = req.params;
       const userId = req.user.id;
+      const userRole = req.user.role;
 
-      logger.debug('Generating QR code', { bookingId, userId });
+      logger.debug('Generating QR code', { bookingId, userId, userRole });
 
-      const qrData = await checkInOutService.generateQRCode(bookingId, userId);
+      const qrData = await checkInOutService.generateQRCode(bookingId, userId, userRole);
 
       return successResponse(res, 'QR code generated successfully', qrData);
     } catch (error) {

@@ -73,40 +73,60 @@ export class AnalyticsService {
         status: 'completed',
         startTime: {
           [db.Sequelize.Op.between]: [dateRange.start, dateRange.end]
-        }
+        },
+        // Only include bookings with a recorded end time (completed sessions)
+        endTime: { [db.Sequelize.Op.ne]: null }
       };
 
       if (vehicleId) {
         where.vehicleId = vehicleId;
       }
 
-      const utilizationData = await db.Booking.findAll({
-        where,
-        attributes: [
-          'vehicleId',
-          [db.Sequelize.fn('COUNT', db.Sequelize.col('id')), 'totalBookings'],
-          [db.Sequelize.fn('SUM', db.Sequelize.literal(
-            'EXTRACT(EPOCH FROM (end_time - start_time)) / 3600'
-          )), 'totalHours'],
-          [db.Sequelize.fn('AVG', db.Sequelize.literal(
-            'EXTRACT(EPOCH FROM (end_time - start_time)) / 3600'
-          )), 'avgDuration'],
-          [db.Sequelize.fn('MAX', db.Sequelize.literal(
-            'EXTRACT(EPOCH FROM (end_time - start_time)) / 3600'
-          )), 'maxDuration']
-        ],
-        group: ['vehicleId'],
-        include: [{
-          model: db.Vehicle,
-          as: 'vehicle',
-          attributes: ['vehicleName', 'licensePlate', 'status', 'groupId']
-        }],
-        raw: true
-      });
+      let utilizationData;
+      try {
+        utilizationData = await db.Booking.findAll({
+          where,
+          attributes: [
+            'vehicleId',
+            [db.Sequelize.fn('COUNT', db.Sequelize.col('Booking.id')), 'totalBookings'],
+            [db.Sequelize.fn('SUM', db.Sequelize.literal(
+              'EXTRACT(EPOCH FROM (end_time - start_time)) / 3600'
+            )), 'totalHours'],
+            [db.Sequelize.fn('AVG', db.Sequelize.literal(
+              'EXTRACT(EPOCH FROM (end_time - start_time)) / 3600'
+            )), 'avgDuration'],
+            [db.Sequelize.fn('MAX', db.Sequelize.literal(
+              'EXTRACT(EPOCH FROM (end_time - start_time)) / 3600'
+            )), 'maxDuration']
+          ],
+          group: [
+            db.Sequelize.col('Booking.vehicle_id'),
+            db.Sequelize.col('vehicle.vehicle_name'),
+            db.Sequelize.col('vehicle.license_plate'),
+            db.Sequelize.col('vehicle.status'),
+            db.Sequelize.col('vehicle.group_id')
+          ],
+          include: [{
+            model: db.Vehicle,
+            as: 'vehicle',
+            attributes: ['vehicleName', 'licensePlate', 'status', 'groupId']
+          }],
+          raw: true
+        });
+      } catch (dbErr) {
+        // Log minimal DB error details (avoid noisy stack traces in normal logs)
+        logger.error('Database query failed in getVehicleUtilization', {
+          message: dbErr.message,
+          sql: dbErr.sql || (dbErr.parent && dbErr.parent.sql) || null
+        });
 
-      const totalPeriodHours = (dateRange.end - dateRange.start) / (1000 * 60 * 60);
+        // Rethrow a concise AppError; detailed DB metadata is logged above.
+        throw new AppError('Failed to execute vehicle utilization query', 500, 'DATABASE_ERROR');
+      }
+
+  const totalPeriodHours = (dateRange.end - dateRange.start) / (1000 * 60 * 60);
       
-      const utilization = utilizationData.map(item => {
+  const utilization = utilizationData.map(item => {
         const totalHours = parseFloat(item.totalHours || 0);
         const utilizationRate = (totalHours / totalPeriodHours) * 100;
         
@@ -409,9 +429,9 @@ export class AnalyticsService {
           [db.Sequelize.Op.between]: [dateRange.start, dateRange.end]
         }
       },
-      attributes: [
+        attributes: [
         'status',
-        [db.Sequelize.fn('COUNT', db.Sequelize.col('id')), 'count']
+        [db.Sequelize.fn('COUNT', db.Sequelize.col('Booking.id')), 'count']
       ],
       group: ['status'],
       raw: true
@@ -430,9 +450,9 @@ export class AnalyticsService {
           [db.Sequelize.Op.between]: [dateRange.start, dateRange.end]
         }
       },
-      attributes: [
+        attributes: [
         [db.Sequelize.fn('DATE', db.Sequelize.col('createdAt')), 'date'],
-        [db.Sequelize.fn('COUNT', db.Sequelize.col('id')), 'count']
+        [db.Sequelize.fn('COUNT', db.Sequelize.col('Booking.id')), 'count']
       ],
       group: [db.Sequelize.fn('DATE', db.Sequelize.col('createdAt'))],
       order: [[db.Sequelize.fn('DATE', db.Sequelize.col('createdAt')), 'ASC']],
@@ -455,12 +475,17 @@ export class AnalyticsService {
       },
       attributes: [
         'vehicleId',
-        [db.Sequelize.fn('COUNT', db.Sequelize.col('id')), 'bookingCount'],
+        [db.Sequelize.fn('COUNT', db.Sequelize.col('Booking.id')), 'bookingCount'],
         [db.Sequelize.fn('SUM', db.Sequelize.literal(
           'EXTRACT(EPOCH FROM (end_time - start_time)) / 3600'
         )), 'totalHours']
       ],
-      group: ['vehicleId'],
+      group: [
+        db.Sequelize.col('Booking.vehicle_id'),
+        db.Sequelize.col('vehicle.vehicle_name'),
+        db.Sequelize.col('vehicle.license_plate'),
+        db.Sequelize.col('vehicle.group_id')
+      ],
       include: [{
         model: db.Vehicle,
         as: 'vehicle',
@@ -487,7 +512,7 @@ export class AnalyticsService {
       },
       attributes: [
         'userId',
-        [db.Sequelize.fn('COUNT', db.Sequelize.col('id')), 'bookingCount']
+        [db.Sequelize.fn('COUNT', db.Sequelize.col('Booking.id')), 'bookingCount']
       ],
       group: ['userId'],
       order: [[db.Sequelize.literal('bookingCount'), 'DESC']],
@@ -527,7 +552,7 @@ export class AnalyticsService {
       },
       attributes: [
         'conflictType',
-        [db.Sequelize.fn('COUNT', db.Sequelize.col('id')), 'count']
+        [db.Sequelize.fn('COUNT', db.Sequelize.col('BookingConflict.id')), 'count']
       ],
       group: ['conflictType'],
       raw: true
@@ -555,7 +580,7 @@ export class AnalyticsService {
       attributes: [
         [db.Sequelize.fn('DATE', db.Sequelize.col('createdAt')), 'date'],
         'status',
-        [db.Sequelize.fn('COUNT', db.Sequelize.col('id')), 'count']
+        [db.Sequelize.fn('COUNT', db.Sequelize.col('Booking.id')), 'count']
       ],
       group: [
         db.Sequelize.fn('DATE', db.Sequelize.col('createdAt')),
@@ -578,7 +603,7 @@ export class AnalyticsService {
       },
       attributes: [
         'userId',
-        [db.Sequelize.fn('COUNT', db.Sequelize.col('id')), 'bookingCount'],
+        [db.Sequelize.fn('COUNT', db.Sequelize.col('Booking.id')), 'bookingCount'],
         [db.Sequelize.fn('SUM', db.Sequelize.literal(
           "CASE WHEN status = 'completed' THEN EXTRACT(EPOCH FROM (end_time - start_time))/3600 ELSE 0 END"
         )), 'totalHours']
@@ -824,7 +849,7 @@ export class AnalyticsService {
       where,
       attributes: [
         [db.Sequelize.fn('DATE', db.Sequelize.col('createdAt')), 'date'],
-        [db.Sequelize.fn('COUNT', db.Sequelize.col('id')), 'count']
+        [db.Sequelize.fn('COUNT', db.Sequelize.col('Booking.id')), 'count']
       ],
       group: [db.Sequelize.fn('DATE', db.Sequelize.col('createdAt'))],
       order: [[db.Sequelize.fn('DATE', db.Sequelize.col('createdAt')), 'ASC']],

@@ -42,6 +42,12 @@ export default (sequelize, DataTypes) => {
       allowNull: false,
       field: 'performed_by'
     },
+    performedAt: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+      field: 'performed_at'
+    },
     location: {
       type: DataTypes.JSONB
     }

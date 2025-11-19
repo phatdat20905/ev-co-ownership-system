@@ -19,19 +19,19 @@ router.put('/:conflictId/resolve',
 
 // Admin conflict management
 router.get('/admin/all', 
-  authorize(['staff', 'admin']), 
+  authorize('staff', 'admin'), 
   validate(conflictValidators.getConflicts), 
   conflictController.getAllConflicts
 );
 
 router.get('/admin/:conflictId', 
-  authorize(['staff', 'admin']), 
+  authorize('staff', 'admin'), 
   validate(conflictValidators.getConflict), 
   conflictController.getConflict
 );
 
 router.put('/admin/:conflictId/resolve', 
-  authorize(['staff', 'admin']), 
+  authorize('staff', 'admin'), 
   validate(conflictValidators.adminResolveConflict), 
   conflictController.adminResolveConflict
 );

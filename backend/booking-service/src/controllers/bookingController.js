@@ -140,6 +140,45 @@ export class BookingController {
       next(error);
     }
   }
+
+  async getBookingAnalytics(req, res, next) {
+    try {
+      const userId = req.user.id;
+      const { period = '30d', groupId } = req.query;
+
+      logger.debug('Getting booking analytics', { userId, period, groupId });
+
+      const analytics = await bookingService.getBookingAnalytics(userId, period, groupId);
+
+      return successResponse(res, 'Booking analytics retrieved successfully', analytics);
+    } catch (error) {
+      logger.error('Failed to get booking analytics', {
+        error: error.message,
+        userId: req.user?.id
+      });
+      next(error);
+    }
+  }
+
+  async getVehicleRevenue(req, res, next) {
+    try {
+      const { vehicleId } = req.params;
+      const userId = req.user.id;
+
+      logger.debug('Getting vehicle revenue', { vehicleId, userId });
+
+      const revenue = await bookingService.getVehicleRevenue(vehicleId, userId);
+
+      return successResponse(res, 'Vehicle revenue retrieved successfully', revenue);
+    } catch (error) {
+      logger.error('Failed to get vehicle revenue', {
+        error: error.message,
+        vehicleId: req.params.vehicleId,
+        userId: req.user?.id
+      });
+      next(error);
+    }
+  }
 }
 
 export default new BookingController();

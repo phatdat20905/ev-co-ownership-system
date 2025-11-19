@@ -371,7 +371,8 @@ export class BookingService {
           {
             model: db.Vehicle,
             as: 'vehicle',
-            attributes: ['id', 'vehicleName', 'licensePlate']
+            attributes: ['id', 'vehicleName', 'licensePlate'],
+            required: false  // LEFT JOIN instead of INNER JOIN
           }
         ],
         order: [['createdAt', 'DESC']],
@@ -391,7 +392,8 @@ export class BookingService {
       };
     } catch (error) {
       logger.error('Failed to get booking history', { 
-        error: error.message, 
+        error: error.message,
+        stack: error.stack,
         userId 
       });
       throw error;
@@ -434,8 +436,58 @@ export class BookingService {
         }
       });
 
+      // Calculate weekly usage (last 7 days)
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      
+      const weeklyUsageResult = await db.Booking.findOne({
+        where: {
+          userId,
+          status: 'completed',
+          endTime: { [Op.gte]: oneWeekAgo }
+        },
+        attributes: [
+          [db.Sequelize.fn('SUM', db.Sequelize.literal(
+            "EXTRACT(EPOCH FROM (end_time - start_time))/3600"
+          )), 'weeklyHours']
+        ],
+        raw: true
+      });
+
+      const weeklyUsage = weeklyUsageResult?.weeklyHours 
+        ? Math.round(parseFloat(weeklyUsageResult.weeklyHours) * 100) / 100 
+        : 0;
+
+      // Get group members count if groupId provided
+      let groupMembers = 0;
+      if (groupId) {
+        try {
+          // Query group-service via shared utils or direct DB if available
+          // For now, set a placeholder - this should be fetched from group-service
+          groupMembers = await this.getGroupMemberCount(groupId);
+        } catch (err) {
+          logger.warn('Failed to fetch group member count', { groupId, error: err.message });
+        }
+      }
+
       const completedBookings = stats.find(s => s.status === 'completed');
       const totalHours = completedBookings ? parseFloat(completedBookings.totalHours || 0) : 0;
+
+      // Calculate total cost from completed bookings
+      const totalCostResult = await db.Booking.findOne({
+        where: {
+          userId,
+          status: 'completed'
+        },
+          attributes: [
+            [db.Sequelize.fn('SUM', db.Sequelize.col('cost')), 'totalCost']
+          ],
+        raw: true
+      });
+
+      const totalCost = totalCostResult?.totalCost 
+        ? Math.round(parseFloat(totalCostResult.totalCost)) 
+        : 0;
 
       const result = {
         userId,
@@ -443,6 +495,9 @@ export class BookingService {
         totalBookings,
         upcomingBookings,
         totalHours: Math.round(totalHours * 100) / 100,
+        totalCost, // Added totalCost
+        weeklyUsage,
+        groupMembers,
         byStatus: stats.reduce((acc, item) => {
           acc[item.status] = parseInt(item.count);
           return acc;
@@ -460,6 +515,287 @@ export class BookingService {
       });
       throw error;
     }
+  }
+
+  // Helper method to get group member count
+  async getGroupMemberCount(groupId) {
+    try {
+      // Call user-service to get group member count
+      const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://localhost:3002';
+      const response = await fetch(`${USER_SERVICE_URL}/groups/${groupId}/count`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch group member count: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      return data.data?.count || 0;
+    } catch (error) {
+      logger.warn('Failed to fetch group member count from user-service', { 
+        groupId, 
+        error: error.message 
+      });
+      // Return default value on error
+      return 0;
+    }
+  }
+
+  async getBookingAnalytics(userId, period = '30d', groupId = null) {
+    try {
+      const cacheKey = `booking_analytics:${userId}:${period}:${groupId || 'all'}`;
+      
+      const cached = await redisClient.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+
+      // Calculate date range
+      const endDate = new Date();
+      const startDate = new Date();
+      
+      switch (period) {
+        case '7d':
+          startDate.setDate(startDate.getDate() - 7);
+          break;
+        case '30d':
+          startDate.setDate(startDate.getDate() - 30);
+          break;
+        case '90d':
+          startDate.setDate(startDate.getDate() - 90);
+          break;
+        case '365d':
+        case 'year':
+          startDate.setFullYear(startDate.getFullYear() - 1);
+          break;
+        default:
+          startDate.setDate(startDate.getDate() - 30);
+      }
+
+      const where = {
+        userId,
+        status: 'completed',
+        startTime: { [Op.between]: [startDate, endDate] }
+      };
+
+      if (groupId) {
+        where.groupId = groupId;
+      }
+
+      // Fetch all completed bookings for analytics
+      const bookings = await db.Booking.findAll({
+        where,
+        include: [{
+          model: db.Vehicle,
+          as: 'vehicle',
+          attributes: ['id', 'vehicleName', 'licensePlate', 'brand', 'model']
+        }],
+        order: [['startTime', 'ASC']]
+      });
+
+      // Process analytics data
+      const analytics = {
+        usageByDay: this.calculateUsageByDay(bookings),
+        usageByCar: this.calculateUsageByCar(bookings),
+        peakHours: this.calculatePeakHours(bookings),
+        monthlyTrend: this.calculateMonthlyTrend(bookings),
+        usageStats: this.calculateUsageStats(bookings)
+      };
+
+        // Enrich analytics with vehicle efficiency by calling vehicle-service
+        try {
+          const vehicleIds = Array.from(new Set(bookings.map(b => b.vehicleId).filter(Boolean)));
+          if (vehicleIds.length > 0) {
+            const VEHICLE_SERVICE = process.env.VEHICLE_SERVICE_URL || 'http://localhost:3005';
+            const token = process.env.INTERNAL_SERVICE_TOKEN;
+
+            // Prefer bulk endpoint to fetch efficiencies for all vehicleIds in one request
+            let effMap = {};
+            try {
+              const res = await fetch(`${VEHICLE_SERVICE}/api/v1/vehicles/stats/bulk`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ ids: vehicleIds })
+              });
+
+              if (res.ok) {
+                const json = await res.json();
+                // Expecting json.data to be a map { vehicleId: stats }
+                const map = json.data || {};
+                effMap = Object.keys(map).reduce((m, vid) => {
+                  const st = map[vid];
+                  const efficiency = st?.efficiency || st?.batteryHealth?.efficiency?.avgEfficiency || null;
+                  m[vid] = efficiency;
+                  return m;
+                }, {});
+              }
+            } catch (err) {
+              logger.warn('Bulk vehicle stats fetch failed, falling back to per-vehicle fetch', { error: err.message, userId });
+              effMap = {};
+            }
+
+            // Attach per-car efficiency and compute weighted average
+            let weightedSum = 0;
+            let totalHours = 0;
+            analytics.usageByCar = analytics.usageByCar.map((entry) => {
+              const vEff = effMap[entry.vehicleId] || null;
+              if (vEff && entry.hours) {
+                weightedSum += (entry.hours || 0) * vEff;
+                totalHours += entry.hours || 0;
+              }
+              return {
+                ...entry,
+                efficiency: vEff
+              };
+            });
+
+            analytics.usageStats.efficiency = totalHours > 0 && weightedSum > 0 ? Math.round((weightedSum / totalHours) * 100) / 100 : null;
+          }
+        } catch (err) {
+          logger.warn('Failed to enrich analytics with vehicle efficiency', { error: err.message, userId });
+        }
+
+      // Cache for 10 minutes
+      await redisClient.set(cacheKey, JSON.stringify(analytics), 600);
+
+      return analytics;
+    } catch (error) {
+      logger.error('Failed to get booking analytics', {
+        error: error.message,
+        userId
+      });
+      throw error;
+    }
+  }
+
+  calculateUsageByDay(bookings) {
+    const dayMap = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+    const usageByDay = {};
+    dayMap.forEach(day => usageByDay[day] = 0);
+
+    bookings.forEach(booking => {
+      const startTime = new Date(booking.startTime);
+      const endTime = new Date(booking.endTime);
+      const duration = booking.duration || ((endTime - startTime) / (1000 * 60 * 60));
+      const dayName = dayMap[startTime.getDay()];
+      usageByDay[dayName] += duration;
+    });
+
+    const maxHours = Math.max(...Object.values(usageByDay), 1);
+    return Object.entries(usageByDay).map(([day, hours]) => ({
+      day,
+      hours: Math.round(hours * 10) / 10,
+      percentage: Math.round((hours / maxHours) * 100)
+    }));
+  }
+
+  calculateUsageByCar(bookings) {
+    const usageByCar = {};
+    
+    bookings.forEach(booking => {
+      const carName = booking.vehicle?.vehicleName || 'Unknown';
+      const startTime = new Date(booking.startTime);
+      const endTime = new Date(booking.endTime);
+      const duration = booking.duration || ((endTime - startTime) / (1000 * 60 * 60));
+
+      if (!usageByCar[carName]) {
+        usageByCar[carName] = { hours: 0, vehicleId: booking.vehicleId };
+      }
+      usageByCar[carName].hours += duration;
+    });
+
+    const totalHours = Object.values(usageByCar).reduce((sum, v) => sum + v.hours, 0);
+    const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500'];
+
+    return Object.entries(usageByCar).map(([car, data], idx) => ({
+      car,
+      vehicleId: data.vehicleId,
+      hours: Math.round(data.hours * 10) / 10,
+      percentage: totalHours > 0 ? Math.round((data.hours / totalHours) * 100) : 0,
+      color: colors[idx % colors.length]
+    }));
+  }
+
+  calculatePeakHours(bookings) {
+    const peakHours = {};
+    for (let i = 0; i < 24; i += 2) {
+      peakHours[`${i}-${i + 2}`] = 0;
+    }
+
+    bookings.forEach(booking => {
+      const startTime = new Date(booking.startTime);
+      const hour = startTime.getHours();
+      const hourRange = `${Math.floor(hour / 2) * 2}-${Math.floor(hour / 2) * 2 + 2}`;
+      if (peakHours[hourRange] !== undefined) {
+        peakHours[hourRange]++;
+      }
+    });
+
+    const maxUsage = Math.max(...Object.values(peakHours), 1);
+    const colors = [
+      'from-blue-100 to-blue-200', 'from-blue-200 to-blue-300',
+      'from-blue-300 to-blue-400', 'from-blue-400 to-blue-500',
+      'from-blue-500 to-blue-600', 'from-blue-600 to-blue-700',
+      'from-blue-700 to-blue-800', 'from-blue-800 to-blue-900',
+      'from-blue-900 to-blue-950', 'from-indigo-500 to-indigo-600',
+      'from-indigo-600 to-indigo-700', 'from-indigo-700 to-indigo-800'
+    ];
+
+    return Object.entries(peakHours).map(([hour, usage], idx) => ({
+      hour,
+      usage: Math.round((usage / maxUsage) * 100),
+      count: usage,
+      color: colors[idx % colors.length]
+    }));
+  }
+
+  calculateMonthlyTrend(bookings) {
+    const monthlyTrend = {};
+
+    bookings.forEach(booking => {
+      const startTime = new Date(booking.startTime);
+      const endTime = new Date(booking.endTime);
+      const duration = booking.duration || ((endTime - startTime) / (1000 * 60 * 60));
+      const monthKey = `T${startTime.getMonth() + 1}`;
+
+      if (!monthlyTrend[monthKey]) {
+        monthlyTrend[monthKey] = { hours: 0, cost: 0 };
+      }
+      monthlyTrend[monthKey].hours += duration;
+  monthlyTrend[monthKey].cost += booking.cost || 0;
+    });
+
+    return Object.entries(monthlyTrend).map(([month, data]) => ({
+      month,
+      hours: Math.round(data.hours * 10) / 10,
+      cost: Math.round(data.cost)
+    }));
+  }
+
+  calculateUsageStats(bookings) {
+    const totalHours = bookings.reduce((sum, booking) => {
+      const startTime = new Date(booking.startTime);
+      const endTime = new Date(booking.endTime);
+      const duration = booking.duration || ((endTime - startTime) / (1000 * 60 * 60));
+      return sum + duration;
+    }, 0);
+
+  const totalCost = bookings.reduce((sum, booking) => sum + (booking.cost || 0), 0);
+    
+    const uniqueMonths = new Set(
+      bookings.map(b => new Date(b.startTime).getMonth())
+    ).size || 1;
+
+    return {
+      totalHours: Math.round(totalHours * 10) / 10,
+      averagePerMonth: Math.round((totalHours / uniqueMonths) * 10) / 10,
+      costPerHour: totalHours > 0 ? Math.round(totalCost / totalHours) : 0,
+      totalCost: Math.round(totalCost),
+      totalBookings: bookings.length,
+      efficiency: 'N/A' // Placeholder for vehicle efficiency data
+    };
   }
 
   async getUpcomingBookings(userId, limit = 5) {
@@ -771,6 +1107,52 @@ export class BookingService {
     } catch (error) {
       logger.error('Failed to auto-process pending bookings', {
         error: error.message
+      });
+      throw error;
+    }
+  }
+
+  async getVehicleRevenue(vehicleId, userId) {
+    try {
+      const cacheKey = `vehicle_revenue:${vehicleId}`;
+      
+      // Check cache first
+      const cached = await redisClient.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+
+      // Query total revenue for completed bookings
+      const result = await db.Booking.findOne({
+        where: {
+          vehicleId,
+          status: 'completed'
+        },
+        attributes: [
+          [db.Sequelize.fn('SUM', db.Sequelize.col('cost')), 'totalRevenue'],
+          [db.Sequelize.fn('COUNT', db.Sequelize.col('id')), 'totalBookings']
+        ],
+        raw: true
+      });
+
+      const revenue = {
+        vehicleId,
+        totalRevenue: result?.totalRevenue ? parseFloat(result.totalRevenue) : 0,
+        totalBookings: result?.totalBookings ? parseInt(result.totalBookings) : 0,
+        currency: 'VND'
+      };
+
+      // Cache for 5 minutes
+      await redisClient.set(cacheKey, JSON.stringify(revenue), 300);
+
+      logger.info('Vehicle revenue calculated', { vehicleId, revenue: revenue.totalRevenue });
+
+      return revenue;
+    } catch (error) {
+      logger.error('Failed to get vehicle revenue', { 
+        error: error.message,
+        vehicleId,
+        userId 
       });
       throw error;
     }
