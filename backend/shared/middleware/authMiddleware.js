@@ -5,8 +5,17 @@ import logger from '../utils/logger.js';
 
 export const authenticate = async (req, res, next) => {
   try {
+    // Allow service-to-service calls using an internal token header
+    const internalToken = req.headers['x-internal-token'] || req.headers['x-service-token'];
+    if (internalToken && process.env.INTERNAL_API_TOKEN && internalToken === process.env.INTERNAL_API_TOKEN) {
+      // Treat internal calls as admin-level system user
+      req.user = { id: 'internal', email: null, role: 'admin' };
+      logger.debug('Internal service authenticated via INTERNAL_API_TOKEN');
+      return next();
+    }
+
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new AuthenticationError('Access token is required');
     }
@@ -40,9 +49,15 @@ export const authorize = (...allowedRoles) => {
         throw new AuthenticationError('Authentication required');
       }
 
-      if (!allowedRoles.includes(req.user.role)) {
-        throw new AuthorizationError(`Access denied. Required roles: ${allowedRoles.join(', ')}`);
-      }
+          // Allow internal service identity to bypass role checks
+          if (req.user && req.user.id === 'internal') {
+            logger.debug('Internal user bypassing role checks', { userId: req.user.id, requiredRoles: allowedRoles });
+            return next();
+          }
+
+          if (!allowedRoles.includes(req.user.role)) {
+            throw new AuthorizationError(`Access denied. Required roles: ${allowedRoles.join(', ')}`);
+          }
 
       logger.debug('User authorized', { 
         userId: req.user.id, 
