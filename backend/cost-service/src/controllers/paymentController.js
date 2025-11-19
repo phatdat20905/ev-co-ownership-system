@@ -87,6 +87,48 @@ export class PaymentController {
     }
   }
 
+  async getPaymentFees(req, res, next) {
+    try {
+      const fees = await paymentService.getPaymentFees();
+
+      logger.info('Payment fees retrieved', { userId: req.user?.id });
+      return successResponse(res, 'Payment fees retrieved successfully', fees);
+    } catch (error) {
+      logger.error('Failed to get payment fees', { error: error.message, userId: req.user?.id });
+      next(error);
+    }
+  }
+
+  async schedulePayment(req, res, next) {
+    try {
+      const scheduleData = req.body;
+      const userId = req.user.id;
+
+      const payment = await paymentService.schedulePayment(scheduleData, userId);
+
+      logger.info('Payment scheduled', { paymentId: payment.id, userId });
+      return successResponse(res, 'Payment scheduled successfully', payment, 201);
+    } catch (error) {
+      logger.error('Failed to schedule payment', { error: error.message, userId: req.user?.id, body: req.body });
+      next(error);
+    }
+  }
+
+  async setupAutoPayment(req, res, next) {
+    try {
+      const setupData = req.body;
+      const userId = req.user.id;
+
+      const saved = await paymentService.setupAutoPayment(setupData, userId);
+
+      logger.info('Auto-payment setup saved', { userId, provider: saved.providerName });
+      return successResponse(res, 'Auto-payment setup saved', saved);
+    } catch (error) {
+      logger.error('Failed to save auto-payment setup', { error: error.message, userId: req.user?.id, body: req.body });
+      next(error);
+    }
+  }
+
   async processMoMoWebhook(req, res, next) {
     try {
       const webhookData = req.body;

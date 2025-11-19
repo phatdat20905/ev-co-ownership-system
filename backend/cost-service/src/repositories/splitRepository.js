@@ -136,6 +136,187 @@ export class SplitRepository {
       throw new AppError('Failed to fetch overdue splits', 500, 'OVERDUE_SPLITS_ERROR');
     }
   }
+
+  async getOwnershipBreakdown(groupId, period = 'month') {
+    try {
+      // Calculate date range
+      const now = new Date();
+      let startDate;
+      
+      switch (period) {
+        case 'week':
+          startDate = new Date(now.setDate(now.getDate() - 7));
+          break;
+        case 'month':
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        case 'quarter':
+          startDate = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+          break;
+        default:
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      }
+
+      const breakdown = await db.CostSplit.findAll({
+        attributes: [
+          'userId',
+          [db.Sequelize.fn('SUM', db.Sequelize.col('split_amount')), 'totalAmount'],
+          [db.Sequelize.fn('SUM', db.Sequelize.col('paid_amount')), 'paidAmount'],
+          [db.Sequelize.fn('COUNT', db.Sequelize.literal("CASE WHEN payment_status = 'paid' THEN 1 END")), 'paidCount'],
+          [db.Sequelize.fn('COUNT', '*'), 'totalCount']
+        ],
+        include: [{
+          model: db.Cost,
+          as: 'cost',
+          where: {
+            groupId,
+            costDate: { [db.Sequelize.Op.gte]: startDate }
+          },
+          attributes: []
+        }],
+        group: ['userId'],
+        raw: true
+      });
+
+      return breakdown.map(item => ({
+        userId: item.userId,
+        amount: parseFloat(item.totalAmount || 0),
+        paidAmount: parseFloat(item.paidAmount || 0),
+        paid: parseInt(item.paidCount || 0) === parseInt(item.totalCount || 0),
+        splitCount: parseInt(item.totalCount || 0)
+      }));
+    } catch (error) {
+      logger.error('SplitRepository.getOwnershipBreakdown - Error:', error);
+      throw new AppError('Failed to get ownership breakdown', 500, 'OWNERSHIP_BREAKDOWN_ERROR');
+    }
+  }
+
+  async getPaymentHistory(userId, groupId, filters = {}) {
+    try {
+      const { status, startDate, endDate, page = 1, limit = 20 } = filters;
+      const offset = (page - 1) * limit;
+
+      const where = { userId };
+      if (status && status !== 'all') {
+        where.paymentStatus = status === 'completed' ? 'paid' : status;
+      }
+
+      const costWhere = { groupId };
+      if (startDate && endDate) {
+        costWhere.costDate = { 
+          [db.Sequelize.Op.between]: [startDate, endDate] 
+        };
+      }
+
+      const { count, rows } = await db.CostSplit.findAndCountAll({
+        where,
+        include: [{
+          model: db.Cost,
+          as: 'cost',
+          where: costWhere,
+          include: [
+            { 
+              model: db.CostCategory, 
+              as: 'category',
+              attributes: ['id', 'categoryName'] 
+            }
+          ]
+        }],
+        order: [['createdAt', 'DESC']],
+        limit,
+        offset,
+        distinct: true
+      });
+
+      const payments = rows.map(split => ({
+        id: split.id,
+        description: split.cost?.costName || 'Chi phí',
+        amount: parseFloat(split.splitAmount),
+        paidAmount: parseFloat(split.paidAmount),
+        date: new Date(split.cost?.costDate || split.createdAt).toLocaleDateString('vi-VN'),
+        status: split.paymentStatus === 'paid' ? 'completed' : split.paymentStatus,
+        type: split.cost?.category?.categoryName || 'other',
+        method: 'VNPay',
+        invoice: `INV-${split.costId?.slice(0, 8)}`,
+        dueDate: split.dueDate ? new Date(split.dueDate).toLocaleDateString('vi-VN') : null,
+        paidAt: split.paidAt ? new Date(split.paidAt).toLocaleDateString('vi-VN') : null
+      }));
+
+      return {
+        rows: payments,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: count,
+          totalPages: Math.ceil(count / limit)
+        }
+      };
+    } catch (error) {
+      logger.error('SplitRepository.getPaymentHistory - Error:', error);
+      throw new AppError('Failed to get payment history', 500, 'PAYMENT_HISTORY_ERROR');
+    }
+  }
+
+  async getPaymentStats(userId, groupId, startDate, endDate) {
+    try {
+      const where = { userId };
+      const costWhere = { groupId };
+      
+      if (startDate && endDate) {
+        costWhere.costDate = { 
+          [db.Sequelize.Op.between]: [startDate, endDate] 
+        };
+      }
+
+      const stats = await db.CostSplit.findAll({
+        attributes: [
+          'paymentStatus',
+          [db.Sequelize.fn('SUM', db.Sequelize.col('split_amount')), 'totalAmount'],
+          [db.Sequelize.fn('COUNT', '*'), 'count']
+        ],
+        where,
+        include: [{
+          model: db.Cost,
+          as: 'cost',
+          where: costWhere,
+          attributes: []
+        }],
+        group: ['paymentStatus'],
+        raw: true
+      });
+
+      const result = {
+        totalPaid: 0,
+        pendingAmount: 0,
+        completedPayments: 0,
+        failedPayments: 0
+      };
+
+      stats.forEach(stat => {
+        const amount = parseFloat(stat.totalAmount || 0);
+        const count = parseInt(stat.count || 0);
+        
+        switch (stat.paymentStatus) {
+          case 'paid':
+            result.totalPaid = amount;
+            result.completedPayments = count;
+            break;
+          case 'pending':
+            result.pendingAmount += amount;
+            break;
+          case 'overdue':
+            result.pendingAmount += amount;
+            result.failedPayments = count;
+            break;
+        }
+      });
+
+      return result;
+    } catch (error) {
+      logger.error('SplitRepository.getPaymentStats - Error:', error);
+      throw new AppError('Failed to get payment stats', 500, 'PAYMENT_STATS_ERROR');
+    }
+  }
 }
 
 export default new SplitRepository();

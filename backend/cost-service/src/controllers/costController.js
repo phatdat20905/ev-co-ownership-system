@@ -130,6 +130,38 @@ export class CostController {
     }
   }
 
+  async getAdminOverview(req, res, next) {
+    try {
+      const { period = 'month' } = req.query;
+      const overview = await costService.getAdminOverview(period);
+      return successResponse(res, 'Admin overview retrieved successfully', overview);
+    } catch (error) {
+      logger.error('Failed to get admin overview', { error: error.message, userId: req.user?.id });
+      next(error);
+    }
+  }
+
+  async getCostBreakdown(req, res, next) {
+    try {
+      const { groupId } = req.params;
+      const { period = 'month' } = req.query;
+      const userId = req.user.id;
+
+      const breakdown = await costService.getCostBreakdown(groupId, period, userId);
+
+      logger.info('Cost breakdown retrieved successfully', { groupId, period, userId });
+
+      return successResponse(res, 'Cost breakdown retrieved successfully', breakdown);
+    } catch (error) {
+      logger.error('Failed to get cost breakdown', { 
+        error: error.message, 
+        groupId: req.params.groupId,
+        userId: req.user?.id 
+      });
+      next(error);
+    }
+  }
+
   async calculateSplits(req, res, next) {
     try {
       const { id } = req.params;
@@ -144,6 +176,121 @@ export class CostController {
       logger.error('Failed to calculate cost splits', { 
         error: error.message, 
         costId: req.params.id,
+        userId: req.user?.id 
+      });
+      next(error);
+    }
+  }
+
+  async getExpenseTracking(req, res, next) {
+    try {
+      const { groupId } = req.params;
+      const { year } = req.query;
+      const userId = req.user.id;
+
+      const expenseData = await costService.getExpenseTracking(groupId, year, userId);
+
+      logger.info('Expense tracking retrieved successfully', { groupId, year, userId });
+
+      return successResponse(res, 'Expense tracking retrieved successfully', expenseData);
+    } catch (error) {
+      logger.error('Failed to get expense tracking', { 
+        error: error.message, 
+        groupId: req.params.groupId,
+        year: req.query.year,
+        userId: req.user?.id 
+      });
+      next(error);
+    }
+  }
+
+  async getPaymentHistory(req, res, next) {
+    try {
+      const { groupId } = req.params;
+      const filters = req.query;
+      const userId = req.user.id;
+
+      const paymentData = await costService.getPaymentHistory(groupId, userId, filters);
+
+      logger.info('Payment history retrieved successfully', { groupId, userId });
+
+      return successResponse(res, 'Payment history retrieved successfully', paymentData);
+    } catch (error) {
+      logger.error('Failed to get payment history', { 
+        error: error.message, 
+        groupId: req.params.groupId,
+        userId: req.user?.id 
+      });
+      next(error);
+    }
+  }
+
+  async exportCostBreakdownPDF(req, res, next) {
+    try {
+      const { groupId } = req.params;
+      const { period = 'month' } = req.query;
+      const userId = req.user.id;
+
+      const pdfBuffer = await costService.exportCostBreakdownPDF(groupId, period, userId);
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=cost-breakdown-${groupId}-${period}.pdf`);
+      
+      logger.info('Cost breakdown PDF exported', { groupId, period, userId });
+      
+      return res.send(pdfBuffer);
+    } catch (error) {
+      logger.error('Failed to export cost breakdown PDF', { 
+        error: error.message, 
+        groupId: req.params.groupId,
+        userId: req.user?.id 
+      });
+      next(error);
+    }
+  }
+
+  async exportExpenseTrackingExcel(req, res, next) {
+    try {
+      const { groupId } = req.params;
+      const { year } = req.query;
+      const userId = req.user.id;
+
+      const excelBuffer = await costService.exportExpenseTrackingExcel(groupId, year, userId);
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=expense-tracking-${groupId}-${year}.xlsx`);
+      
+      logger.info('Expense tracking Excel exported', { groupId, year, userId });
+      
+      return res.send(excelBuffer);
+    } catch (error) {
+      logger.error('Failed to export expense tracking Excel', { 
+        error: error.message, 
+        groupId: req.params.groupId,
+        userId: req.user?.id 
+      });
+      next(error);
+    }
+  }
+
+  async exportPaymentHistoryPDF(req, res, next) {
+    try {
+      const { groupId } = req.params;
+      const filters = req.query;
+      const userId = req.user.id;
+
+      const pdfBuffer = await costService.exportPaymentHistoryPDF(groupId, userId, filters);
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=payment-history-${groupId}.pdf`);
+      
+      logger.info('Payment history PDF exported', { groupId, userId });
+      
+      return res.send(pdfBuffer);
+    } catch (error) {
+      logger.error('Failed to export payment history PDF', { 
+        error: error.message, 
+        groupId: req.params.groupId,
         userId: req.user?.id 
       });
       next(error);

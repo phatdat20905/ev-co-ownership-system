@@ -10,6 +10,9 @@ import vnpayAdapter from './vnpayAdapter.js';
 import vietqrAdapter from './vietqrAdapter.js';
 import eventService from './eventService.js';
 import db from '../models/index.js'; // THÊM DÒNG NÀY
+import { readFile, writeFile } from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 export class PaymentService {
   async createPayment(paymentData, userId) {
@@ -258,6 +261,106 @@ export class PaymentService {
       return await paymentRepository.getPaymentSummary(groupId, period);
     } catch (error) {
       logger.error('PaymentService.getPaymentSummary - Error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Return payment provider fee configuration.
+   * For now this is static — can be loaded from env or DB later.
+   */
+  async getPaymentFees() {
+    try {
+      const fees = {
+        currency: 'VND',
+        providers: [
+          { name: 'momo', label: 'MoMo', feePercent: 0.02, fixedFee: 1000 },
+          { name: 'vnpay', label: 'VNPay', feePercent: 0.015, fixedFee: 500 },
+          { name: 'vietqr', label: 'VietQR/Bank Transfer', feePercent: 0.005, fixedFee: 0 }
+        ]
+      };
+
+      return fees;
+    } catch (error) {
+      logger.error('PaymentService.getPaymentFees - Error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Schedule a payment to be executed later. This will create a Payment record with
+   * paymentStatus set to 'pending' and a gatewayResponse.schedule meta so the
+   * scheduler (cron/job) can pick it up later. No schema migration required.
+   */
+  async schedulePayment(scheduleData, userId) {
+    try {
+      const { costSplitId, amount, scheduleAt, paymentMethod, providerName } = scheduleData;
+
+      // Basic validations: cost split ownership & amount checks
+      const costSplits = await splitRepository.findByCostId(costSplitId);
+      const split = costSplits.find(s => s.id === costSplitId);
+      if (!split) throw new AppError('Cost split not found', 404, 'COST_SPLIT_NOT_FOUND');
+      if (split.userId !== userId) throw new AppError('Not authorized to schedule this payment', 403, 'SCHEDULE_UNAUTHORIZED');
+
+      const remainingAmount = parseFloat(split.splitAmount) - parseFloat(split.paidAmount || 0);
+      if (amount > remainingAmount) {
+        throw new AppError(`Scheduled amount exceeds remaining balance. Remaining: ${remainingAmount}`, 400, 'SCHEDULE_AMOUNT_EXCEEDED');
+      }
+
+      const txnId = `SCHED-${Date.now()}`;
+
+      const payment = await paymentRepository.create({
+        costSplitId,
+        userId,
+        amount,
+        paymentMethod: paymentMethod || 'bank_transfer',
+        providerName: providerName || 'scheduled',
+        paymentStatus: 'pending',
+        transactionId: txnId,
+        gatewayResponse: { scheduled: true, scheduleAt, scheduledBy: userId }
+      });
+
+      // Note: actual scheduled execution should be handled by a background job/cron
+      return payment;
+    } catch (error) {
+      logger.error('PaymentService.schedulePayment - Error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save auto-payment setup for a user (dev-friendly JSON persistence).
+   * This is intentionally simple: stores per-user config in src/data/autoPaymentSetups.json
+   */
+  async setupAutoPayment(setupData, userId) {
+    try {
+      const { providerName, providerConfig = {}, enabled = true } = setupData;
+
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = path.dirname(__filename);
+      const filePath = path.join(__dirname, '../data/autoPaymentSetups.json');
+
+      let existing = {};
+      try {
+        const raw = await readFile(filePath, 'utf8');
+        existing = raw ? JSON.parse(raw) : {};
+      } catch (err) {
+        // If file doesn't exist or is malformed, start with empty object
+        existing = {};
+      }
+
+      existing[userId] = {
+        providerName,
+        providerConfig,
+        enabled,
+        updatedAt: new Date().toISOString()
+      };
+
+      await writeFile(filePath, JSON.stringify(existing, null, 2), 'utf8');
+
+      return existing[userId];
+    } catch (error) {
+      logger.error('PaymentService.setupAutoPayment - Error:', error);
       throw error;
     }
   }

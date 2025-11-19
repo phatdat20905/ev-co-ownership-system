@@ -7,28 +7,31 @@ import { logger, redisClient } from '@ev-coownership/shared';
 class OverdueReminderJob {
   constructor() {
     this.queueName = 'overdue-reminders';
-    
-    // Sử dụng redisClient.client để fix lỗi authentication
-    this.queue = new Queue(this.queueName, {
-      connection: redisClient.client
-    });
-    
-    this.worker = new Worker(
-      this.queueName,
-      this.processJob.bind(this),
-      { 
-        connection: redisClient.client,
-        concurrency: 3
-      }
-    );
-
-    this.setupWorkerEvents();
+    // lazy-init to avoid blocking startup if Redis isn't fully ready
+    this.queue = null;
+    this.worker = null;
+    this._initialized = false;
   }
 
   async run() {
     try {
       logger.info('🔄 Starting overdue reminder job');
-      await this.scheduleDailyReminders();
+      if (!this._initialized) {
+        try {
+          this.queue = new Queue(this.queueName, { connection: redisClient.client });
+          this.worker = new Worker(this.queueName, this.processJob.bind(this), { connection: redisClient.client, concurrency: 3 });
+          this.setupWorkerEvents();
+          this._initialized = true;
+          logger.info('✅ Overdue reminder queue/worker initialized');
+        } catch (err) {
+          logger.error('Failed to initialize overdue reminder queue/worker', { error: err?.message || err });
+        }
+      }
+
+      // schedule asynchronously so it doesn't block startup
+      this.scheduleDailyReminders().catch((err) => {
+        logger.error('Failed to schedule daily reminders (async)', { error: err?.message || err });
+      });
     } catch (error) {
       logger.error('Failed to start reminder job', { error: error.message });
     }
@@ -40,10 +43,10 @@ class OverdueReminderJob {
       await this.queue.add(
         'daily-overdue-reminders',
         { type: 'daily' },
-        {
-          repeat: { pattern: '0 9 * * *' }, // 9AM hàng ngày
-          jobId: 'daily-overdue-reminders'
-        }
+          {
+            repeat: { cron: '0 9 * * *' }, // 9AM hàng ngày
+            jobId: 'daily-overdue-reminders'
+          }
       );
 
       logger.info('✅ Daily overdue reminders scheduled');
@@ -190,6 +193,7 @@ class OverdueReminderJob {
   }
 
   setupWorkerEvents() {
+    if (!this.worker) return;
     this.worker.on('completed', (job) => {
       logger.info('Reminder job completed', { jobId: job.id });
     });
@@ -197,14 +201,22 @@ class OverdueReminderJob {
     this.worker.on('failed', (job, error) => {
       logger.error('Reminder job failed', { 
         jobId: job?.id, 
-        error: error.message 
+        error: error?.message || error
       });
     });
   }
 
   async close() {
-    await this.worker.close();
-    await this.queue.close();
+    try {
+      if (this.worker) await this.worker.close();
+    } catch (err) {
+      logger.error('Error closing reminder worker', { error: err?.message || err });
+    }
+    try {
+      if (this.queue) await this.queue.close();
+    } catch (err) {
+      logger.error('Error closing reminder queue', { error: err?.message || err });
+    }
     logger.info('Reminder job closed');
   }
 }

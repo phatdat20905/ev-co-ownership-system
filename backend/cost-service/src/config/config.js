@@ -19,7 +19,7 @@ export default {
     password: process.env.DB_PASSWORD || 'postgres123',
     database: process.env.DB_NAME || 'cost_db',
     host: process.env.DB_HOST || 'localhost',
-    logging: console.log,
+    // logging: console.log,
     ...commonConfig,
   },
   test: {

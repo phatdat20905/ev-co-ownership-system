@@ -6,28 +6,37 @@ import { logger, redisClient } from '@ev-coownership/shared';
 class InvoiceGenerationJob {
   constructor() {
     this.queueName = 'invoice-generation';
-    
-    // Sử dụng redisClient.client để fix lỗi authentication
-    this.queue = new Queue(this.queueName, {
-      connection: redisClient.client
-    });
-    
-    this.worker = new Worker(
-      this.queueName,
-      this.processJob.bind(this),
-      { 
-        connection: redisClient.client,
-        concurrency: 2
-      }
-    );
-
-    this.setupWorkerEvents();
+    // lazy-init: don't create Queue/Worker at import time to avoid blocking startup
+    this.queue = null;
+    this.worker = null;
+    this._initialized = false;
   }
 
   async run() {
     try {
       logger.info('🔄 Starting invoice generation job');
-      await this.scheduleMonthlyInvoices();
+      // Initialize queue/worker if not already
+      if (!this._initialized) {
+        try {
+          // create queue and worker with redis connection
+          this.queue = new Queue(this.queueName, { connection: redisClient.client });
+          this.worker = new Worker(
+            this.queueName,
+            this.processJob.bind(this),
+            { connection: redisClient.client, concurrency: 2 }
+          );
+          this.setupWorkerEvents();
+          this._initialized = true;
+          logger.info('✅ Invoice job queue/worker initialized');
+        } catch (err) {
+          logger.error('Failed to initialize invoice queue/worker', { error: err?.message || err });
+        }
+      }
+
+      // Schedule monthly invoices asynchronously so scheduling doesn't block startup
+      this.scheduleMonthlyInvoices().catch((err) => {
+        logger.error('Failed to schedule monthly invoices (async)', { error: err?.message || err });
+      });
     } catch (error) {
       logger.error('Failed to start invoice job', { error: error.message });
     }
@@ -40,7 +49,8 @@ class InvoiceGenerationJob {
         'monthly-invoice-generation',
         { type: 'monthly' },
         {
-          repeat: { pattern: '0 2 1 * *' }, // 2AM ngày 1 hàng tháng
+          // Use cron expression with bullmq repeat option
+          repeat: { cron: '0 2 1 * *' }, // 2AM ngày 1 hàng tháng
           jobId: 'monthly-invoice-generation'
         }
       );
@@ -138,6 +148,7 @@ class InvoiceGenerationJob {
   }
 
   setupWorkerEvents() {
+    if (!this.worker) return;
     this.worker.on('completed', (job) => {
       logger.info('Invoice job completed', { jobId: job.id });
     });
@@ -145,14 +156,22 @@ class InvoiceGenerationJob {
     this.worker.on('failed', (job, error) => {
       logger.error('Invoice job failed', { 
         jobId: job?.id, 
-        error: error.message 
+        error: error?.message || error
       });
     });
   }
 
   async close() {
-    await this.worker.close();
-    await this.queue.close();
+    try {
+      if (this.worker) await this.worker.close();
+    } catch (err) {
+      logger.error('Error closing invoice worker', { error: err?.message || err });
+    }
+    try {
+      if (this.queue) await this.queue.close();
+    } catch (err) {
+      logger.error('Error closing invoice queue', { error: err?.message || err });
+    }
     logger.info('Invoice job closed');
   }
 }

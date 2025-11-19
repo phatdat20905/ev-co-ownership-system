@@ -14,8 +14,10 @@ router.post('/webhook/vietqr', paymentController.processVietQRWebhook);
 
 // Authenticated routes
 router.use(authenticate);
-
+router.get('/fees', paymentController.getPaymentFees);
 router.post('/create', validate(paymentValidators.createPayment), paymentController.createPayment);
+router.post('/schedule', validate(paymentValidators.schedulePayment), paymentController.schedulePayment);
+router.post('/auto-setup', validate(paymentValidators.autoSetup), paymentController.setupAutoPayment);
 router.get('/user', paymentController.getUserPayments);
 router.get('/:id', validate(paymentValidators.getPayment), paymentController.getPayment);
 router.get('/group/:groupId/summary', validate(paymentValidators.getPaymentSummary), paymentController.getPaymentSummary);

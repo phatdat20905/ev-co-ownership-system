@@ -106,30 +106,21 @@ export class CostRepository {
   async getCostSummary(groupId, period = 'month') {
     try {
       const where = { groupId };
-      
-      // Add date filter based on period
+      // Calculate a safe startDate based on period (avoid mutating `now`)
       const now = new Date();
-      let startDate;
-      
-      switch (period) {
-        case 'week':
-          startDate = new Date(now.setDate(now.getDate() - 7));
-          break;
-        case 'month':
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-          break;
-        case 'quarter':
-          startDate = new Date(now.getFullYear(), now.getMonth() - 3, 1);
-          break;
-        case 'year':
-          startDate = new Date(now.getFullYear(), 0, 1);
-          break;
-        default:
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      let startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      if (period === 'week') {
+        startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      } else if (period === 'quarter') {
+        startDate = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+      } else if (period === 'year') {
+        startDate = new Date(now.getFullYear(), 0, 1);
       }
 
       where.costDate = { [db.Sequelize.Op.gte]: startDate };
 
+      // Use a simpler GROUP BY query without joining category to avoid dialect alias issues
       const summary = await db.Cost.findAll({
         where,
         attributes: [
@@ -137,19 +128,91 @@ export class CostRepository {
           [db.Sequelize.fn('SUM', db.Sequelize.col('total_amount')), 'totalAmount'],
           [db.Sequelize.fn('COUNT', db.Sequelize.col('id')), 'costCount']
         ],
-        include: [
-          { model: db.CostCategory, as: 'category', attributes: ['id', 'categoryName'] }
-        ],
-        group: ['categoryId', 'category.id'],
+        group: ['categoryId'],
         raw: true
       });
 
-      return summary;
+      // Fetch category names separately to attach them to the summary rows
+      const categoryIds = summary.map(s => s.categoryId).filter(Boolean);
+      let categoriesMap = {};
+      if (categoryIds.length > 0) {
+        const categories = await db.CostCategory.findAll({
+          where: { id: categoryIds },
+          attributes: ['id', 'categoryName'],
+          raw: true
+        });
+        categoriesMap = categories.reduce((acc, c) => {
+          acc[c.id] = c.categoryName;
+          return acc;
+        }, {});
+      }
+
+      const enriched = summary.map(item => ({
+        ...item,
+        categoryName: categoriesMap[item.categoryId] || 'Khác'
+      }));
+
+      return enriched || [];
     } catch (error) {
       logger.error('CostRepository.getCostSummary - Error:', error);
       throw new AppError('Failed to get cost summary', 500, 'COST_SUMMARY_ERROR');
     }
   }
+
+  async getCostsByDateRange(groupId, startDate, endDate) {
+    try {
+      const where = { 
+        groupId,
+        costDate: { 
+          [db.Sequelize.Op.between]: [startDate, endDate] 
+        }
+      };
+
+      const costs = await db.Cost.findAll({
+        where,
+        include: [
+          { model: db.CostCategory, as: 'category', attributes: ['id', 'categoryName'] }
+        ],
+        order: [['costDate', 'DESC']],
+        raw: true
+      });
+
+      return costs;
+    } catch (error) {
+      logger.error('CostRepository.getCostsByDateRange - Error:', error);
+      throw new AppError('Failed to get costs by date range', 500, 'COST_DATE_RANGE_ERROR');
+    }
+  }
+
+    // Get total revenue across all groups for a given period
+    async getTotalRevenue(period = 'month') {
+      try {
+        const now = new Date();
+        let startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        if (period === 'week') {
+          startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        } else if (period === 'quarter') {
+          startDate = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+        } else if (period === 'year') {
+          startDate = new Date(now.getFullYear(), 0, 1);
+        }
+
+        const result = await db.Cost.findAll({
+          where: {
+            costDate: { [db.Sequelize.Op.gte]: startDate }
+          },
+          attributes: [[db.Sequelize.fn('SUM', db.Sequelize.col('total_amount')), 'totalRevenue']],
+          raw: true
+        });
+
+        const totalRevenue = parseFloat(result?.[0]?.totalRevenue || 0);
+        return totalRevenue;
+      } catch (error) {
+        logger.error('CostRepository.getTotalRevenue - Error:', error);
+        throw new AppError('Failed to calculate total revenue', 500, 'COST_REVENUE_ERROR');
+      }
+    }
 }
 
 export default new CostRepository();
