@@ -13,13 +13,15 @@ router.use('/auth', createServiceProxy('auth', serviceMap.auth));
 router.use('/user', authenticate, createServiceProxy('user', serviceMap.user));
 
 // Booking – yêu cầu đăng nhập
-router.use('/bookings', authenticate, createServiceProxy('booking', serviceMap.booking));
+// Use plural serviceName to match downstream route prefixes (avoid path rewrite mismatch)
+router.use('/bookings', authenticate, createServiceProxy('bookings', serviceMap.booking));
 
 // Cost, Vehicle, Contract, Notification, AI – đều yêu cầu đăng nhập
-router.use('/costs', authenticate, createServiceProxy('cost', serviceMap.cost));
-router.use('/vehicles', authenticate, createServiceProxy('vehicle', serviceMap.vehicle));
-router.use('/contracts', authenticate, createServiceProxy('contract', serviceMap.contract));
-router.use('/notifications', authenticate, createServiceProxy('notification', serviceMap.notification));
+// Ensure serviceName passed to proxy matches the mounted path so pathRewrite preserves expected downstream route prefixes
+router.use('/costs', authenticate, createServiceProxy('costs', serviceMap.cost));
+router.use('/vehicles', authenticate, createServiceProxy('vehicles', serviceMap.vehicle));
+router.use('/contracts', authenticate, createServiceProxy('contracts', serviceMap.contract));
+router.use('/notifications', authenticate, createServiceProxy('notifications', serviceMap.notification));
 router.use('/ai', authenticate, createServiceProxy('ai', serviceMap.ai));
 
 // Admin – yêu cầu admin role (phân quyền ở service level)
