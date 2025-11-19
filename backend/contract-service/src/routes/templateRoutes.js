@@ -13,7 +13,7 @@ router.use(authenticate);
 
 // Template CRUD operations (Admin only)
 router.post('/', 
-  authorize(['admin', 'staff']),
+  authorize('admin', 'staff'),
   validate(templateValidators.createTemplate), 
   templateController.createTemplate
 );
@@ -32,13 +32,13 @@ router.get('/:templateId',
 );
 
 router.put('/:templateId', 
-  authorize(['admin', 'staff']),
+  authorize('admin', 'staff'),
   validate(templateValidators.updateTemplate), 
   templateController.updateTemplate
 );
 
 router.delete('/:templateId', 
-  authorize(['admin', 'staff']),
+  authorize('admin', 'staff'),
   templateController.deleteTemplate
 );
 

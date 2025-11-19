@@ -79,6 +79,58 @@ export class ContractService {
     }
   }
 
+  async getAllContracts(filters = {}) {
+    try {
+      const {
+        status,
+        contractType,
+        page = 1,
+        limit = 20,
+        sortBy = 'created_at',
+        sortOrder = 'DESC'
+      } = filters;
+
+      const where = {};
+      
+      if (status) where.status = status;
+      if (contractType) where.contract_type = contractType;
+
+      const offset = (page - 1) * limit;
+
+      // Get all contracts with parties
+      const { count, rows: contracts } = await db.Contract.findAndCountAll({
+        where,
+        include: [
+          {
+            model: db.ContractParty,
+            as: 'parties',
+            attributes: ['user_id', 'party_role', 'has_signed', 'signing_order', 'ownership_percentage'],
+            required: false // LEFT JOIN to include contracts even without parties
+          }
+        ],
+        order: [[sortBy, sortOrder]],
+        limit,
+        offset,
+        distinct: true
+      });
+
+      const result = {
+        contracts,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: count,
+          totalPages: Math.ceil(count / limit)
+        }
+      };
+
+      return result;
+    } catch (error) {
+      logger.error('Failed to get all contracts', { error: error.message });
+      throw error;
+    }
+  }
+
   async getContractById(contractId, userId = null) {
     try {
       const cacheKey = `contract:${contractId}`;

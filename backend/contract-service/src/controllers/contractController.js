@@ -79,6 +79,8 @@ export class ContractController {
   async getUserContracts(req, res, next) {
     try {
       const userId = req.user.id;
+      const userRole = req.user.role;
+      
       const filters = {
         status: req.query.status,
         contractType: req.query.contractType,
@@ -88,7 +90,13 @@ export class ContractController {
         sortOrder: req.query.sortOrder || 'DESC'
       };
 
-      const result = await contractService.getContractsByUser(userId, filters);
+      // If user is admin or staff, get all contracts; otherwise filter by user
+      let result;
+      if (userRole === 'admin' || userRole === 'staff') {
+        result = await contractService.getAllContracts(filters);
+      } else {
+        result = await contractService.getContractsByUser(userId, filters);
+      }
 
       return successResponse(res, 'User contracts retrieved successfully', result);
     } catch (error) {
