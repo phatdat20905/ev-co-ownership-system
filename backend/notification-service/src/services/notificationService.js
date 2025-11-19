@@ -289,6 +289,31 @@ class NotificationService {
     return notification;
   }
 
+  async markAllAsRead(userId) {
+    const [updatedCount] = await db.Notification.update(
+      {
+        status: NOTIFICATION_STATUS.READ,
+        readAt: new Date(),
+      },
+      {
+        where: {
+          userId,
+          status: { [db.Sequelize.Op.ne]: NOTIFICATION_STATUS.READ }
+        }
+      }
+    );
+
+    logger.info('All notifications marked as read', {
+      userId,
+      count: updatedCount
+    });
+
+    return {
+      success: true,
+      count: updatedCount
+    };
+  }
+
   async deleteNotification(notificationId, userId) {
     const notification = await db.Notification.findOne({
       where: { id: notificationId, userId },
@@ -301,6 +326,59 @@ class NotificationService {
     await notification.destroy();
     
     return { success: true };
+  }
+
+  async sendBulkNotification(bulkData) {
+    const { recipients, title, message, type, metadata, channels } = bulkData;
+    
+    let sentCount = 0;
+    let failedCount = 0;
+    const results = [];
+
+    for (const userId of recipients) {
+      try {
+        const result = await this.sendNotification({
+          userId,
+          type,
+          title,
+          message,
+          channels,
+          metadata
+        });
+        
+        sentCount++;
+        results.push({
+          userId,
+          success: true,
+          notificationId: result.notificationId
+        });
+      } catch (error) {
+        failedCount++;
+        results.push({
+          userId,
+          success: false,
+          error: error.message
+        });
+        
+        logger.error('Failed to send notification to user', {
+          userId,
+          error: error.message,
+          title
+        });
+      }
+    }
+
+    logger.info('Bulk notification completed', {
+      total: recipients.length,
+      sent: sentCount,
+      failed: failedCount
+    });
+
+    return {
+      sent: sentCount,
+      failed: failedCount,
+      results
+    };
   }
 }
 

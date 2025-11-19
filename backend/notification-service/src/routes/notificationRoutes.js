@@ -10,14 +10,17 @@ router.use(authenticate);
 
 // Send notifications
 router.post('/', notificationController.sendNotification);
+router.post('/send', notificationController.sendBulkNotification); // Bulk send for groups
 router.post('/template', notificationController.sendTemplateNotification);
 
 // Get user notifications
+router.get('/', notificationController.getCurrentUserNotifications); // Get current user's notifications
 router.get('/user/:userId', notificationController.getUserNotifications);
 router.get('/stats/:userId', notificationController.getNotificationStats);
 
 // Notification actions
 router.put('/:id/read', notificationController.markAsRead);
+router.put('/read-all', notificationController.markAllAsRead); // Mark all as read
 router.delete('/:id', notificationController.deleteNotification);
 
 export default router;

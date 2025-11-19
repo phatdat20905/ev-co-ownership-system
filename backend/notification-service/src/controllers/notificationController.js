@@ -26,6 +26,47 @@ class NotificationController {
     }
   }
 
+  async sendBulkNotification(req, res, next) {
+    try {
+      const { recipients, title, message, type, metadata } = req.body;
+
+      if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
+        throw new AppError('Recipients array is required', 400, 'MISSING_REQUIRED_FIELDS');
+      }
+
+      if (!title || !message) {
+        throw new AppError('Title and message are required', 400, 'MISSING_REQUIRED_FIELDS');
+      }
+
+      const results = await notificationService.sendBulkNotification({
+        recipients,
+        title,
+        message,
+        type: type || 'group_announcement',
+        metadata: metadata || {},
+        channels: ['in_app', 'push'] // Default channels for group notifications
+      });
+
+      logger.info('Bulk notifications sent', {
+        recipientCount: recipients.length,
+        sentCount: results.sent,
+        failedCount: results.failed,
+      });
+
+      return successResponse(res, 'Notifications sent successfully', {
+        sent: results.sent,
+        failed: results.failed,
+        total: recipients.length
+      }, 201);
+    } catch (error) {
+      logger.error('Failed to send bulk notifications', {
+        error: error.message,
+        recipientCount: req.body?.recipients?.length,
+      });
+      next(error);
+    }
+  }
+
   async sendTemplateNotification(req, res, next) {
     try {
       const { templateName, userId, variables = {} } = req.body;
@@ -154,6 +195,54 @@ class NotificationController {
       logger.error('Failed to get notification stats', {
         error: error.message,
         userId: req.params?.userId,
+      });
+      next(error);
+    }
+  }
+
+  async getCurrentUserNotifications(req, res, next) {
+    try {
+      const userId = req.user?.id; // From authentication middleware
+      const { page, limit, status, type } = req.query;
+
+      const result = await notificationService.getUserNotifications(userId, {
+        page: parseInt(page) || 1,
+        limit: parseInt(limit) || 20,
+        status,
+        type,
+      });
+
+      logger.debug('Current user notifications retrieved', {
+        userId,
+        count: result.notifications.length,
+      });
+
+      return successResponse(res, 'Notifications retrieved successfully', result);
+    } catch (error) {
+      logger.error('Failed to get current user notifications', {
+        error: error.message,
+        userId: req.user?.id,
+      });
+      next(error);
+    }
+  }
+
+  async markAllAsRead(req, res, next) {
+    try {
+      const userId = req.user?.id; // From authentication middleware
+
+      const result = await notificationService.markAllAsRead(userId);
+
+      logger.info('All notifications marked as read', {
+        userId,
+        count: result.count || 0,
+      });
+
+      return successResponse(res, 'All notifications marked as read', result);
+    } catch (error) {
+      logger.error('Failed to mark all notifications as read', {
+        error: error.message,
+        userId: req.user?.id,
       });
       next(error);
     }

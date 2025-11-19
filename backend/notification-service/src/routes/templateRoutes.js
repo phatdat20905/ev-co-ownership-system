@@ -7,7 +7,7 @@ const router = express.Router();
 
 // Apply authentication and admin authorization to all routes
 router.use(authenticate);
-router.use(authorize(['admin', 'staff']));
+router.use(authorize('admin', 'staff'));
 
 // Template CRUD operations
 router.post('/', templateController.createTemplate);
