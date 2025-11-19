@@ -38,6 +38,22 @@ export default (sequelize, DataTypes) => {
         analytics_view: false
       }
     },
+    // Optional denormalized contact information to avoid N+1 calls to user-service
+    email: {
+      type: DataTypes.STRING(255),
+      allowNull: true
+    },
+    phone: {
+      type: DataTypes.STRING(50),
+      allowNull: true
+    },
+    // Optional count of vehicles this staff manages (denormalized); can be derived from a separate assignment table in future
+    managedVehiclesCount: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+      field: 'managed_vehicles_count'
+    },
     hireDate: {
       type: DataTypes.DATEONLY,
       allowNull: false,

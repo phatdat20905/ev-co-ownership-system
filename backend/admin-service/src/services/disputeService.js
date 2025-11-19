@@ -91,8 +91,10 @@ export class DisputeService {
 
       return result;
     } catch (error) {
+      // Add filters to the log for easier debugging of 500s
       logger.error('Failed to list disputes', {
         error: error.message,
+        stack: error.stack,
         filters
       });
       throw error;
@@ -229,6 +231,29 @@ export class DisputeService {
         error: error.message,
         disputeId
       });
+      throw error;
+    }
+  }
+
+  async pauseDispute(disputeId, pausedBy) {
+    try {
+      const dispute = await disputeRepository.update(disputeId, { status: 'on_hold' });
+      if (!dispute) {
+        throw new AppError('Dispute not found', 404, 'DISPUTE_NOT_FOUND');
+      }
+
+      logger.info('Dispute paused', { disputeId, pausedBy });
+
+      await eventService.publishDisputeEscalated({
+        disputeId: dispute.id,
+        disputeNumber: dispute.disputeNumber,
+        newPriority: dispute.priority,
+        escalatedBy: pausedBy
+      });
+
+      return dispute;
+    } catch (error) {
+      logger.error('Failed to pause dispute', { error: error.message, disputeId });
       throw error;
     }
   }

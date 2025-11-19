@@ -35,6 +35,12 @@ router.get('/business-insights',
   analyticsController.getBusinessInsights
 );
 
+// Vehicle analytics (proxy to booking/vehicle services)
+router.get('/vehicles',
+  requirePermission('analytics_view'),
+  analyticsController.getVehicleAnalytics
+);
+
 // System logs
 router.get('/logs',
   requirePermission('analytics_view'),

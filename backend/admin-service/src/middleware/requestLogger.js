@@ -1,5 +1,6 @@
 // src/middleware/requestLogger.js
 import { logger } from '@ev-coownership/shared';
+import analyticsRepository from '../repositories/analyticsRepository.js';
 
 export const adminRequestLogger = (req, res, next) => {
   const start = Date.now();
@@ -32,7 +33,6 @@ export const adminRequestLogger = (req, res, next) => {
 
     // Log to analytics for admin actions
     if (req.staff && res.statusCode < 400) {
-      const analyticsRepository = require('../repositories/analyticsRepository.js').default;
       analyticsRepository.logAnalyticsEvent({
         event_type: 'admin.action.performed',
         user_id: req.staff.userId,

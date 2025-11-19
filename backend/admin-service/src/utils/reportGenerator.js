@@ -47,11 +47,108 @@ export class ReportGenerator {
       case 'dispute_summary':
         this.addDisputeSummaryPDF(doc, reportData, yPosition);
         break;
+      case 'dispute_detail':
+        this.addDisputeDetailPDF(doc, reportData, yPosition);
+        break;
       case 'kyc_status':
         this.addKYCStatusPDF(doc, reportData, yPosition);
         break;
       default:
         this.addGenericReportPDF(doc, reportData, yPosition);
+    }
+  }
+
+  // Safely flatten objects to key/value pairs without blowing the stack on circular refs
+  static flattenObjectSafe(obj) {
+    const result = {};
+    const seen = new WeakSet();
+
+    function helper(value, prefix) {
+      if (value === null || typeof value !== 'object') {
+        result[prefix] = value;
+        return;
+      }
+
+      if (seen.has(value)) {
+        result[prefix] = '[Circular]';
+        return;
+      }
+      seen.add(value);
+
+      if (Array.isArray(value)) {
+        value.forEach((item, idx) => {
+          helper(item, `${prefix}[${idx}]`);
+        });
+        return;
+      }
+
+      Object.keys(value).forEach((key) => {
+        const v = value[key];
+        const newKey = prefix ? `${prefix}.${key}` : key;
+        if (v !== null && typeof v === 'object') {
+          helper(v, newKey);
+        } else {
+          result[newKey] = v;
+        }
+      });
+    }
+
+    helper(obj, '');
+    // Remove empty-prefix keys (root-level assigned to '')
+    if (Object.prototype.hasOwnProperty.call(result, '')) {
+      const val = result[''];
+      delete result[''];
+      if (typeof val === 'object' && val !== null) {
+        Object.assign(result, val);
+      } else {
+        result['value'] = val;
+      }
+    }
+
+    return result;
+  }
+
+  static addDisputeDetailPDF(doc, dispute, startY) {
+    let y = startY;
+    doc.fontSize(18).text(`Dispute ${dispute.disputeNumber || dispute.id}`, 100, y);
+    y += 30;
+
+    doc.fontSize(12)
+       .text(`Title: ${dispute.title || '-'}`, 100, y);
+    y += 20;
+    doc.text(`Status: ${dispute.status || '-'}`, 100, y);
+    y += 18;
+    doc.text(`Priority: ${dispute.priority || '-'}`, 100, y);
+    y += 18;
+    doc.text(`Filed by: ${dispute.filedBy || dispute.filed_by || '-'}`, 100, y);
+    y += 18;
+    doc.text(`Against: ${dispute.againstUser || dispute.against_user || '-'}`, 100, y);
+    y += 18;
+    doc.text(`Group: ${dispute.groupId || dispute.group_id || '-'}`, 100, y);
+    y += 18;
+    if (dispute.assignedStaff) {
+      doc.text(`Assigned to: ${dispute.assignedStaff.employeeId || dispute.assignedStaff.id} — ${dispute.assignedStaff.position || ''}`, 100, y);
+      y += 18;
+    }
+    if (dispute.resolution) {
+      doc.text(`Resolution: ${dispute.resolution}`, 100, y);
+      y += 20;
+    }
+
+    // Messages
+    if (Array.isArray(dispute.messages) && dispute.messages.length) {
+      if (y > 700) { doc.addPage(); y = 100; }
+      doc.fontSize(14).text('Messages', 100, y);
+      y += 24;
+      dispute.messages.forEach((m) => {
+        if (y > 720) { doc.addPage(); y = 100; }
+        const sender = m.user || m.senderName || m.senderId || m.senderId || 'Unknown';
+        const time = m.time || m.createdAt || m.updatedAt || '';
+        doc.fontSize(10).text(`${sender} — ${time}`, 120, y);
+        y += 14;
+        doc.fontSize(11).text(`${m.message}`, 120, y, { width: 380 });
+        y += 28;
+      });
     }
   }
 
@@ -154,20 +251,8 @@ export class ReportGenerator {
     doc.fontSize(16).text('System Report', 100, y);
     y += 40;
 
-    // Convert object to key-value pairs
-    const flattenObject = (obj, prefix = '') => {
-      return Object.keys(obj).reduce((acc, key) => {
-        const pre = prefix.length ? prefix + '.' : '';
-        if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
-          Object.assign(acc, flattenObject(obj[key], pre + key));
-        } else {
-          acc[pre + key] = obj[key];
-        }
-        return acc;
-      }, {});
-    };
-
-    const flattened = flattenObject(data);
+    // Safely flatten the object (handles circular refs)
+    const flattened = this.flattenObjectSafe(data);
     
     Object.entries(flattened).forEach(([key, value]) => {
       if (y > 700) {
@@ -357,19 +442,7 @@ export class ReportGenerator {
   static async addGenericReportExcel(worksheet, data, startRow) {
     let row = startRow;
 
-    const flattenObject = (obj, prefix = '') => {
-      return Object.keys(obj).reduce((acc, key) => {
-        const pre = prefix.length ? prefix + '.' : '';
-        if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
-          Object.assign(acc, flattenObject(obj[key], pre + key));
-        } else {
-          acc[pre + key] = obj[key];
-        }
-        return acc;
-      }, {});
-    };
-
-    const flattened = flattenObject(data);
+    const flattened = this.flattenObjectSafe(data);
     
     worksheet.mergeCells(`A${row}:B${row}`);
     worksheet.getCell(`A${row}`).value = 'System Report';
@@ -420,19 +493,7 @@ export class ReportGenerator {
   }
 
   static convertToCSV(data) {
-    const flattenObject = (obj, prefix = '') => {
-      return Object.keys(obj).reduce((acc, key) => {
-        const pre = prefix.length ? prefix + '.' : '';
-        if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
-          Object.assign(acc, flattenObject(obj[key], pre + key));
-        } else {
-          acc[pre + key] = obj[key];
-        }
-        return acc;
-      }, {});
-    };
-
-    const flattened = flattenObject(data);
+    const flattened = this.flattenObjectSafe(data);
     const headers = Object.keys(flattened).join(',');
     const values = Object.values(flattened).map(val => 
       typeof val === 'string' ? `"${val.replace(/"/g, '""')}"` : val

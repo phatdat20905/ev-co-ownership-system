@@ -137,7 +137,11 @@ export class StaffManagementController {
         limit: parseInt(limit)
       };
 
-      const result = await staffService.listStaff(filters);
+      // Support server-side bulk enrichment when requested by query param
+      const enrichedFlag = req.query.enriched === 'true' || req.query.enriched === '1';
+      const result = enrichedFlag
+        ? await staffService.listStaffEnriched(filters)
+        : await staffService.listStaff(filters);
 
       logger.debug('Staff list retrieved successfully', {
         total: result.pagination.total,

@@ -32,7 +32,10 @@ app.use(createCorsMiddleware());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// 🚦 Rate limiting
+// � Static file serving for uploads
+app.use('/uploads', express.static('uploads'));
+
+// �🚦 Rate limiting
 app.use(generalRateLimiter);
 
 // 🧾 Request logger

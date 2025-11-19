@@ -44,25 +44,42 @@ export class KYCRepository extends BaseRepository {
     });
   }
 
-  async getKYCStats(period = '30 days') {
+  async getKYCStats(period = '30') {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - parseInt(period));
 
-    const stats = await this.model.findAll({
+    const kycs = await this.model.findAll({
       where: {
         submittedAt: {
           [Op.gte]: startDate
         }
       },
-      attributes: [
-        'verificationStatus',
-        [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'count']
-      ],
-      group: ['verificationStatus'],
       raw: true
     });
 
-    return stats;
+    const byStatus = {};
+    kycs.forEach(kyc => {
+      byStatus[kyc.verificationStatus] = (byStatus[kyc.verificationStatus] || 0) + 1;
+    });
+
+    const averageProcessingTime = await this.getAverageProcessingTime(period);
+
+    return {
+      total: kycs.length,
+      byStatus,
+      averageProcessingTime
+    };
+  }
+
+  async getPendingKYC(limit = 5) {
+    return await this.model.findAll({
+      where: {
+        verificationStatus: 'pending'
+      },
+      order: [['submittedAt', 'ASC']],
+      limit,
+      raw: true
+    });
   }
 
   async getAverageProcessingTime(period = '30 days') {

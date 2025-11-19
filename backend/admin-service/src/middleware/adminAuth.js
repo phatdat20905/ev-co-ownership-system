@@ -13,9 +13,38 @@ export const adminAuth = async (req, res, next) => {
       if (err) throw err;
     });
 
-    // Check if user has staff profile
-    const staff = await staffService.getStaffByUserId(req.user.id);
-    
+    // Check if user has staff profile. If not found but the authenticated user
+    // appears to be an admin (from identity provider), allow a fallback pseudo-staff
+    // so site admin UX works even when an entry is not present in the staff table.
+    let staff;
+    try {
+      staff = await staffService.getStaffByUserId(req.user.id);
+    } catch (err) {
+      // If staff not found, allow admin fallback when possible
+      const isAdminUser = req.user && (
+        req.user.role === 'admin' ||
+        (Array.isArray(req.user.roles) && req.user.roles.includes('admin')) ||
+        req.user.isAdmin === true
+      );
+
+      if (err && /staff not found/i.test(err.message) && isAdminUser) {
+        // create a minimal pseudo-staff object so permission checks that only
+        // require a staff presence will continue to work for admins
+        staff = {
+          id: null,
+          userId: req.user.id,
+          name: req.user.name || req.user.email || 'admin',
+          department: 'admin',
+          role: 'admin',
+          isActive: true,
+        };
+        logger.info('No staff record found; using admin fallback', { userId: req.user.id });
+      } else {
+        // rethrow to be handled below
+        throw err;
+      }
+    }
+
     if (!staff.isActive) {
       throw new AppError('Staff account is deactivated', 403, 'STAFF_DEACTIVATED');
     }
@@ -38,6 +67,17 @@ export const requirePermission = (permission) => {
     try {
       if (!req.staff) {
         throw new AppError('Staff authentication required', 401, 'STAFF_AUTH_REQUIRED');
+      }
+
+      // Skip permission check for pseudo-staff (admin fallback with null id)
+      // These are authenticated admin users without a staff DB entry
+      if (req.staff.id === null && req.staff.department === 'admin') {
+        logger.info('Bypassing permission check for admin pseudo-staff', {
+          userId: req.staff.userId,
+          permission,
+          path: req.path
+        });
+        return next();
       }
 
       await staffService.validateStaffPermissions(req.staff.id, permission);

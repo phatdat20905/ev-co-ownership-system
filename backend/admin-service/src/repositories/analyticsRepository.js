@@ -288,6 +288,22 @@ export class AnalyticsRepository {
       throw error;
     }
   }
+
+  async findEvents({ limit = 10, offset = 0, sort = { timestamp: -1 }, ...filter }) {
+    try {
+      const collection = mongoDBClient.getCollection(this.collections.ANALYTICS_EVENTS);
+      
+      const cursor = collection.find(filter)
+        .sort(sort)
+        .skip(offset)
+        .limit(limit);
+
+      return await cursor.toArray();
+    } catch (error) {
+      logger.error('Error finding events:', error);
+      return [];
+    }
+  }
 }
 
 export default new AnalyticsRepository();

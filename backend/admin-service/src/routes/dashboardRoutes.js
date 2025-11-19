@@ -19,6 +19,18 @@ router.get('/stats',
   dashboardController.getStats
 );
 
+// Recent activities
+router.get('/activities',
+  requirePermission('reports_view'),
+  dashboardController.getRecentActivities
+);
+
+// Notifications
+router.get('/notifications',
+  requirePermission('reports_view'),
+  dashboardController.getNotifications
+);
+
 // Real-time metrics
 router.get('/live-metrics',
   requirePermission('analytics_view'),

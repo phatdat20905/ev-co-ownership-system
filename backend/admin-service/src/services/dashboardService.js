@@ -330,6 +330,145 @@ export class DashboardService {
     
     return ((last - first) / first) * 100;
   }
+
+  async getRecentActivities({ limit = 10, offset = 0, type }) {
+    try {
+      const filter = type ? { event_type: { $regex: type, $options: 'i' } } : {};
+      
+      const activities = await analyticsRepository.findEvents({
+        ...filter,
+        limit,
+        offset,
+        sort: { timestamp: -1 }
+      });
+
+      // Transform to frontend-friendly format
+      return activities.map(activity => ({
+        id: activity._id || activity.id,
+        user: activity.user_name || activity.metadata?.userName || 'System',
+        userName: activity.user_name || activity.metadata?.userName || 'System',
+        action: activity.event_type || activity.description || 'Activity',
+        description: activity.description || activity.event_type,
+        time: this.formatTimeAgo(activity.timestamp),
+        timestamp: activity.timestamp,
+        type: this.getActivityType(activity.event_type)
+      }));
+    } catch (error) {
+      logger.error('Failed to get recent activities', { error: error.message });
+      return [];
+    }
+  }
+
+  async getNotifications({ staffId, limit = 20, unreadOnly = false }) {
+    try {
+      // Run dependent queries in parallel and guard them with short timeouts.
+      const withTimeout = (p, ms, name) =>
+        Promise.race([
+          p,
+          new Promise((resolve) => setTimeout(() => {
+            logger.warn(`Timeout when fetching ${name} after ${ms}ms`);
+            resolve([]);
+          }, ms))
+        ]);
+
+      const analyticsPromise = withTimeout(
+        analyticsRepository.findEvents({
+          severity: { $in: ['high', 'critical'] },
+          timestamp: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+          limit,
+          sort: { timestamp: -1 }
+        }),
+        4000,
+        'analytics events'
+      );
+
+      const disputesPromise = withTimeout(disputeRepository.getRecentDisputes(5), 3000, 'recent disputes');
+      const kycPromise = withTimeout(kycRepository.getPendingKYC(5), 3000, 'pending kyc');
+
+      const [criticalEvents, disputes, kycPending] = await Promise.all([
+        analyticsPromise,
+        disputesPromise,
+        kycPromise
+      ]);
+
+      const notifications = [
+        ...(Array.isArray(criticalEvents) ? criticalEvents.map(event => ({
+          id: event._id || event.id,
+          title: this.getNotificationTitle(event.event_type),
+          message: event.description || event.event_type,
+          time: this.formatTimeAgo(event.timestamp),
+          timestamp: event.timestamp,
+          type: event.severity === 'critical' ? 'error' : 'warning',
+          read: false
+        })) : []),
+        ...(Array.isArray(disputes) ? disputes.map(dispute => ({
+          id: `dispute_${dispute.id}`,
+          title: 'Tranh chấp mới',
+          message: `Tranh chấp ${dispute.type || 'mới'} cần xử lý`,
+          time: this.formatTimeAgo(dispute.created_at),
+          timestamp: dispute.created_at,
+          type: 'warning',
+          read: false
+        })) : []),
+        ...(Array.isArray(kycPending) ? kycPending.map(kyc => ({
+          id: `kyc_${kyc.id}`,
+          title: 'KYC chờ duyệt',
+          message: `Yêu cầu KYC từ ${kyc.user_name || 'người dùng'}`,
+          time: this.formatTimeAgo(kyc.submitted_at),
+          timestamp: kyc.submitted_at,
+          type: 'info',
+          read: false
+        })) : [])
+      ];
+
+      // Sort by timestamp
+      notifications.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      return notifications.slice(0, limit);
+    } catch (error) {
+      logger.error('Failed to get notifications', { error: error.message });
+      return [];
+    }
+  }
+
+  getActivityType(eventType) {
+    if (!eventType) return 'info';
+    
+    if (eventType.includes('user.registered') || eventType.includes('user.created')) return 'success';
+    if (eventType.includes('booking.created')) return 'success';
+    if (eventType.includes('payment.completed')) return 'success';
+    if (eventType.includes('dispute') || eventType.includes('error')) return 'error';
+    if (eventType.includes('warning') || eventType.includes('pending')) return 'warning';
+    
+    return 'info';
+  }
+
+  getNotificationTitle(eventType) {
+    if (!eventType) return 'Thông báo';
+    
+    if (eventType.includes('user')) return 'Người dùng';
+    if (eventType.includes('booking')) return 'Đặt lịch';
+    if (eventType.includes('payment')) return 'Thanh toán';
+    if (eventType.includes('dispute')) return 'Tranh chấp';
+    if (eventType.includes('vehicle')) return 'Phương tiện';
+    if (eventType.includes('system')) return 'Hệ thống';
+    
+    return 'Thông báo';
+  }
+
+  formatTimeAgo(timestamp) {
+    const now = new Date();
+    const date = new Date(timestamp);
+    const seconds = Math.floor((now - date) / 1000);
+
+    if (seconds < 60) return `${seconds} giây trước`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)} phút trước`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)} giờ trước`;
+    if (seconds < 604800) return `${Math.floor(seconds / 86400)} ngày trước`;
+    if (seconds < 2592000) return `${Math.floor(seconds / 604800)} tuần trước`;
+    
+    return date.toLocaleDateString('vi-VN');
+  }
 }
 
 export default new DashboardService();

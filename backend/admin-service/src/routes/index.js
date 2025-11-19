@@ -6,6 +6,9 @@ import disputeRoutes from './disputeRoutes.js';
 import kycRoutes from './kycRoutes.js';
 import systemRoutes from './systemRoutes.js';
 import analyticsRoutes from './analyticsRoutes.js';
+import groupsRoutes from './groupsRoutes.js';
+import profileRoutes from './profileRoutes.js';
+import reportsRoutes from './reportsRoutes.js';
 
 const router = express.Router();
 
@@ -26,5 +29,8 @@ router.use('/admin/disputes', disputeRoutes);
 router.use('/admin/kyc', kycRoutes);
 router.use('/admin/system', systemRoutes);
 router.use('/admin/analytics', analyticsRoutes);
+router.use('/admin/profile', profileRoutes);
+router.use('/admin/reports', reportsRoutes);
+router.use('/admin/groups', groupsRoutes);
 
 export default router;

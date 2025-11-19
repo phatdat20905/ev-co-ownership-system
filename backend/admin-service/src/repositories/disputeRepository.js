@@ -54,6 +54,7 @@ export class DisputeRepository extends BaseRepository {
   }
 
   async getDisputeWithMessages(disputeId) {
+    // Use separate:true on messages include so ordering works reliably across DB adapters
     return await this.model.findByPk(disputeId, {
       include: [
         {
@@ -64,7 +65,8 @@ export class DisputeRepository extends BaseRepository {
         {
           model: db.DisputeMessage,
           as: 'messages',
-          order: [['createdAt', 'ASC']]
+          separate: true,
+          order: [['created_at', 'ASC']]
         }
       ]
     });
@@ -92,27 +94,51 @@ export class DisputeRepository extends BaseRepository {
     });
   }
 
-  async getDisputeStats(period = '30 days') {
+  async getDisputeStats(period = '30') {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - parseInt(period));
 
-    const stats = await this.model.findAll({
+    const disputes = await this.model.findAll({
       where: {
         createdAt: {
           [Op.gte]: startDate
         }
       },
-      attributes: [
-        'status',
-        'priority',
-        'disputeType',
-        [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'count']
-      ],
-      group: ['status', 'priority', 'disputeType'],
       raw: true
     });
 
-    return stats;
+    const byStatus = {};
+    const byPriority = {};
+    const byType = {};
+
+    disputes.forEach(dispute => {
+      byStatus[dispute.status] = (byStatus[dispute.status] || 0) + 1;
+      byPriority[dispute.priority] = (byPriority[dispute.priority] || 0) + 1;
+      byType[dispute.disputeType] = (byType[dispute.disputeType] || 0) + 1;
+    });
+
+    const averageResolutionTime = await this.getAverageResolutionTime(period);
+
+    return {
+      total: disputes.length,
+      byStatus,
+      byPriority,
+      byType,
+      averageResolutionTime
+    };
+  }
+
+  async getRecentDisputes(limit = 5) {
+    return await this.model.findAll({
+      where: {
+        status: {
+          [Op.in]: ['open', 'investigating']
+        }
+      },
+      order: [['createdAt', 'DESC']],
+      limit,
+      raw: true
+    });
   }
 
   async getAverageResolutionTime(period = '30 days') {

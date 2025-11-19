@@ -35,6 +35,23 @@ router.put('/:disputeId/assign',
   disputeController.assignDispute
 );
 
+router.put('/:disputeId/pause',
+  requirePermission('dispute_management'),
+  disputeController.pauseDispute
+);
+
+// Export dispute summary report (PDF)
+router.get('/export/summary',
+  requirePermission('reports_view'),
+  disputeController.exportDisputeSummary
+);
+
+// Export single dispute (BP) - PDF
+router.get('/:disputeId/export',
+  requirePermission('reports_view'),
+  disputeController.exportDisputeById
+);
+
 router.post('/:disputeId/messages',
   requirePermission('dispute_management'),
   disputeController.addDisputeMessage

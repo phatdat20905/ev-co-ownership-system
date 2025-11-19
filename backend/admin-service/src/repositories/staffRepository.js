@@ -34,6 +34,20 @@ export class StaffRepository extends BaseRepository {
   }
 
   async getStaffWithPerformance(period = 'monthly') {
+    // Map friendly period names to Postgres interval units.
+    const unitMap = {
+      daily: 'day',
+      weekly: 'week',
+      monthly: 'month',
+      yearly: 'year',
+      year: 'year',
+      month: 'month',
+      week: 'week',
+      day: 'day'
+    };
+
+    const unit = unitMap[period] || unitMap[period?.toLowerCase()] || 'month';
+
     const query = `
       SELECT 
         sp.id,
@@ -45,9 +59,9 @@ export class StaffRepository extends BaseRepository {
         AVG(CASE WHEN d.status = 'resolved' THEN 1 ELSE 0 END) as resolution_rate
       FROM staff_profiles sp
       LEFT JOIN disputes d ON d.assigned_to = sp.id 
-        AND d.created_at >= NOW() - INTERVAL '1 ${period}'
+        AND d.created_at >= NOW() - INTERVAL '1 ${unit}'
       LEFT JOIN kyc_verifications k ON k.verified_by = sp.id 
-        AND k.verified_at >= NOW() - INTERVAL '1 ${period}'
+        AND k.verified_at >= NOW() - INTERVAL '1 ${unit}'
       WHERE sp.is_active = true
       GROUP BY sp.id, sp.employee_id, sp.position, sp.department
       ORDER BY total_disputes DESC, resolution_rate DESC

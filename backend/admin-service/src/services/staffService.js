@@ -181,6 +181,60 @@ export class StaffService {
         limit
       });
 
+      // Enrich returned staff rows with performance summary (disputes, kyc) and managedVehiclesCount
+      try {
+        // Get aggregated performance for active staff for the same period (monthly)
+        const perfRows = await staffRepository.getStaffWithPerformance('monthly');
+        const perfMap = {};
+        if (Array.isArray(perfRows)) {
+          perfRows.forEach(p => {
+            if (p.id) perfMap[p.id] = p;
+          });
+        }
+
+        // Normalize result data shape (paginate helper may return { data } or { rows })
+        const dataKey = result.data ? 'data' : (result.rows ? 'rows' : null);
+        const items = dataKey ? result[dataKey] : (Array.isArray(result) ? result : []);
+
+        const enriched = items.map((s) => {
+          const id = s.id || s.ID || null;
+          const perf = perfMap[id] || {};
+          const totalDisputes = perf.total_disputes ? Number(perf.total_disputes) : 0;
+          const totalKYC = perf.total_kyc_reviews ? Number(perf.total_kyc_reviews) : 0;
+          const resolutionRate = perf.resolution_rate ? Number(perf.resolution_rate) : 0;
+
+          // rough estimate of resolved disputes count (resolutionRate is avg 0/1)
+          const resolvedDisputes = Math.round(totalDisputes * resolutionRate);
+
+          // Completed tasks = resolved disputes + completed KYC reviews (approximation)
+          const completedTasks = resolvedDisputes + totalKYC;
+
+          return {
+            ...s,
+            totalDisputes,
+            totalKYCReviews: totalKYC,
+            resolutionRate,
+            completedTasks,
+            // managedVehiclesCount is a denormalized column; fallback to 0 if missing
+            managedVehiclesCount: s.managedVehiclesCount ?? s.managed_vehicles_count ?? 0,
+            // normalize common contact fields to camelCase for frontend convenience
+            email: s.email ?? s.contact_email ?? null,
+            phone: s.phone ?? s.contact_phone ?? null
+          };
+        });
+
+        // attach enriched items back into result preserving pagination metadata
+        if (dataKey) {
+          result[dataKey] = enriched;
+        } else {
+          // unknown paginate shape: return enriched array as-is
+          return { data: enriched, pagination: result.pagination || {} };
+        }
+      } catch (err) {
+        // Do not block the list if enrichment fails; log and return original result
+        logger.warn('Failed to enrich staff list with performance data', { error: err.message });
+      }
+
       return result;
     } catch (error) {
       logger.error('Failed to list staff', {
@@ -206,6 +260,82 @@ export class StaffService {
         error: error.message,
         period
       });
+      throw error;
+    }
+  }
+
+  /**
+   * Return staff list enriched with external user profiles (bulk) to avoid N+1 calls.
+   * This method will fall back to the regular list if the user-service call fails.
+   */
+  async listStaffEnriched(filters = {}) {
+    try {
+      // Reuse existing listStaff which already provides performance enrichment and denormalized fields
+      const result = await this.listStaff(filters);
+
+      // Normalize result items array
+      const dataKey = result.data ? 'data' : (result.rows ? 'rows' : null);
+      const items = dataKey ? result[dataKey] : (Array.isArray(result) ? result : []);
+
+      // Collect userIds to request from user-service in bulk
+      const userIds = Array.from(new Set(items.map(i => i.userId).filter(Boolean)));
+      if (userIds.length === 0) return result;
+
+      // Attempt bulk fetch from user-service (POST /api/v1/users/bulk-get) or fallback to query param API
+      const userServiceBase = process.env.USER_SERVICE_URL;
+      if (!userServiceBase) {
+        logger.warn('USER_SERVICE_URL not configured — returning staff list without external enrichment');
+        return result;
+      }
+
+      try {
+        const url = `${userServiceBase.replace(/\/$/, '')}/api/v1/users/bulk-get`;
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: userIds })
+        });
+
+        if (!resp.ok) {
+          // Try alternate GET style
+          const altUrl = `${userServiceBase.replace(/\/$/, '')}/api/v1/users?ids=${userIds.join(',')}`;
+          const altResp = await fetch(altUrl);
+          if (!altResp.ok) throw new Error(`User service bulk endpoints failed: ${resp.status}/${altResp.status}`);
+          const altJson = await altResp.json();
+          const users = altJson.data || altJson;
+          const userMap = {};
+          users.forEach(u => { if (u.id) userMap[u.id] = u; });
+
+          const merged = items.map(it => ({ ...it, ...(userMap[it.userId] || {}) }));
+          if (dataKey) result[dataKey] = merged; else result.data = merged;
+          return result;
+        }
+
+        const json = await resp.json();
+        const users = json.data || json;
+        const userMap = {};
+        if (Array.isArray(users)) users.forEach(u => { if (u.id) userMap[u.id] = u; });
+
+        // Merge user profile fields (email, phone, name) into staff items
+        const mergedItems = items.map((it) => {
+          const user = userMap[it.userId] || {};
+          return {
+            ...it,
+            firstName: it.firstName || user.firstName || user.first_name || null,
+            lastName: it.lastName || user.lastName || user.last_name || null,
+            email: it.email || user.email || null,
+            phone: it.phone || user.phone || null
+          };
+        });
+
+        if (dataKey) result[dataKey] = mergedItems; else result.data = mergedItems;
+        return result;
+      } catch (err) {
+        logger.warn('Bulk fetch from user-service failed — returning denormalized staff list', { error: err.message });
+        return result;
+      }
+    } catch (error) {
+      logger.error('Failed to list enriched staff', { error: error.message, filters });
       throw error;
     }
   }

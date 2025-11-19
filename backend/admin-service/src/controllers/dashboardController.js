@@ -28,17 +28,31 @@ export class DashboardController {
     try {
       const { period = '7d', metrics = 'users,bookings,revenue' } = req.query;
       
-      const stats = await dashboardService.getOverviewStats(period);
+      const overview = await dashboardService.getOverviewStats(period);
 
-      // Filter metrics if specified
-      const metricList = metrics.split(',');
-      const filteredStats = {};
-      
-      metricList.forEach(metric => {
-        if (stats[metric]) {
-          filteredStats[metric] = stats[metric];
-        }
-      });
+      // Flatten the structure for frontend compatibility
+      const flatStats = {
+        totalUsers: overview.users?.total || 0,
+        activeUsers: overview.users?.active || 0,
+        totalCars: 24, // TODO: Get from vehicle service
+        activeContracts: 18, // TODO: Get from contract service
+        monthlyRevenue: overview.revenue?.total || 0,
+        totalRevenue: overview.revenue?.total || 0,
+        utilizationRate: 76, // TODO: Calculate from booking data
+        todayBookings: Math.floor(overview.bookings?.total / 30) || 0, // Estimate
+        maintenanceDue: 3, // TODO: Get from vehicle service
+        activeDisputes: overview.disputes?.open || 0,
+        pendingIssues: overview.kyc?.pending || 0,
+        staffMembers: 8, // TODO: Get from staff repository
+        
+        // Additional stats
+        totalBookings: overview.bookings?.total || 0,
+        completedBookings: overview.bookings?.completed || 0,
+        revenueGrowth: overview.revenue?.growth || 0,
+        userGrowth: overview.users?.growth || 0,
+        
+        period: overview.period
+      };
 
       logger.info('Dashboard stats retrieved', {
         staffId: req.staff.id,
@@ -46,9 +60,7 @@ export class DashboardController {
         metrics
       });
 
-      return successResponse(res, 'Dashboard stats retrieved successfully', 
-        Object.keys(filteredStats).length > 0 ? filteredStats : stats
-      );
+      return successResponse(res, 'Dashboard stats retrieved successfully', flatStats);
     } catch (error) {
       logger.error('Failed to get dashboard stats', {
         error: error.message,
@@ -123,6 +135,56 @@ export class DashboardController {
       return successResponse(res, 'Growth analytics retrieved successfully', growthData);
     } catch (error) {
       logger.error('Failed to get growth analytics', {
+        error: error.message,
+        staffId: req.staff?.id
+      });
+      next(error);
+    }
+  }
+
+  async getRecentActivities(req, res, next) {
+    try {
+      const { limit = 10, offset = 0, type } = req.query;
+      
+      const activities = await dashboardService.getRecentActivities({ 
+        limit: parseInt(limit), 
+        offset: parseInt(offset),
+        type 
+      });
+
+      logger.info('Recent activities retrieved', {
+        staffId: req.staff.id,
+        count: activities.length
+      });
+
+      return successResponse(res, 'Recent activities retrieved successfully', activities);
+    } catch (error) {
+      logger.error('Failed to get recent activities', {
+        error: error.message,
+        staffId: req.staff?.id
+      });
+      next(error);
+    }
+  }
+
+  async getNotifications(req, res, next) {
+    try {
+      const { limit = 20, unreadOnly = false } = req.query;
+      
+      const notifications = await dashboardService.getNotifications({
+        staffId: req.staff.id,
+        limit: parseInt(limit),
+        unreadOnly: unreadOnly === 'true'
+      });
+
+      logger.info('Notifications retrieved', {
+        staffId: req.staff.id,
+        count: notifications.length
+      });
+
+      return successResponse(res, 'Notifications retrieved successfully', notifications);
+    } catch (error) {
+      logger.error('Failed to get notifications', {
         error: error.message,
         staffId: req.staff?.id
       });

@@ -59,13 +59,34 @@ export class DisputeController {
         limit = 20
       } = req.query;
 
+      // Normalize frontend filter values to backend enum values to avoid invalid queries
+      const statusMap = {
+        pending: 'open',
+        in_progress: 'investigating',
+        resolved: 'resolved',
+        cancelled: 'closed',
+        open: 'open',
+        investigating: 'investigating',
+        closed: 'closed'
+      };
+
+      const typeMap = {
+        schedule: 'booking_conflict',
+        payment: 'cost_dispute',
+        damage: 'damage_claim',
+        other: 'other'
+      };
+
+      const normalizedStatus = status ? (statusMap[status] || status) : undefined;
+      const normalizedType = type ? (typeMap[type] || type) : undefined;
+
       const filters = {
-        status,
+        status: normalizedStatus,
         priority,
-        type,
+        type: normalizedType,
         assignedTo,
-        page: parseInt(page),
-        limit: parseInt(limit)
+        page: parseInt(page, 10) || 1,
+        limit: parseInt(limit, 10) || 20
       };
 
       const result = await disputeService.listDisputes(filters);
@@ -114,7 +135,8 @@ export class DisputeController {
       const { disputeId } = req.params;
       const messageData = {
         ...req.body,
-        senderId: req.staff.id,
+        // Use staff.id when available; fall back to authenticated user id for admin pseudo-staff
+        senderId: req.staff?.id || req.user?.id || null,
         isInternal: req.body.isInternal || false
       };
 
@@ -141,7 +163,8 @@ export class DisputeController {
       const { disputeId } = req.params;
       const resolutionData = {
         ...req.body,
-        resolvedBy: req.staff.id
+        // If the request is from a pseudo-staff/admin with no staff.id, fall back to the authenticated user id
+        resolvedBy: req.staff?.id || req.user?.id || null
       };
 
       const dispute = await disputeService.resolveDispute(disputeId, resolutionData);
@@ -184,6 +207,70 @@ export class DisputeController {
         error: error.message,
         disputeId: req.params.disputeId
       });
+      next(error);
+    }
+  }
+
+  async pauseDispute(req, res, next) {
+    try {
+      const { disputeId } = req.params;
+
+      const dispute = await disputeService.pauseDispute(disputeId, req.staff.id);
+
+      logger.info('Dispute paused successfully', {
+        disputeId,
+        pausedBy: req.staff.id
+      });
+
+      return successResponse(res, 'Dispute paused successfully', dispute);
+    } catch (error) {
+      logger.error('Failed to pause dispute', {
+        error: error.message,
+        disputeId: req.params.disputeId
+      });
+      next(error);
+    }
+  }
+
+  async exportDisputeSummary(req, res, next) {
+    try {
+      const period = req.query.period || '30';
+      const stats = await disputeService.getDisputeStats(period);
+
+      // Use report generator to make PDF
+      const ReportGenerator = (await import('../utils/reportGenerator.js')).default;
+      const pdfBuffer = await ReportGenerator.generatePDFReport(stats, { type: 'dispute_summary', title: 'Dispute Summary', period, generatedBy: req.staff.id });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename="dispute-summary.pdf"');
+      return res.status(200).send(pdfBuffer);
+    } catch (error) {
+      logger.error('Failed to export dispute summary', { error: error.message });
+      next(error);
+    }
+  }
+
+  async exportDisputeById(req, res, next) {
+    try {
+      const { disputeId } = req.params;
+      const dispute = await disputeService.getDisputeById(disputeId);
+
+      if (!dispute) {
+        return res.status(404).json({ message: 'Dispute not found' });
+      }
+
+      // Convert Sequelize instance to plain object to avoid circular references
+      const plainDispute = typeof dispute.toJSON === 'function' ? dispute.toJSON() : dispute;
+
+      const ReportGenerator = (await import('../utils/reportGenerator.js')).default;
+      // For a single-dispute export, pass the plain object and use a type 'dispute_detail'
+      const pdfBuffer = await ReportGenerator.generatePDFReport(plainDispute, { type: 'dispute_detail', title: `Dispute ${plainDispute.disputeNumber || plainDispute.id}`, generatedBy: req.staff.id });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="dispute-${plainDispute.disputeNumber || disputeId}.pdf"`);
+      return res.status(200).send(pdfBuffer);
+    } catch (error) {
+      logger.error('Failed to export dispute by id', { error: error.message, disputeId: req.params.disputeId });
       next(error);
     }
   }
