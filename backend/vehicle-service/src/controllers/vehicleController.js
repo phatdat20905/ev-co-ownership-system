@@ -12,7 +12,7 @@ export class VehicleController {
       const vehicleData = req.body;
       const userId = req.user.id;
 
-      const vehicle = await vehicleService.createVehicle(vehicleData, userId);
+  const vehicle = await vehicleService.createVehicle(vehicleData, userId, req.user.role);
 
       logger.info('Vehicle created successfully', { 
         vehicleId: vehicle.id, 
@@ -36,7 +36,7 @@ export class VehicleController {
       const { groupId, status, page = 1, limit = 20 } = req.query;
       const userId = req.user.id;
 
-      const result = await vehicleService.getVehicles(groupId, status, parseInt(page), parseInt(limit), userId);
+  const result = await vehicleService.getVehicles(groupId, status, parseInt(page), parseInt(limit), userId, req.user.role);
 
       logger.debug('Vehicles retrieved successfully', { 
         groupId, 
@@ -60,7 +60,7 @@ export class VehicleController {
       const { vehicleId } = req.params;
       const userId = req.user.id;
 
-      const vehicle = await vehicleService.getVehicle(vehicleId, userId);
+  const vehicle = await vehicleService.getVehicle(vehicleId, userId, req.user.role);
 
       logger.debug('Vehicle retrieved successfully', { vehicleId, userId });
 
@@ -81,7 +81,7 @@ export class VehicleController {
       const updateData = req.body;
       const userId = req.user.id;
 
-      const vehicle = await vehicleService.updateVehicle(vehicleId, updateData, userId);
+  const vehicle = await vehicleService.updateVehicle(vehicleId, updateData, userId, req.user.role);
 
       logger.info('Vehicle updated successfully', { vehicleId, userId });
 
@@ -101,7 +101,7 @@ export class VehicleController {
       const { vehicleId } = req.params;
       const userId = req.user.id;
 
-      await vehicleService.deleteVehicle(vehicleId, userId);
+  await vehicleService.deleteVehicle(vehicleId, userId, req.user.role);
 
       logger.info('Vehicle deleted successfully', { vehicleId, userId });
 
@@ -122,7 +122,7 @@ export class VehicleController {
       const { status, reason } = req.body;
       const userId = req.user.id;
 
-      const vehicle = await vehicleService.updateVehicleStatus(vehicleId, status, reason, userId);
+  const vehicle = await vehicleService.updateVehicleStatus(vehicleId, status, reason, userId, req.user.role);
 
       logger.info('Vehicle status updated successfully', { 
         vehicleId, 
@@ -147,7 +147,7 @@ export class VehicleController {
       const { vehicleId } = req.params;
       const userId = req.user.id;
 
-      const stats = await vehicleService.getVehicleStats(vehicleId, userId);
+  const stats = await vehicleService.getVehicleStats(vehicleId, userId, req.user.role);
 
       logger.debug('Vehicle stats retrieved successfully', { vehicleId, userId });
 
@@ -162,12 +162,28 @@ export class VehicleController {
     }
   }
 
+  async getVehicleStatsBulk(req, res, next) {
+    try {
+      const { ids } = req.body;
+      const userId = req.user.id;
+
+  const statsMap = await vehicleService.getVehiclesStatsBulk(ids, userId, req.user.role);
+
+      logger.debug('Bulk vehicle stats retrieved', { count: Object.keys(statsMap).length, userId });
+
+      return successResponse(res, 'Bulk vehicle stats retrieved successfully', statsMap);
+    } catch (error) {
+      logger.error('Failed to get bulk vehicle stats', { error: error.message, userId: req.user?.id });
+      next(error);
+    }
+  }
+
   async searchVehicles(req, res, next) {
     try {
       const { query, groupId } = req.query;
       const userId = req.user.id;
 
-      const vehicles = await vehicleService.searchVehicles(query, groupId, userId);
+  const vehicles = await vehicleService.searchVehicles(query, groupId, userId, req.user.role);
 
       logger.debug('Vehicles search completed', { 
         query, 

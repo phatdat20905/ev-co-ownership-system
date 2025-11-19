@@ -5,15 +5,17 @@ import {
   AppError,
   redisClient
 } from '@ev-coownership/shared';
+import { internalFetch } from '../utils/internalAuth.js';
 import eventService from './eventService.js';
+import analyticsService from './analyticsService.js';
 
 export class VehicleService {
-  async createVehicle(vehicleData, userId) {
+  async createVehicle(vehicleData, userId, userRole) {
     const transaction = await db.sequelize.transaction();
 
     try {
       // Check if user has access to the group
-      const hasAccess = await this.checkGroupAccess(vehicleData.groupId, userId);
+  const hasAccess = await this.checkGroupAccess(vehicleData.groupId, userId, userRole);
       if (!hasAccess) {
         throw new AppError('You do not have access to this group', 403, 'ACCESS_DENIED');
       }
@@ -61,7 +63,7 @@ export class VehicleService {
     }
   }
 
-  async getVehicles(groupId, status, page, limit, userId) {
+  async getVehicles(groupId, status, page, limit, userId, userRole) {
     try {
       const cacheKey = `vehicles:${groupId}:${status}:${page}:${limit}`;
       
@@ -72,17 +74,27 @@ export class VehicleService {
       }
 
       const whereClause = {};
+      
+      // If groupId is provided, check access and filter by groupId
       if (groupId) {
-        // Check group access
-        const hasAccess = await this.checkGroupAccess(groupId, userId);
+  const hasAccess = await this.checkGroupAccess(groupId, userId, userRole);
         if (!hasAccess) {
           throw new AppError('You do not have access to this group', 403, 'ACCESS_DENIED');
         }
         whereClause.groupId = groupId;
-      } else {
-        // Get all groups user has access to
+      } 
+      // If no groupId, check if user is admin/staff
+      // Admin/staff can see all vehicles, co-owners see only their groups
+      else {
         const accessibleGroups = await this.getUserAccessibleGroups(userId);
-        whereClause.groupId = accessibleGroups;
+        
+        // If accessibleGroups is empty or user is admin/staff, don't filter by groupId
+        // This allows admin/staff to see all vehicles in the system
+        if (accessibleGroups.length > 0) {
+          whereClause.groupId = accessibleGroups;
+        }
+        // If empty array and user is NOT admin, they would get 403 from checkGroupAccess
+        // So reaching here with empty array means admin/staff → show all vehicles
       }
 
       if (status) {
@@ -126,7 +138,7 @@ export class VehicleService {
     }
   }
 
-  async getVehicle(vehicleId, userId) {
+  async getVehicle(vehicleId, userId, userRole) {
     try {
       const cacheKey = `vehicle:${vehicleId}`;
       
@@ -169,7 +181,7 @@ export class VehicleService {
       }
 
       // Check access
-      const hasAccess = await this.checkGroupAccess(vehicle.groupId, userId);
+  const hasAccess = await this.checkGroupAccess(vehicle.groupId, userId, userRole);
       if (!hasAccess) {
         throw new AppError('You do not have access to this vehicle', 403, 'ACCESS_DENIED');
       }
@@ -184,7 +196,7 @@ export class VehicleService {
     }
   }
 
-  async updateVehicle(vehicleId, updateData, userId) {
+  async updateVehicle(vehicleId, updateData, userId, userRole) {
     const transaction = await db.sequelize.transaction();
 
     try {
@@ -194,7 +206,7 @@ export class VehicleService {
       }
 
       // Check access
-      const hasAccess = await this.checkGroupAccess(vehicle.groupId, userId);
+  const hasAccess = await this.checkGroupAccess(vehicle.groupId, userId, userRole);
       if (!hasAccess) {
         throw new AppError('You do not have access to this vehicle', 403, 'ACCESS_DENIED');
       }
@@ -233,7 +245,7 @@ export class VehicleService {
     }
   }
 
-  async deleteVehicle(vehicleId, userId) {
+  async deleteVehicle(vehicleId, userId, userRole) {
     const transaction = await db.sequelize.transaction();
 
     try {
@@ -243,7 +255,7 @@ export class VehicleService {
       }
 
       // Check access
-      const hasAccess = await this.checkGroupAccess(vehicle.groupId, userId);
+  const hasAccess = await this.checkGroupAccess(vehicle.groupId, userId, userRole);
       if (!hasAccess) {
         throw new AppError('You do not have access to this vehicle', 403, 'ACCESS_DENIED');
       }
@@ -275,7 +287,7 @@ export class VehicleService {
     }
   }
 
-  async updateVehicleStatus(vehicleId, status, reason, userId) {
+  async updateVehicleStatus(vehicleId, status, reason, userId, userRole) {
     const transaction = await db.sequelize.transaction();
 
     try {
@@ -285,7 +297,7 @@ export class VehicleService {
       }
 
       // Check access
-      const hasAccess = await this.checkGroupAccess(vehicle.groupId, userId);
+  const hasAccess = await this.checkGroupAccess(vehicle.groupId, userId, userRole);
       if (!hasAccess) {
         throw new AppError('You do not have access to this vehicle', 403, 'ACCESS_DENIED');
       }
@@ -319,7 +331,7 @@ export class VehicleService {
     }
   }
 
-  async getVehicleStats(vehicleId, userId) {
+  async getVehicleStats(vehicleId, userId, userRole) {
     try {
       const cacheKey = `vehicle:stats:${vehicleId}`;
       
@@ -335,7 +347,7 @@ export class VehicleService {
       }
 
       // Check access
-      const hasAccess = await this.checkGroupAccess(vehicle.groupId, userId);
+  const hasAccess = await this.checkGroupAccess(vehicle.groupId, userId, userRole);
       if (!hasAccess) {
         throw new AppError('You do not have access to this vehicle', 403, 'ACCESS_DENIED');
       }
@@ -382,6 +394,16 @@ export class VehicleService {
         lastUpdated: new Date()
       };
 
+      // Try to enrich stats with battery health / efficiency (uses analyticsService which wraps batteryService)
+      try {
+        const batteryHealth = await analyticsService.getBatteryHealth(vehicleId, userId);
+        if (batteryHealth) {
+          stats.batteryHealth = batteryHealth;
+          stats.efficiency = batteryHealth.efficiency?.avgEfficiency || batteryHealth.efficiency?.average || null;
+        }
+      } catch (err) {
+        logger.warn('Failed to attach battery health to vehicle stats', { error: err.message, vehicleId, userId });
+      }
       // Cache for 10 minutes
       await redisClient.set(cacheKey, JSON.stringify(stats), 600);
 
@@ -392,7 +414,64 @@ export class VehicleService {
     }
   }
 
-  async searchVehicles(query, groupId, userId) {
+  /**
+   * Return stats for multiple vehicles in a single call.
+   * Result is an object: { [vehicleId]: stats }
+   */
+  async getVehiclesStatsBulk(vehicleIds = [], userId, userRole) {
+    try {
+      if (!Array.isArray(vehicleIds) || vehicleIds.length === 0) {
+        return {};
+      }
+
+      // Fetch vehicles in one query to validate existence and access
+      const vehicles = await db.Vehicle.findAll({ where: { id: vehicleIds } });
+
+      // Build a map of vehicleId -> basic info
+      const vehicleMap = vehicles.reduce((acc, v) => {
+        acc[v.id] = v;
+        return acc;
+      }, {});
+
+      // For each requested id, if vehicle exists and user has access, fetch stats (in parallel)
+      const promises = vehicleIds.map(async (vid) => {
+        const vehicle = vehicleMap[vid];
+        if (!vehicle) {
+          return [vid, { error: 'VEHICLE_NOT_FOUND' }];
+        }
+
+        // Check access per vehicle; if denied, return an error placeholder
+  const hasAccess = await this.checkGroupAccess(vehicle.groupId, userId, userRole);
+        if (!hasAccess) {
+          return [vid, { error: 'ACCESS_DENIED' }];
+        }
+
+        try {
+          // Reuse existing getVehicleStats for a single vehicle to ensure same enrichment/caching
+          const stats = await this.getVehicleStats(vid, userId);
+          return [vid, stats];
+        } catch (err) {
+          logger.warn('Failed to build stats for vehicle in bulk request', { vehicleId: vid, error: err.message });
+          return [vid, { error: err.message }];
+        }
+      });
+
+      const settled = await Promise.all(promises);
+
+      // Convert to object map
+      const result = settled.reduce((acc, [id, stats]) => {
+        acc[id] = stats;
+        return acc;
+      }, {});
+
+      return result;
+    } catch (error) {
+      logger.error('Failed to get vehicles stats bulk', { error: error.message, userId });
+      throw error;
+    }
+  }
+
+  async searchVehicles(query, groupId, userId, userRole) {
     try {
       const whereClause = {
         [db.Sequelize.Op.or]: [
@@ -405,7 +484,7 @@ export class VehicleService {
 
       if (groupId) {
         // Check group access
-        const hasAccess = await this.checkGroupAccess(groupId, userId);
+  const hasAccess = await this.checkGroupAccess(groupId, userId, userRole);
         if (!hasAccess) {
           throw new AppError('You do not have access to this group', 403, 'ACCESS_DENIED');
         }
@@ -413,7 +492,10 @@ export class VehicleService {
       } else {
         // Get all groups user has access to
         const accessibleGroups = await this.getUserAccessibleGroups(userId);
-        whereClause.groupId = accessibleGroups;
+        // If empty array (admin/staff), don't filter by groupId
+        if (accessibleGroups.length > 0) {
+          whereClause.groupId = accessibleGroups;
+        }
       }
 
       const vehicles = await db.Vehicle.findAll({
@@ -443,16 +525,15 @@ export class VehicleService {
     }
   }
 
-  async checkGroupAccess(groupId, userId) {
+  async checkGroupAccess(groupId, userId, userRole) {
     try {
-      // Call User Service to check group membership
-      // This is a simplified version - in reality, you'd call the User Service API
-      const response = await fetch(`${process.env.USER_SERVICE_URL}/api/v1/groups/${groupId}/members/${userId}`, {
-        headers: {
-          'Authorization': `Bearer ${process.env.INTERNAL_SERVICE_TOKEN}`
-        }
-      });
+      // Allow admin/staff to bypass membership check when role provided
+      if (userRole === 'admin' || userRole === 'staff') {
+        return true;
+      }
 
+      const url = `${process.env.USER_SERVICE_URL}/api/v1/internal/groups/${groupId}/members/${userId}`;
+      const response = await internalFetch(url, { method: 'GET' });
       return response.ok;
     } catch (error) {
       logger.error('Failed to check group access', { error: error.message, groupId, userId });

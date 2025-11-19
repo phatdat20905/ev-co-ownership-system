@@ -4,6 +4,7 @@ import {
   AppError,
   logger 
 } from '@ev-coownership/shared';
+import { internalFetch } from '../utils/internalAuth.js';
 
 export const vehicleAccess = async (req, res, next) => {
   try {
@@ -47,13 +48,8 @@ export const vehicleAccess = async (req, res, next) => {
 // Helper function to check group access
 async function checkGroupAccess(groupId, userId) {
   try {
-    const response = await fetch(`${process.env.USER_SERVICE_URL}/api/v1/groups/${groupId}/members/${userId}`, {
-      headers: {
-        'Authorization': `Bearer ${process.env.INTERNAL_SERVICE_TOKEN}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
+    const url = `${process.env.USER_SERVICE_URL}/api/v1/internal/groups/${groupId}/members/${userId}`;
+    const response = await internalFetch(url, { headers: { 'Content-Type': 'application/json' } });
     return response.ok;
   } catch (error) {
     logger.error('Failed to check group access', { error: error.message, groupId, userId });

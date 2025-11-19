@@ -20,10 +20,11 @@ export const maintenanceValidators = {
         'any.required': 'Scheduled date is required'
       }),
       odometerAtSchedule: Joi.number().integer().min(0).max(1000000).optional(),
-      estimatedCost: Joi.number().precision(2).min(0).max(100000).optional().messages({
+      estimatedCost: Joi.number().precision(2).min(0).max(1000000000).optional().messages({
         'number.min': 'Estimated cost cannot be negative',
-        'number.max': 'Estimated cost cannot exceed 100,000'
+        'number.max': 'Estimated cost cannot exceed 1,000,000,000 VND'
       }),
+      serviceProvider: Joi.string().max(255).optional(),
       notes: Joi.string().max(1000).optional()
     })
   },
@@ -58,9 +59,12 @@ export const maintenanceValidators = {
     }),
     body: Joi.object({
       maintenanceType: Joi.string().min(1).max(100).optional(),
-      scheduledDate: Joi.date().greater('now').optional(),
+      scheduledDate: Joi.date().optional().messages({
+        'date.base': 'Scheduled date must be a valid date'
+      }),
       odometerAtSchedule: Joi.number().integer().min(0).max(1000000).optional(),
-      estimatedCost: Joi.number().precision(2).min(0).max(100000).optional(),
+      estimatedCost: Joi.number().precision(2).min(0).max(1000000000).optional(),
+      serviceProvider: Joi.string().max(255).optional(),
       notes: Joi.string().max(1000).optional(),
       status: Joi.string().valid('scheduled', 'in_progress', 'completed', 'cancelled').optional()
     }).min(1).messages({
@@ -90,9 +94,9 @@ export const maintenanceValidators = {
         'number.max': 'Odometer reading cannot exceed 1,000,000 km',
         'any.required': 'Odometer reading is required'
       }),
-      cost: Joi.number().precision(2).min(0).max(100000).required().messages({
+      cost: Joi.number().precision(2).min(0).max(1000000000).required().messages({
         'number.min': 'Cost cannot be negative',
-        'number.max': 'Cost cannot exceed 100,000',
+        'number.max': 'Cost cannot exceed 1,000,000,000 VND',
         'any.required': 'Cost is required'
       }),
       serviceProvider: Joi.string().max(255).optional(),
@@ -125,9 +129,9 @@ export const maintenanceValidators = {
         'number.max': 'Odometer reading cannot exceed 1,000,000 km',
         'any.required': 'Odometer reading is required'
       }),
-      cost: Joi.number().precision(2).min(0).max(100000).required().messages({
+      cost: Joi.number().precision(2).min(0).max(1000000000).required().messages({
         'number.min': 'Cost cannot be negative',
-        'number.max': 'Cost cannot exceed 100,000',
+        'number.max': 'Cost cannot exceed 1,000,000,000 VND',
         'any.required': 'Cost is required'
       }),
       serviceProvider: Joi.string().max(255).optional(),

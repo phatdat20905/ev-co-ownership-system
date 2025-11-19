@@ -39,6 +39,10 @@ export default (sequelize) => {
       type: DataTypes.DECIMAL(15, 2),
       field: 'actual_cost'
     },
+    serviceProvider: {
+      type: DataTypes.STRING(255),
+      field: 'service_provider'
+    },
     notes: {
       type: DataTypes.TEXT
     }
@@ -48,7 +52,8 @@ export default (sequelize) => {
     underscored: true,
     hooks: {
       beforeValidate: (schedule) => {
-        if (schedule.scheduledDate && new Date(schedule.scheduledDate) < new Date()) {
+        // Only validate scheduledDate if it's being created or changed
+        if (schedule.changed('scheduledDate') && schedule.scheduledDate && new Date(schedule.scheduledDate) < new Date()) {
           throw new Error('Scheduled date cannot be in the past');
         }
       }

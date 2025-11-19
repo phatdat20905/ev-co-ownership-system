@@ -21,5 +21,7 @@ router.put('/:vehicleId', groupAccess, validate(vehicleValidators.update), vehic
 router.delete('/:vehicleId', groupAccess, validate(vehicleValidators.delete), vehicleController.deleteVehicle);
 router.put('/:vehicleId/status', groupAccess, validate(vehicleValidators.updateStatus), vehicleController.updateVehicleStatus);
 router.get('/:vehicleId/stats', validate(vehicleValidators.getById), vehicleController.getVehicleStats);
+// Bulk stats for many vehicles (expects JSON body: { ids: ["uuid", ...] })
+router.post('/stats/bulk', validate(vehicleValidators.bulkStats), vehicleController.getVehicleStatsBulk);
 
 export default router;

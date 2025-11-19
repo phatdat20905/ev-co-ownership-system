@@ -12,6 +12,9 @@ const router = express.Router();
 
 router.use(authenticate);
 
+// Admin/Staff route to get all schedules (must come before :vehicleId routes)
+router.get('/schedules', maintenanceController.getAllMaintenanceSchedules);
+
 // Vehicle-specific maintenance routes
 router.post('/vehicles/:vehicleId/schedules', groupAccess, validate(maintenanceValidators.createSchedule), maintenanceController.createMaintenanceSchedule);
 router.get('/vehicles/:vehicleId/schedules', validate(maintenanceValidators.listSchedules), maintenanceController.getMaintenanceSchedules);

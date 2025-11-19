@@ -11,8 +11,9 @@ export class MaintenanceController {
       const { vehicleId } = req.params;
       const scheduleData = { ...req.body, vehicleId };
       const userId = req.user.id;
+      const userRole = req.user.role;
 
-      const schedule = await maintenanceService.createMaintenanceSchedule(scheduleData, userId);
+      const schedule = await maintenanceService.createMaintenanceSchedule(scheduleData, userId, userRole);
 
       logger.info('Maintenance schedule created successfully', { 
         scheduleId: schedule.id, 
@@ -81,8 +82,9 @@ export class MaintenanceController {
       const { scheduleId } = req.params;
       const updateData = req.body;
       const userId = req.user.id;
+      const userRole = req.user.role;
 
-      const schedule = await maintenanceService.updateMaintenanceSchedule(scheduleId, updateData, userId);
+      const schedule = await maintenanceService.updateMaintenanceSchedule(scheduleId, updateData, userId, userRole);
 
       logger.info('Maintenance schedule updated successfully', { scheduleId, userId });
 
@@ -101,8 +103,9 @@ export class MaintenanceController {
     try {
       const { scheduleId } = req.params;
       const userId = req.user.id;
+      const userRole = req.user.role;
 
-      await maintenanceService.deleteMaintenanceSchedule(scheduleId, userId);
+      await maintenanceService.deleteMaintenanceSchedule(scheduleId, userId, userRole);
 
       logger.info('Maintenance schedule deleted successfully', { scheduleId, userId });
 
@@ -122,8 +125,9 @@ export class MaintenanceController {
       const { scheduleId } = req.params;
       const completionData = req.body;
       const userId = req.user.id;
+      const userRole = req.user.role;
 
-      const history = await maintenanceService.completeMaintenance(scheduleId, completionData, userId);
+      const history = await maintenanceService.completeMaintenance(scheduleId, completionData, userId, userRole);
 
       logger.info('Maintenance completed successfully', { 
         scheduleId, 
@@ -187,6 +191,34 @@ export class MaintenanceController {
         error: error.message, 
         userId: req.user?.id,
         vehicleId: req.params.vehicleId 
+      });
+      next(error);
+    }
+  }
+
+  async getAllMaintenanceSchedules(req, res, next) {
+    try {
+      const { status, vehicleId } = req.query;
+      const userId = req.user.id;
+      const userRole = req.user.role;
+
+      const schedules = await maintenanceService.getAllMaintenanceSchedules(
+        { status, vehicleId }, 
+        userId, 
+        userRole
+      );
+
+      logger.debug('All maintenance schedules retrieved successfully', { 
+        count: schedules.length,
+        userId,
+        userRole
+      });
+
+      return successResponse(res, 'All maintenance schedules retrieved successfully', { schedules });
+    } catch (error) {
+      logger.error('Failed to get all maintenance schedules', { 
+        error: error.message, 
+        userId: req.user?.id
       });
       next(error);
     }

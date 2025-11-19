@@ -7,7 +7,7 @@ import {
 import eventService from './eventService.js';
 
 export class MaintenanceService {
-  async createMaintenanceSchedule(scheduleData, userId) {
+  async createMaintenanceSchedule(scheduleData, userId, userRole) {
     const transaction = await db.sequelize.transaction();
 
     try {
@@ -16,10 +16,12 @@ export class MaintenanceService {
         throw new AppError('Vehicle not found', 404, 'VEHICLE_NOT_FOUND');
       }
 
-      // Check access
-      const hasAccess = await this.checkGroupAccess(vehicle.groupId, userId);
-      if (!hasAccess) {
-        throw new AppError('You do not have access to this vehicle', 403, 'ACCESS_DENIED');
+      // Check access (bypass for admin/staff)
+      if (userRole !== 'admin' && userRole !== 'staff') {
+        const hasAccess = await this.checkGroupAccess(vehicle.groupId, userId);
+        if (!hasAccess) {
+          throw new AppError('You do not have access to this vehicle', 403, 'ACCESS_DENIED');
+        }
       }
 
       // Validate scheduled date
@@ -115,7 +117,7 @@ export class MaintenanceService {
     }
   }
 
-  async updateMaintenanceSchedule(scheduleId, updateData, userId) {
+  async updateMaintenanceSchedule(scheduleId, updateData, userId, userRole) {
     const transaction = await db.sequelize.transaction();
 
     try {
@@ -127,15 +129,24 @@ export class MaintenanceService {
         throw new AppError('Maintenance schedule not found', 404, 'MAINTENANCE_SCHEDULE_NOT_FOUND');
       }
 
-      // Check access
-      const hasAccess = await this.checkGroupAccess(schedule.vehicle.groupId, userId);
-      if (!hasAccess) {
-        throw new AppError('You do not have access to this maintenance schedule', 403, 'ACCESS_DENIED');
+      // Check access (bypass for admin/staff)
+      if (userRole !== 'admin' && userRole !== 'staff') {
+        const hasAccess = await this.checkGroupAccess(schedule.vehicle.groupId, userId);
+        if (!hasAccess) {
+          throw new AppError('You do not have access to this maintenance schedule', 403, 'ACCESS_DENIED');
+        }
       }
 
-      // Validate scheduled date if provided
-      if (updateData.scheduledDate && new Date(updateData.scheduledDate) < new Date()) {
-        throw new AppError('Scheduled date cannot be in the past', 400, 'INVALID_SCHEDULED_DATE');
+      // Validate scheduled date only if it's being changed to a new value
+      if (updateData.scheduledDate) {
+        const newDate = new Date(updateData.scheduledDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        // Only enforce future date for new schedules that haven't started
+        if (schedule.status === 'scheduled' && newDate < today) {
+          throw new AppError('Scheduled date cannot be in the past for scheduled maintenance', 400, 'INVALID_SCHEDULED_DATE');
+        }
       }
 
       await schedule.update(updateData, { transaction });
@@ -158,7 +169,7 @@ export class MaintenanceService {
     }
   }
 
-  async deleteMaintenanceSchedule(scheduleId, userId) {
+  async deleteMaintenanceSchedule(scheduleId, userId, userRole) {
     const transaction = await db.sequelize.transaction();
 
     try {
@@ -170,10 +181,12 @@ export class MaintenanceService {
         throw new AppError('Maintenance schedule not found', 404, 'MAINTENANCE_SCHEDULE_NOT_FOUND');
       }
 
-      // Check access
-      const hasAccess = await this.checkGroupAccess(schedule.vehicle.groupId, userId);
-      if (!hasAccess) {
-        throw new AppError('You do not have access to this maintenance schedule', 403, 'ACCESS_DENIED');
+      // Check access (bypass for admin/staff)
+      if (userRole !== 'admin' && userRole !== 'staff') {
+        const hasAccess = await this.checkGroupAccess(schedule.vehicle.groupId, userId);
+        if (!hasAccess) {
+          throw new AppError('You do not have access to this maintenance schedule', 403, 'ACCESS_DENIED');
+        }
       }
 
       await schedule.destroy({ transaction });
@@ -194,7 +207,7 @@ export class MaintenanceService {
     }
   }
 
-  async completeMaintenance(scheduleId, completionData, userId) {
+  async completeMaintenance(scheduleId, completionData, userId, userRole) {
     const transaction = await db.sequelize.transaction();
 
     try {
@@ -206,10 +219,12 @@ export class MaintenanceService {
         throw new AppError('Maintenance schedule not found', 404, 'MAINTENANCE_SCHEDULE_NOT_FOUND');
       }
 
-      // Check access
-      const hasAccess = await this.checkGroupAccess(schedule.vehicle.groupId, userId);
-      if (!hasAccess) {
-        throw new AppError('You do not have access to this maintenance schedule', 403, 'ACCESS_DENIED');
+      // Check access (bypass for admin/staff)
+      if (userRole !== 'admin' && userRole !== 'staff') {
+        const hasAccess = await this.checkGroupAccess(schedule.vehicle.groupId, userId);
+        if (!hasAccess) {
+          throw new AppError('You do not have access to this maintenance schedule', 403, 'ACCESS_DENIED');
+        }
       }
 
       // Create maintenance history record
@@ -358,13 +373,48 @@ export class MaintenanceService {
     }
   }
 
+  // Get all schedules (admin/staff only - no vehicle filtering)
+  async getAllMaintenanceSchedules(filters, userId, userRole) {
+    try {
+      // Check if user is admin or staff
+      if (!userRole || !['admin', 'staff'].includes(userRole.toLowerCase())) {
+        throw new AppError('Access denied: Admin or staff role required', 403, 'ACCESS_DENIED');
+      }
+
+      const whereClause = {};
+      if (filters.status) {
+        whereClause.status = filters.status;
+      }
+      if (filters.vehicleId) {
+        whereClause.vehicleId = filters.vehicleId;
+      }
+
+      const schedules = await db.MaintenanceSchedule.findAll({
+        where: whereClause,
+        order: [['scheduledDate', 'DESC']],
+        include: [
+          {
+            model: db.Vehicle,
+            as: 'vehicle',
+            attributes: ['id', 'vehicleName', 'licensePlate', 'groupId']
+          }
+        ]
+      });
+
+      return schedules;
+    } catch (error) {
+      logger.error('Failed to get all maintenance schedules', { error: error.message, userId });
+      throw error;
+    }
+  }
+
   // Helper methods
   async checkGroupAccess(groupId, userId) {
     try {
       // Call User Service to check group membership
-      const response = await fetch(`${process.env.USER_SERVICE_URL}/api/v1/groups/${groupId}/members/${userId}`, {
+      const response = await fetch(`${process.env.USER_SERVICE_URL}/api/v1/user/groups/${groupId}/members/${userId}`, {
         headers: {
-          'Authorization': `Bearer ${process.env.INTERNAL_SERVICE_TOKEN}`
+          'Authorization': `Bearer ${process.env.VEHICLE_SERVICE_INTERNAL_TOKEN || process.env.INTERNAL_SERVICE_TOKEN}`
         }
       });
 

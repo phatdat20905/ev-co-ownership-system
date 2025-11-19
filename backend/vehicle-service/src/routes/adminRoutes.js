@@ -11,7 +11,7 @@ import { adminValidators } from '../validators/adminValidators.js';
 const router = express.Router();
 
 router.use(authenticate);
-router.use(authorize(['admin', 'staff']));
+router.use(authorize('admin', 'staff'));
 
 // Admin endpoints
 router.get('/vehicles', validate(adminValidators.listVehicles), adminController.getAllVehicles);

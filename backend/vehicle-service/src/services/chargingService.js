@@ -384,9 +384,9 @@ export class ChargingService {
 
   async checkGroupAccess(groupId, userId) {
     try {
-      const response = await fetch(`${process.env.USER_SERVICE_URL}/api/v1/groups/${groupId}/members/${userId}`, {
+      const response = await fetch(`${process.env.USER_SERVICE_URL}/api/v1/user/groups/${groupId}/members/${userId}`, {
         headers: {
-          'Authorization': `Bearer ${process.env.INTERNAL_SERVICE_TOKEN}`
+          'Authorization': `Bearer ${process.env.VEHICLE_SERVICE_INTERNAL_TOKEN || process.env.INTERNAL_SERVICE_TOKEN}`
         }
       });
 

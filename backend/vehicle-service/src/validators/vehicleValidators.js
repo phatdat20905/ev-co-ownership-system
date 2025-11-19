@@ -38,9 +38,10 @@ export const vehicleValidators = {
       purchaseDate: Joi.date().max('now').optional().messages({
         'date.max': 'Purchase date cannot be in the future'
       }),
-      purchasePrice: Joi.number().precision(2).min(0).max(1000000).optional().messages({
+      // Allow large purchase prices (VNĐ) up to a high ceiling to accommodate vehicle prices
+      purchasePrice: Joi.number().precision(2).min(0).max(1000000000000).optional().messages({
         'number.min': 'Purchase price cannot be negative',
-        'number.max': 'Purchase price cannot exceed 1,000,000'
+        'number.max': 'Purchase price is too large'
       }),
       images: Joi.array().items(Joi.string().uri()).optional(),
       specifications: Joi.object().optional()
@@ -84,7 +85,7 @@ export const vehicleValidators = {
       batteryCapacityKwh: Joi.number().precision(2).min(10).max(200).optional(),
       currentOdometer: Joi.number().integer().min(0).max(1000000).optional(),
       purchaseDate: Joi.date().max('now').optional(),
-      purchasePrice: Joi.number().precision(2).min(0).max(1000000).optional(),
+  purchasePrice: Joi.number().precision(2).min(0).max(1000000000000).optional(),
       images: Joi.array().items(Joi.string().uri()).optional(),
       specifications: Joi.object().optional()
     }).min(1).messages({
@@ -126,6 +127,16 @@ export const vehicleValidators = {
       }),
       groupId: Joi.string().uuid().optional().messages({
         'string.guid': 'Group ID must be a valid UUID'
+      })
+    })
+  }
+,
+
+  bulkStats: {
+    body: Joi.object({
+      ids: Joi.array().items(Joi.string().uuid().messages({ 'string.guid': 'Each vehicle ID must be a valid UUID' })).min(1).required().messages({
+        'array.min': 'At least one vehicle ID must be provided',
+        'any.required': 'ids is required'
       })
     })
   }

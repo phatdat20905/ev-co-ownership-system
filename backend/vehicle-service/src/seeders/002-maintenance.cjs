@@ -49,10 +49,10 @@ module.exports = {
         description: 'Bảo dưỡng định kỳ 5,000km',
         scheduled_date: new Date('2024-11-20T08:00:00Z'),
         completed_date: null,
-        odometer_reading: null,
-        cost: null,
-        service_provider: 'VinFast Service - Quận 7',
-        notes: 'Đã đặt lịch hẹn',
+        odometer_reading: 5000,
+        cost: 2500000,
+        service_provider: 'Kỹ thuật viên Nguyễn Văn Tâm',
+        notes: 'Đã đặt lịch hẹn - Kiểm tra hệ thống điện và phanh',
         status: 'scheduled',
         created_by: '44444444-4444-4444-4444-444444444441',
         created_at: new Date('2024-11-10T09:00:00Z'),
@@ -83,14 +83,86 @@ module.exports = {
         description: 'Kiểm tra đăng kiểm định kỳ',
         scheduled_date: new Date('2024-11-25T08:00:00Z'),
         completed_date: null,
-        odometer_reading: null,
-        cost: null,
-        service_provider: 'Trung tâm Đăng kiểm Xe cơ giới 50-03D',
-        notes: 'Chuẩn bị hồ sơ đăng kiểm',
+        odometer_reading: 16000,
+        cost: 800000,
+        service_provider: 'Kỹ thuật viên Trần Minh Quân',
+        notes: 'Chuẩn bị hồ sơ đăng kiểm - Trung tâm Đăng kiểm 50-03D',
         status: 'scheduled',
         created_by: '55555555-5555-5555-5555-555555555552',
         created_at: new Date('2024-11-08T10:00:00Z'),
         updated_at: new Date('2024-11-08T10:00:00Z')
+      },
+
+      // Tesla Model 3 - Upcoming maintenance
+      {
+        id: uuidv4(),
+        vehicle_id: MASTER_SEED_DATA.vehicles.tesla.id,
+        type: 'scheduled',
+        description: 'Bảo dưỡng định kỳ 20,000km',
+        scheduled_date: new Date('2024-12-05T09:00:00Z'),
+        completed_date: null,
+        odometer_reading: 19500,
+        cost: 4500000,
+        service_provider: 'Kỹ thuật viên Lê Hoàng Nam',
+        notes: 'Kiểm tra toàn bộ hệ thống, thay phanh sau',
+        status: 'scheduled',
+        created_by: '33333333-3333-3333-3333-333333333331',
+        created_at: new Date('2024-11-18T10:00:00Z'),
+        updated_at: new Date('2024-11-18T10:00:00Z')
+      },
+
+      // VinFast VF e34 - Battery check
+      {
+        id: uuidv4(),
+        vehicle_id: MASTER_SEED_DATA.vehicles.vinfast.id,
+        type: 'inspection',
+        description: 'Kiểm tra pin và hệ thống điện',
+        scheduled_date: new Date('2024-11-28T08:30:00Z'),
+        completed_date: null,
+        odometer_reading: 5200,
+        cost: 1500000,
+        service_provider: 'Kỹ thuật viên Phạm Văn Đức',
+        notes: 'Kiểm tra sức khỏe pin, cập nhật phần mềm hệ thống',
+        status: 'scheduled',
+        created_by: '44444444-4444-4444-4444-444444444442',
+        created_at: new Date('2024-11-17T14:00:00Z'),
+        updated_at: new Date('2024-11-17T14:00:00Z')
+      },
+
+      // Hyundai Ioniq 5 - Tire rotation
+      {
+        id: uuidv4(),
+        vehicle_id: MASTER_SEED_DATA.vehicles.ioniq5.id,
+        type: 'scheduled',
+        description: 'Xoay vị trí lốp và cân chỉnh độ chụm',
+        scheduled_date: new Date('2024-12-10T10:00:00Z'),
+        completed_date: null,
+        odometer_reading: 16500,
+        cost: 1200000,
+        service_provider: 'Kỹ thuật viên Võ Thành Công',
+        notes: 'Xoay lốp theo chu kỳ, kiểm tra áp suất lốp',
+        status: 'scheduled',
+        created_by: '55555555-5555-5555-5555-555555555551',
+        created_at: new Date('2024-11-19T09:00:00Z'),
+        updated_at: new Date('2024-11-19T09:00:00Z')
+      },
+
+      // Tesla Model 3 - AC service
+      {
+        id: uuidv4(),
+        vehicle_id: MASTER_SEED_DATA.vehicles.tesla.id,
+        type: 'repair',
+        description: 'Bảo dưỡng hệ thống điều hòa',
+        scheduled_date: new Date('2024-12-15T13:00:00Z'),
+        completed_date: null,
+        odometer_reading: 19800,
+        cost: 3200000,
+        service_provider: 'Kỹ thuật viên Nguyễn Thanh Tùng',
+        notes: 'Vệ sinh dàn lạnh, thay lọc gió cabin, kiểm tra gas lạnh',
+        status: 'scheduled',
+        created_by: '33333333-3333-3333-3333-333333333332',
+        created_at: new Date('2024-11-19T11:30:00Z'),
+        updated_at: new Date('2024-11-19T11:30:00Z')
       }
     ];
 
@@ -105,6 +177,7 @@ module.exports = {
         odometer_at_schedule: r.odometer_reading,
         status: r.status || 'scheduled',
         estimated_cost: r.cost || null,
+        service_provider: r.service_provider || null,
         notes: r.notes || null,
         created_at: r.created_at || new Date(),
         updated_at: r.updated_at || new Date()
@@ -142,6 +215,8 @@ module.exports = {
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.bulkDelete('maintenance_records', null, {});
+    // Remove in reverse order to satisfy FK constraints
+    await queryInterface.bulkDelete('maintenance_history', null, {});
+    await queryInterface.bulkDelete('maintenance_schedules', null, {});
   }
 };
