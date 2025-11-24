@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { User, Mail, Phone, MapPin, Calendar, Shield, Bell, Camera, Save, Edit, CheckCircle, X, Badge, Building, Clock, Key } from "lucide-react";
+import { User, Mail, Phone, MapPin, Calendar, Shield, Bell, Camera, Save, Edit, CheckCircle, X, Building, Clock, Key } from "lucide-react";
 import { staffAPI } from "../../api/staff";
+import { userAPI } from "../../api/user";
 import { useAuthStore } from "../../store/authStore";
 import showToast from "../../utils/toast";
+import DashboardLayout from "../../components/layout/DashboardLayout";
 
 const StaffProfile = () => {
   const { user } = useAuthStore();
@@ -15,19 +17,48 @@ const StaffProfile = () => {
   const [activeTab, setActiveTab] = useState("personal");
   const fileInputRef = useRef(null);
 
+  // Normalize user-service profile -> staff UI shape
+  const normalizeUserProfile = (user) => {
+    if (!user) return null;
+    return {
+      id: user.id ?? null,
+      userId: user.userId ?? null,
+      name: user.fullName || user.name || null,
+      email: user.email || null,
+      phone: user.phoneNumber || user.phone || null,
+      address: user.address || null,
+      position: user.position || 'Nhân viên',
+      // Provide sensible mock defaults when user-service doesn't include org data
+      department: user.department || 'Hỗ trợ',
+      employeeId: user.employeeId || user.employee_id || null,
+      accessLevel: user.accessLevel || 'Nhân viên',
+      joinDate: user.createdAt || user.joinDate || null,
+      avatar: user.avatarUrl || user.avatar || null,
+      verified: user.verified !== undefined ? user.verified : false,
+      // If lastLogin missing, mock a recent timestamp (7 days ago) so UI isn't empty
+      lastLogin: user.lastLogin || user.last_login || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      notificationPreferences: (user.preferences && user.preferences.notifications) || user.notificationPreferences || {},
+      securitySettings: user.securitySettings || user.security_settings || {},
+      permissions: user.permissions || []
+    };
+  };
+
+  // Notification handler for layout
+  const handleNotificationRead = async (notificationId) => {
+    // Implement notification read logic if needed
+  };
+
   // Fetch staff profile data
   useEffect(() => {
     const fetchStaffData = async () => {
       setLoading(true);
       try {
-        const result = await staffAPI.getProfile();
-        if (result.success) {
-          const data = result.data;
-          setStaffData(data);
-          setFormData(data);
-        } else {
-          showToast.error(result.message || 'Không thể tải thông tin profile');
-        }
+        // Prefer user-service profile which contains canonical user info
+        const resp = await userAPI.getProfile();
+        const data = resp.data || resp;
+        const normalized = normalizeUserProfile(data);
+        setStaffData(normalized);
+        setFormData(normalized);
       } catch (error) {
         console.error('Error fetching staff data:', error);
         showToast.error('Đã có lỗi xảy ra khi tải thông tin');
@@ -63,16 +94,15 @@ const StaffProfile = () => {
       // Upload avatar
       setSaving(true);
       try {
-        const result = await staffAPI.uploadAvatar(file);
-        if (result.success) {
-          showToast.success(result.message || 'Cập nhật ảnh đại diện thành công');
-          // Update local state
-          const avatarUrl = result.data.avatar || result.data.avatarUrl;
-          setStaffData(prev => ({ ...prev, avatar: avatarUrl }));
-          setFormData(prev => ({ ...prev, avatar: avatarUrl }));
-        } else {
-          showToast.error(result.message || 'Không thể tải ảnh lên');
-        }
+        const form = new FormData();
+        form.append('avatar', file);
+        const result = await userAPI.uploadAvatar(form);
+        const resp = result.data || result;
+        showToast.success(resp.message || 'Cập nhật ảnh đại diện thành công');
+        // Update local state
+        const avatarUrl = resp.avatar || resp.avatarUrl || resp;
+        setStaffData(prev => ({ ...prev, avatar: avatarUrl }));
+        setFormData(prev => ({ ...prev, avatar: avatarUrl }));
       } catch (error) {
         console.error('Error uploading avatar:', error);
         showToast.error('Đã có lỗi khi tải ảnh lên');
@@ -97,15 +127,22 @@ const StaffProfile = () => {
 
     setSaving(true);
     try {
-      const result = await staffAPI.updateProfile(formData);
-      if (result.success) {
-        showToast.success(result.message || 'Cập nhật thông tin thành công');
-        setStaffData(result.data);
-        setFormData(result.data);
-        setIsEditing(false);
-      } else {
-        showToast.error(result.message || 'Không thể cập nhật thông tin');
-      }
+      // Forward profile updates to user-service canonical profile
+      const payload = {
+        fullName: formData.name,
+        email: formData.email,
+        phoneNumber: formData.phone,
+        address: formData.address,
+        position: formData.position,
+        department: formData.department
+      };
+      const result = await userAPI.updateProfile(payload);
+      const resp = result.data || result;
+      showToast.success(resp.message || 'Cập nhật thông tin thành công');
+      const normalized = normalizeUserProfile(resp);
+      setStaffData(normalized);
+      setFormData(normalized);
+      setIsEditing(false);
     } catch (error) {
       console.error('Error updating profile:', error);
       showToast.error('Đã có lỗi khi cập nhật thông tin');
@@ -159,7 +196,11 @@ const StaffProfile = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <DashboardLayout
+        userRole="staff"
+        notifications={[]}
+        onNotificationRead={handleNotificationRead}
+      >
         <div className="max-w-6xl mx-auto px-6 py-8">
           <div className="animate-pulse">
             <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
@@ -183,12 +224,16 @@ const StaffProfile = () => {
             </div>
           </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <DashboardLayout
+      userRole="staff"
+      notifications={[]}
+      onNotificationRead={handleNotificationRead}
+    >
       <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Header */}
         <motion.div
@@ -430,15 +475,7 @@ const StaffProfile = () => {
                       )}
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Mã nhân viên
-                      </label>
-                      <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl">
-                        <Badge className="w-5 h-5 text-gray-400" />
-                        <span className="text-gray-900">{staffData?.employeeId}</span>
-                      </div>
-                    </div>
+                    {/* employeeId removed - not used */}
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -484,7 +521,7 @@ const StaffProfile = () => {
                       </label>
                       <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl">
                         <Shield className="w-5 h-5 text-gray-400" />
-                        <span className="text-gray-900">{staffData?.accessLevel}</span>
+                        <span className="text-gray-900">{staffData?.accessLevel || 'Nhân viên'}</span>
                       </div>
                     </div>
 
@@ -495,7 +532,7 @@ const StaffProfile = () => {
                       <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl">
                         <Calendar className="w-5 h-5 text-gray-400" />
                         <span className="text-gray-900">
-                          {new Date(staffData?.joinDate).toLocaleDateString("vi-VN")}
+                          {staffData?.joinDate ? new Date(staffData.joinDate).toLocaleDateString("vi-VN") : 'Chưa có'}
                         </span>
                       </div>
                     </div>
@@ -672,8 +709,8 @@ const StaffProfile = () => {
           </div>
         </div>
       </div>
-    </div>
-  );
+      </DashboardLayout>
+    );
 };
 
 export default StaffProfile;

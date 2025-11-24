@@ -134,8 +134,9 @@ export const useCostStore = create((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await costAPI.getCostBreakdown(groupId, params);
-      set({ costSummary: response.data, isLoading: false });
-      return response.data;
+      // Return data directly for components to handle
+      set({ isLoading: false });
+      return response.data || response;
     } catch (error) {
       set({
         error: error.response?.data?.message || 'Lỗi tải phân tích chi phí',
@@ -149,8 +150,9 @@ export const useCostStore = create((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await costAPI.getExpenseTracking(groupId, params);
+      // Return data directly for components to handle
       set({ isLoading: false });
-      return response.data;
+      return response.data || response;
     } catch (error) {
       set({
         error: error.response?.data?.message || 'Lỗi tải báo cáo chi phí',
@@ -164,8 +166,9 @@ export const useCostStore = create((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await costAPI.getPaymentHistory(groupId, params);
+      // Return data directly for components to handle
       set({ isLoading: false });
-      return response.data;
+      return response.data || response;
     } catch (error) {
       set({
         error: error.response?.data?.message || 'Lỗi tải lịch sử thanh toán',

@@ -1,9 +1,12 @@
 import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { useEffect } from 'react';
 import ScrollToTop from "./components/layout/ScrollToTop";
 import { ProtectedRoute } from "./components/common";
 import { useAuthInit } from "./hooks";
+import { useNotificationStore } from './store/notificationStore';
+import { useAuthStore } from './store/authStore';
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -40,6 +43,7 @@ import PaymentDetail from "./pages/dashboard/coowner/financial/PaymentDetail";
 import ExpenseTracking from "./pages/dashboard/coowner/financial/ExpenseTracking";
 import UsageHistory from "./pages/dashboard/coowner/history/UsageHistory";
 import UsageAnalytics from "./pages/dashboard/coowner/history/UsageAnalytics";
+import FairnessAnalytics from "./pages/dashboard/coowner/fairness/FairnessAnalytics";
 import GroupManagement from "./pages/dashboard/coowner/group/GroupManagement";
 import VotingSystem from "./pages/dashboard/coowner/group/VotingSystem";
 import CommonFund from "./pages/dashboard/coowner/group/CommonFund";
@@ -57,6 +61,46 @@ import QuyenLoiThanhVien from "./pages/policies/QuyenLoiThanhVien";
 export default function App() {
   // Initialize auth from localStorage
   useAuthInit();
+  
+  // Get auth and notification stores
+  const { user, isAuthenticated } = useAuthStore();
+  const { initializeFCM, fetchNotifications } = useNotificationStore();
+
+  // Initialize FCM when user is authenticated
+  useEffect(() => {
+    const setupFCM = async () => {
+      if (isAuthenticated && user?.id) {
+        console.log('🔔 Initializing FCM for user:', user.id);
+        
+        // Initialize FCM and request permission
+        const success = await initializeFCM(user.id);
+        
+        if (success) {
+          console.log('✅ FCM initialized successfully');
+          // Fetch existing notifications
+          await fetchNotifications();
+        } else {
+          console.warn('⚠️ FCM initialization failed or permission denied');
+        }
+      }
+    };
+
+    setupFCM();
+  }, [isAuthenticated, user?.id, initializeFCM, fetchNotifications]);
+
+  // Register service worker for background notifications
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker
+        .register('/firebase-messaging-sw.js')
+        .then((registration) => {
+          console.log('✅ Service Worker registered:', registration);
+        })
+        .catch((error) => {
+          console.error('❌ Service Worker registration failed:', error);
+        });
+    }
+  }, []);
 
   return (
     <Router>
@@ -185,6 +229,23 @@ export default function App() {
             <ContractViewer />
           </ProtectedRoute>
         } />
+        {/* Support path-based contract id so components can read useParams(':id') */}
+        <Route path="/dashboard/coowner/ownership/contract/:id" element={
+          <ProtectedRoute allowedRoles={['co-owner']}>
+            <ContractViewer />
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboard/coowner/ownership/contract/:id/documents" element={
+          <ProtectedRoute allowedRoles={['co-owner']}>
+            <DocumentUpload />
+          </ProtectedRoute>
+        } />
+        {/* Also support documents path with id segment */}
+        <Route path="/dashboard/coowner/ownership/documents/:id" element={
+          <ProtectedRoute allowedRoles={['co-owner']}>
+            <DocumentUpload />
+          </ProtectedRoute>
+        } />
         <Route path="/dashboard/coowner/ownership/documents" element={
           <ProtectedRoute allowedRoles={['co-owner']}>
             <DocumentUpload />
@@ -238,6 +299,11 @@ export default function App() {
         <Route path="/dashboard/coowner/history/analytics" element={
           <ProtectedRoute allowedRoles={['co-owner']}>
             <UsageAnalytics />
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboard/coowner/fairness" element={
+          <ProtectedRoute allowedRoles={['co-owner']}>
+            <FairnessAnalytics />
           </ProtectedRoute>
         } />
         <Route path="/dashboard/coowner/group" element={

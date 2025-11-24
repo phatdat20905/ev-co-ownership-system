@@ -26,11 +26,27 @@ export default function CostBreakdown() {
       }
 
       try {
-        const data = await fetchCostBreakdown(activeGroup.id, { period: timeRange });
-        setBreakdown(data);
+        const response = await fetchCostBreakdown(activeGroup.id, { period: timeRange });
+        // Handle API response structure: { success, data: { total, categories, ownershipBreakdown, ... } }
+        const data = response?.data || response;
+        setBreakdown({
+          total: data?.total || 0,
+          categories: data?.categories || [],
+          period: data?.period || timeRange,
+          change: data?.change || '+0%',
+          ownershipBreakdown: data?.ownershipBreakdown || []
+        });
       } catch (err) {
         console.error('Error fetching cost breakdown:', err);
         showToast.error(getErrorMessage(err));
+        // Set empty data on error
+        setBreakdown({
+          total: 0,
+          categories: [],
+          period: timeRange,
+          change: '+0%',
+          ownershipBreakdown: []
+        });
       }
     };
 

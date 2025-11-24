@@ -6,19 +6,32 @@ import Header from '../../../../components/layout/Header';
 import Footer from '../../../../components/layout/Footer';
 import { contractAPI } from '../../../../api/contract';
 import { socketClient } from '../../../../services/socketClient';
+import { useContractStore } from '../../../../store/contractStore';
+import { showToast } from '../../../../utils/toast';
 
 export default function OwnershipManagement() {
-  const [contracts, setContracts] = useState([]);
+  // Use contractStore for better state management (like ContractManagement does)
+  const { 
+    contracts: storeContracts, 
+    loading: storeLoading,
+    error: storeError,
+    fetchContracts,
+    clearError
+  } = useContractStore();
+
   const [selectedContract, setSelectedContract] = useState(null);
   const [parties, setParties] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editPercentage, setEditPercentage] = useState('');
+  const [partiesLoading, setPartiesLoading] = useState(false);
+
+  // Extract contracts array from store (handle both array and object with contracts property)
+  const contracts = Array.isArray(storeContracts) ? storeContracts : (storeContracts?.contracts || []);
 
   useEffect(() => {
-    fetchUserContracts();
-  }, []);
+    // Fetch contracts from store
+    fetchContracts();
+  }, [fetchContracts]);
 
   useEffect(() => {
     if (selectedContract) {
@@ -26,11 +39,25 @@ export default function OwnershipManagement() {
     }
   }, [selectedContract]);
 
+  // Auto-select first contract when contracts load
+  useEffect(() => {
+    if (contracts.length > 0 && !selectedContract) {
+      setSelectedContract(contracts[0].id);
+    }
+  }, [contracts, selectedContract]);
+
+  // Show error toasts from store
+  useEffect(() => {
+    if (storeError) {
+      showToast.error(storeError);
+      clearError();
+    }
+  }, [storeError, clearError]);
+
   // Listen for contract/document notifications to refresh parties
   useEffect(() => {
     const handler = (payload) => {
       try {
-        // payload may contain type and contractId or related fields
         const t = payload.type || payload.event || payload.name || null;
         const contractId = payload.contractId || payload.data?.contractId || null;
         if (t && contractId && contractId === selectedContract) {
@@ -52,40 +79,25 @@ export default function OwnershipManagement() {
     };
   }, [selectedContract]);
 
-  const fetchUserContracts = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await contractAPI.getUserContracts();
-
-      if (response.success) {
-        setContracts(response.data);
-        // Auto-select first contract if available
-        if (response.data && response.data.length > 0) {
-          setSelectedContract(response.data[0].id);
-        }
-      }
-
-      setLoading(false);
-    } catch (err) {
-      console.error('Failed to fetch contracts:', err);
-      setError('Không thể tải danh sách hợp đồng. Vui lòng thử lại.');
-      setLoading(false);
-    }
-  };
-
   const fetchContractParties = async (contractId) => {
+    if (!contractId) return;
+
     try {
+      setPartiesLoading(true);
       const response = await contractAPI.getParties(contractId);
 
       if (response.success) {
-        setParties(response.data);
+        setParties(response.data || []);
+      } else {
+        showToast.error(response.message || 'Không thể tải danh sách thành viên');
+        setParties([]);
       }
     } catch (err) {
       console.error('Failed to fetch contract parties:', err);
-      // Keep empty array on error
+      showToast.error('Có lỗi xảy ra khi tải thành viên');
       setParties([]);
+    } finally {
+      setPartiesLoading(false);
     }
   };
 
@@ -95,19 +107,27 @@ export default function OwnershipManagement() {
   };
 
   const handleSave = async (partyId) => {
+    if (!selectedContract) return;
+
     try {
-      await contractAPI.updatePartyStatus(selectedContract, partyId, {
-        ownershipPercentage: parseInt(editPercentage)
-      });
-      
-      // Refresh parties
-      await fetchContractParties(selectedContract);
-      setEditingId(null);
-      setEditPercentage('');
-      alert('Đã cập nhật tỷ lệ sở hữu thành công!');
+      const response = await contractAPI.updatePartyStatus(
+        selectedContract, 
+        partyId, 
+        { ownershipPercentage: parseInt(editPercentage) }
+      );
+
+      if (response.success) {
+        // Refresh parties list
+        await fetchContractParties(selectedContract);
+        setEditingId(null);
+        setEditPercentage('');
+        showToast.success('Đã cập nhật tỷ lệ sở hữu thành công');
+      } else {
+        showToast.error(response.message || 'Không thể cập nhật tỷ lệ sở hữu');
+      }
     } catch (err) {
       console.error('Failed to update party:', err);
-      alert('Không thể cập nhật tỷ lệ sở hữu. Vui lòng thử lại.');
+      showToast.error('Có lỗi xảy ra khi cập nhật');
     }
   };
 
@@ -116,7 +136,57 @@ export default function OwnershipManagement() {
     setEditPercentage('');
   };
 
-  if (loading) {
+  const handleDownloadReport = () => {
+    if (!selectedContract || parties.length === 0) {
+      showToast.error('Không có dữ liệu để tải báo cáo');
+      return;
+    }
+
+    try {
+      // Find the contract info
+      const contract = contracts.find(c => c.id === selectedContract);
+      
+      // Prepare CSV data
+      const headers = ['STT', 'User ID', 'Vai trò', 'Tỷ lệ sở hữu (%)', 'Trạng thái ký', 'Thứ tự ký'];
+      const rows = parties.map((party, index) => [
+        index + 1,
+        party.user_id,
+        party.party_role === 'owner' ? 'Chủ sở hữu' : 'Đồng sở hữu',
+        parseFloat(party.ownership_percentage || 0).toFixed(2),
+        party.has_signed ? 'Đã ký' : 'Chưa ký',
+        party.signing_order
+      ]);
+
+      // Create CSV content
+      const csvContent = [
+        `Báo Cáo Quyền Sở Hữu`,
+        `Hợp đồng: ${contract?.title || contract?.contract_number || selectedContract}`,
+        `Ngày xuất: ${new Date().toLocaleDateString('vi-VN')}`,
+        `Tổng số thành viên: ${parties.length}`,
+        '',
+        headers.join(','),
+        ...rows.map(row => row.join(','))
+      ].join('\n');
+
+      // Create blob and download
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `ownership-report-${new Date().getTime()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      showToast.success('Đã tải báo cáo thành công');
+    } catch (error) {
+      console.error('Download report error:', error);
+      showToast.error('Có lỗi xảy ra khi tải báo cáo');
+    }
+  };
+
+  if (storeLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
@@ -138,24 +208,18 @@ export default function OwnershipManagement() {
     );
   }
 
-  if (error) {
+  if (contracts.length === 0 && !storeLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
         <div className="pt-20">
           <div className="max-w-7xl mx-auto px-6 py-8">
-            <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex items-start gap-3">
-              <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <h3 className="font-semibold text-red-900 mb-1">Lỗi tải dữ liệu</h3>
-                <p className="text-red-700 mb-4">{error}</p>
-                <button
-                  onClick={() => fetchUserContracts()}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  Thử lại
-                </button>
-              </div>
+            <div className="bg-white rounded-2xl p-8 shadow-sm text-center">
+              <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Chưa có hợp đồng</h3>
+              <p className="text-gray-600 mb-6">
+                Bạn chưa tham gia hợp đồng đồng sở hữu nào. Vui lòng liên hệ quản trị viên để được thêm vào nhóm.
+              </p>
             </div>
           </div>
         </div>
@@ -199,7 +263,7 @@ export default function OwnershipManagement() {
                   >
                     {contracts.map((contract) => (
                       <option key={contract.id} value={contract.id}>
-                        {contract.vehicle?.model || 'N/A'} - {contract.contractNumber}
+                        {contract.title || contract.contract_number || contract.id.substring(0, 8)}
                       </option>
                     ))}
                   </select>
@@ -232,12 +296,20 @@ export default function OwnershipManagement() {
                       >
                         <div className="flex items-center gap-4">
                           <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl flex items-center justify-center font-semibold">
-                            {(member.partyName || member.name || 'U').charAt(0).toUpperCase()}
+                            {member.user_id ? member.user_id.substring(0, 2).toUpperCase() : 'U'}
                           </div>
                           <div>
-                            <h3 className="font-semibold text-gray-900">{member.partyName || member.name || 'N/A'}</h3>
-                            <p className="text-sm text-gray-600">{member.email || 'Chưa có email'}</p>
-                            <p className="text-sm text-gray-600">{member.phone || 'Chưa có SĐT'}</p>
+                            <h3 className="font-semibold text-gray-900">
+                              {member.user_id ? `User ${member.user_id.substring(0, 8)}...` : 'Unknown User'}
+                            </h3>
+                            <p className="text-sm text-gray-600">
+                              {member.party_role === 'owner' ? 'Chủ sở hữu' : 
+                               member.party_role === 'co_owner' ? 'Đồng sở hữu' : member.party_role}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              {member.has_signed ? 'Đã ký' : 'Chưa ký'} • 
+                              Thứ tự ký: {member.signing_order}
+                            </p>
                           </div>
                         </div>
 
@@ -269,10 +341,10 @@ export default function OwnershipManagement() {
                           ) : (
                             <>
                               <span className="text-2xl font-bold text-blue-600">
-                                {member.ownershipPercentage || member.percentage || 0}%
+                                {parseFloat(member.ownership_percentage || 0).toFixed(0)}%
                               </span>
                               <button
-                                onClick={() => handleEdit(member.id, member.ownershipPercentage || member.percentage || 0)}
+                                onClick={() => handleEdit(member.id, parseFloat(member.ownership_percentage || 0))}
                                 className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                               >
                                 <Edit3 className="w-5 h-5" />
@@ -299,11 +371,11 @@ export default function OwnershipManagement() {
                         <div key={member.id} className="text-center">
                           <div className="w-16 h-16 bg-white rounded-full border-4 border-blue-500 flex items-center justify-center mx-auto mb-2">
                             <span className="text-lg font-bold text-blue-600">
-                              {member.ownershipPercentage || member.percentage || 0}%
+                              {parseFloat(member.ownership_percentage || 0).toFixed(0)}%
                             </span>
                           </div>
                           <p className="text-sm font-medium text-gray-700">
-                            {(member.partyName || member.name || 'N/A').split(' ').slice(-1)[0]}
+                            {member.party_role === 'owner' ? 'Chủ' : `Thành viên ${index + 1}`}
                           </p>
                         </div>
                       ))
@@ -326,7 +398,7 @@ export default function OwnershipManagement() {
                     <div className="text-sm text-blue-600">Tổng quyền sở hữu</div>
                   </div>
                   <div className="text-center p-4 bg-green-50 rounded-xl border border-green-200">
-                    <div className="text-3xl font-bold text-green-600">3</div>
+                    <div className="text-3xl font-bold text-green-600">{parties.length}</div>
                     <div className="text-sm text-green-600">Thành viên</div>
                   </div>
                 </div>
@@ -337,7 +409,7 @@ export default function OwnershipManagement() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Hành động nhanh</h3>
                 <div className="space-y-3">
                   <Link
-                    to="/dashboard/coowner/ownership/contract"
+                    to={selectedContract ? `/dashboard/coowner/ownership/contract?id=${selectedContract}` : '/dashboard/coowner/ownership/contract'}
                     className="flex items-center gap-3 p-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors group"
                   >
                     <FileText className="w-5 h-5" />
@@ -345,14 +417,17 @@ export default function OwnershipManagement() {
                     <ArrowRight className="w-4 h-4 ml-auto group-hover:translate-x-1 transition-transform" />
                   </Link>
                   <Link
-                    to="/dashboard/coowner/ownership/documents"
+                    to={selectedContract ? `/dashboard/coowner/ownership/documents?id=${selectedContract}` : '/dashboard/coowner/ownership/documents'}
                     className="flex items-center gap-3 p-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors group"
                   >
                     <Upload className="w-5 h-5" />
                     <span>Tải lên tài liệu</span>
                     <ArrowRight className="w-4 h-4 ml-auto group-hover:translate-x-1 transition-transform" />
                   </Link>
-                  <button className="flex items-center gap-3 p-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors group w-full">
+                  <button 
+                    onClick={handleDownloadReport}
+                    className="flex items-center gap-3 p-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors group w-full"
+                  >
                     <Download className="w-5 h-5" />
                     <span>Tải báo cáo</span>
                     <ArrowRight className="w-4 h-4 ml-auto group-hover:translate-x-1 transition-transform" />

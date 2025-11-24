@@ -1,11 +1,130 @@
 import { create } from 'zustand';
 import { notificationAPI } from '../api';
+import { 
+  initializeFirebase,
+  requestNotificationPermission, 
+  setupMessageListener,
+  deleteToken as deleteFCMToken
+} from '../config/firebase';
+import showToast from '../utils/toast';
+import axios from '../api/axios';
 
 export const useNotificationStore = create((set, get) => ({
   notifications: [],
   unreadCount: 0,
   loading: false,
   error: null,
+  
+  // FCM state
+  fcmToken: null,
+  messagingInitialized: false,
+  permissionGranted: false,
+
+  /**
+   * Initialize FCM and request permission
+   */
+  initializeFCM: async (userId) => {
+    try {
+      set({ loading: true, error: null });
+
+      // Initialize Firebase messaging
+      const messaging = await initializeFirebase();
+      
+      if (!messaging) {
+        console.warn('Firebase messaging not supported');
+        set({ messagingInitialized: false, loading: false });
+        return false;
+      }
+
+      set({ messagingInitialized: true });
+
+      // Request permission and get token
+      const token = await requestNotificationPermission();
+      
+      if (token) {
+        set({ fcmToken: token, permissionGranted: true });
+        
+        // Register token with backend
+        await get().registerDeviceToken(userId, token);
+        
+        // Setup foreground message listener
+        setupMessageListener((payload) => {
+          console.log('Foreground message received:', payload);
+          
+          // Add to notifications list
+          get().addNotification({
+            id: Date.now().toString(),
+            title: payload.notification?.title || 'Thông báo mới',
+            message: payload.notification?.body || '',
+            type: payload.data?.type || 'system',
+            data: payload.data,
+            isRead: false,
+            createdAt: new Date().toISOString()
+          });
+          
+          // Show toast
+          showToast.info(payload.notification?.title || 'Thông báo mới');
+        });
+        
+        set({ loading: false });
+        return true;
+      } else {
+        set({ permissionGranted: false, loading: false });
+        return false;
+      }
+    } catch (error) {
+      console.error('Failed to initialize FCM:', error);
+      set({ error: error.message, loading: false });
+      return false;
+    }
+  },
+
+  /**
+   * Register device token with backend
+   */
+  registerDeviceToken: async (userId, token) => {
+    try {
+      const platform = 'web';
+      
+      await axios.post('/notifications/register-token', {
+        userId,
+        token,
+        platform
+      });
+      
+      console.log('✅ FCM token registered with backend');
+      return true;
+    } catch (error) {
+      console.error('Failed to register FCM token:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Remove device token
+   */
+  removeDeviceToken: async (token) => {
+    try {
+      if (!token) {
+        token = get().fcmToken;
+      }
+      
+      if (token) {
+        await axios.delete(`/notifications/token/${token}`);
+        
+        // Delete from FCM
+        await deleteFCMToken();
+        
+        set({ fcmToken: null, permissionGranted: false });
+        console.log('✅ FCM token removed');
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Failed to remove FCM token:', error);
+      return false;
+    }
+  },
 
   // Fetch all notifications
   fetchNotifications: async () => {
@@ -14,7 +133,10 @@ export const useNotificationStore = create((set, get) => ({
       const response = await notificationAPI.getNotifications();
       // Normalize possible response shapes: response.data.data (service) or response.data (fallback)
       const respData = response?.data;
-      const list = Array.isArray(respData?.data)
+      // backend returns { data: { notifications: [...], pagination: {...} } }
+      const list = Array.isArray(respData?.data?.notifications)
+        ? respData.data.notifications
+        : Array.isArray(respData?.data)
         ? respData.data
         : Array.isArray(respData)
         ? respData
@@ -124,6 +246,9 @@ export const useNotificationStore = create((set, get) => ({
     notifications: [],
     unreadCount: 0,
     loading: false,
-    error: null
+    error: null,
+    fcmToken: null,
+    messagingInitialized: false,
+    permissionGranted: false
   })
 }));

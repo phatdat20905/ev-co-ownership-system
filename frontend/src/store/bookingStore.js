@@ -71,13 +71,15 @@ export const useBookingStore = create((set, get) => ({
         }));
         return { success: true, data: result.data, message: result.message };
       } else {
+        // Surface backend errors as rejected promises so callers (and toast.promise) can handle them
         set({ error: result.message, isLoading: false });
-        return { success: false, message: result.message };
+        throw new Error(result.message || 'Lỗi tạo booking');
       }
     } catch (error) {
       const errorMsg = error.message || 'Lỗi tạo booking';
       set({ error: errorMsg, isLoading: false });
-      return { success: false, message: errorMsg };
+      // Re-throw so UI code (showToast.promise and try/catch) sees the failure
+      throw error;
     }
   },
 
@@ -125,10 +127,10 @@ export const useBookingStore = create((set, get) => ({
     }
   },
 
-  fetchBookingStats: async () => {
+  fetchBookingStats: async (params = {}) => {
     set({ isLoading: true, error: null });
     try {
-      const result = await bookingAPI.getBookingStats();
+      const result = await bookingAPI.getBookingStats(params);
       if (result.success) {
         set({ bookingStats: result.data, isLoading: false });
         return result.data;

@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { User, Mail, Phone, MapPin, Calendar, Shield, Bell, CreditCard, FileText, Camera, Save, Edit, CheckCircle, X, Users, Building, Badge, Key } from "lucide-react";
+import { User, Mail, Phone, MapPin, Calendar, Shield, Bell, CreditCard, FileText, Camera, Save, Edit, CheckCircle, X, Users, Building, Key } from "lucide-react";
 import { adminAPI } from "../../api/admin";
+import { userAPI } from "../../api/user";
 import showToast, { getErrorMessage } from '../../utils/toast';
+import { useAuthStore } from "../../store/authStore";
+import DashboardLayout from "../../components/layout/DashboardLayout";
 
 const AdminProfile = () => {
+  const { user } = useAuthStore();
   const [adminData, setAdminData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -19,15 +23,57 @@ const AdminProfile = () => {
   });
   const fileInputRef = useRef(null);
 
+  // Normalize user-service profile -> admin UI shape
+  const normalizeUserProfile = (user) => {
+    if (!user) return null;
+    return {
+      id: user.id ?? null,
+      userId: user.userId ?? null,
+      name: user.fullName || user.name || null,
+      email: user.email || null,
+      phone: user.phoneNumber || user.phone || null,
+      address: user.address || null,
+      position: user.position || 'Administrator',
+      department: user.department || 'admin',
+      employeeId: user.employeeId || user.employee_id || null,
+      accessLevel: user.accessLevel || 'Super Admin',
+      joinDate: user.createdAt || user.joinDate || null,
+      avatar: user.avatarUrl || user.avatar || null,
+      verified: user.verified !== undefined ? user.verified : true,
+       lastLogin: user.lastLogin || user.last_login || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      notificationPreferences: (user.preferences && user.preferences.notifications) || user.notificationPreferences || {
+        email: true,
+        sms: false,
+        push: true,
+        systemAlerts: true,
+        securityAlerts: true,
+        reportNotifications: true
+      },
+      securitySettings: user.securitySettings || user.security_settings || {
+        twoFactor: false,
+        sessionTimeout: 30,
+        loginAlerts: true,
+        passwordExpiry: 90
+      },
+      permissions: user.permissions || ['full_access']
+    };
+  };
+
+  // Notification handler for layout
+  const handleNotificationRead = async (notificationId) => {
+    // Implement notification read logic if needed
+  };
+
   // Fetch admin data from API
   useEffect(() => {
     const fetchAdminData = async () => {
       try {
         setLoading(true);
-        const response = await adminAPI.getAdminProfile();
-        const data = response.data || response;
-        setAdminData(data);
-        setFormData(data);
+  const response = await userAPI.getProfile();
+  const data = response.data || response;
+  const normalized = normalizeUserProfile(data);
+  setAdminData(normalized);
+  setFormData(normalized);
       } catch (error) {
         console.error('Failed to fetch admin profile:', error);
   showToast.error('Không thể tải thông tin profile');
@@ -64,14 +110,15 @@ const AdminProfile = () => {
         const formData = new FormData();
         formData.append('avatar', file);
 
-        const response = await adminAPI.uploadAvatar(formData);
-        const avatarUrl = response.data?.avatar || response.avatar;
+  const response = await userAPI.uploadAvatar(formData);
+        const resp = response.data || response;
+        const avatarUrl = resp.avatar || resp.avatarUrl || resp;
 
         setFormData(prev => ({
           ...prev,
           avatar: avatarUrl
         }));
-        
+
         setAdminData(prev => ({
           ...prev,
           avatar: avatarUrl
@@ -97,18 +144,20 @@ const AdminProfile = () => {
       setSaving(true);
       
       // Update profile
-      const response = await adminAPI.updateAdminProfile({
-        name: formData.name,
+      const response = await userAPI.updateProfile({
+        fullName: formData.name,
         email: formData.email,
-        phone: formData.phone,
+        phoneNumber: formData.phone,
         address: formData.address,
+        // keep position/department as admin-managed fields — include if backend accepts them
         position: formData.position,
         department: formData.department
       });
 
-      const updatedData = response.data || response;
-      setAdminData(updatedData);
-      setFormData(updatedData);
+  const updatedData = response.data || response;
+  const normalized = normalizeUserProfile(updatedData);
+  setAdminData(normalized);
+  setFormData(normalized);
       setIsEditing(false);
   showToast.success('Cập nhật thông tin thành công');
     } catch (error) {
@@ -233,41 +282,46 @@ const AdminProfile = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-6xl mx-auto px-6 py-8">
-          <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-              <div className="lg:col-span-1">
-                <div className="bg-white rounded-2xl p-6 shadow-sm">
-                  <div className="h-6 bg-gray-200 rounded w-3/4 mb-4"></div>
-                  {[...Array(4)].map((_, i) => (
-                    <div key={i} className="h-4 bg-gray-200 rounded w-full mb-3"></div>
-                  ))}
-                </div>
+      <DashboardLayout
+        userRole="admin"
+        notifications={[]}
+        onNotificationRead={handleNotificationRead}
+      >
+        <div className="animate-pulse space-y-6">
+          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-2xl p-6 shadow-sm">
+                <div className="h-6 bg-gray-200 rounded w-3/4 mb-4"></div>
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="h-4 bg-gray-200 rounded w-full mb-3"></div>
+                ))}
               </div>
-              <div className="lg:col-span-3">
-                <div className="bg-white rounded-2xl p-6 shadow-sm">
-                  <div className="h-6 bg-gray-200 rounded w-1/2 mb-6"></div>
-                  {[...Array(4)].map((_, i) => (
-                    <div key={i} className="h-4 bg-gray-200 rounded w-full mb-4"></div>
-                  ))}
-                </div>
+            </div>
+            <div className="lg:col-span-3">
+              <div className="bg-white rounded-2xl p-6 shadow-sm">
+                <div className="h-6 bg-gray-200 rounded w-1/2 mb-6"></div>
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="h-4 bg-gray-200 rounded w-full mb-4"></div>
+                ))}
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+    <DashboardLayout
+      userRole="admin"
+      notifications={[]}
+      onNotificationRead={handleNotificationRead}
+    >
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
           className="mb-8"
         >
@@ -470,15 +524,7 @@ const AdminProfile = () => {
                       )}
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Mã nhân viên
-                      </label>
-                      <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl">
-                        <Badge className="w-5 h-5 text-gray-400" />
-                        <span className="text-gray-900">{adminData?.employeeId}</span>
-                      </div>
-                    </div>
+                    {/* employeeId removed - not used */}
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -912,8 +958,7 @@ const AdminProfile = () => {
             </motion.div>
           </div>
         )}
-      </div>
-    </div>
+    </DashboardLayout>
   );
 };
 

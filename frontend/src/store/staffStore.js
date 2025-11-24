@@ -70,13 +70,27 @@ export const useStaffStore = create((set, get) => ({
     set({ loading: true, error: null });
     try {
       const response = await adminAPI.createStaff(staffData);
-      const newStaff = response.data.data || response.data;
-      
+
+      // Normalize unwrap: adminAPI returns response.data (server payload),
+      // but different environments sometimes double-wrap. Handle robustly.
+      let newStaff = null;
+      if (!response) newStaff = null;
+      else if (response.data && response.data.data) newStaff = response.data.data;
+      else if (response.data) newStaff = response.data;
+      else newStaff = response;
+
+      // If we couldn't derive a new staff object, fallback to refetching list
+      if (!newStaff) {
+        await get().fetchStaff();
+        set({ loading: false });
+        return null;
+      }
+
       set((state) => ({
         staff: [newStaff, ...state.staff],
         loading: false
       }));
-      
+
       return newStaff;
     } catch (error) {
       set({ 

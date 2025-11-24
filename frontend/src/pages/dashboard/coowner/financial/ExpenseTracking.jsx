@@ -29,11 +29,31 @@ export default function ExpenseTracking() {
 
     setLoading(true);
     try {
-      const data = await fetchExpenseTracking(activeGroup.id, { year: selectedYear });
-      setExpenseData(data);
+      const response = await fetchExpenseTracking(activeGroup.id, { year: selectedYear });
+      // Handle API response structure: { success, data: { totalExpenses, monthlyAverage, ... } }
+      const data = response?.data || response;
+      setExpenseData({
+        totalExpenses: data?.totalExpenses || 0,
+        monthlyAverage: data?.monthlyAverage || 0,
+        yoyGrowth: data?.yoyGrowth || 0,
+        categories: data?.categories || [],
+        monthlyData: data?.monthlyData || [],
+        recentTransactions: data?.recentTransactions || [],
+        year: data?.year || selectedYear
+      });
     } catch (error) {
       console.error('Failed to load expense tracking:', error);
       showToast.error(getErrorMessage(error));
+      // Set empty data on error
+      setExpenseData({
+        totalExpenses: 0,
+        monthlyAverage: 0,
+        yoyGrowth: 0,
+        categories: [],
+        monthlyData: [],
+        recentTransactions: [],
+        year: selectedYear
+      });
     } finally {
       setLoading(false);
     }

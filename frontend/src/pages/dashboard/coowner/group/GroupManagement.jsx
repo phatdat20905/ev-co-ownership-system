@@ -183,11 +183,11 @@ export default function GroupManagement() {
     try {
       // Gửi notification đến tất cả thành viên trong nhóm qua API wrapper
       await notificationAPI.sendBulkNotification({
-        recipients: members.map(m => m.userId),
+        userIds: members.map(m => m.userId), // Changed from 'recipients' to 'userIds'
         title: notificationTitle,
-        message: notificationMessage,
-        type: 'group_announcement',
-        metadata: {
+        body: notificationMessage, // Changed from 'message' to 'body'
+        data: { // Moved to 'data' field
+          type: 'group_announcement',
           groupId: groupData.id,
           groupName: groupData.groupName
         }

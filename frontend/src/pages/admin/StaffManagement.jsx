@@ -8,6 +8,7 @@ import { useAuthStore } from "../../store/authStore";
 import { useAdminStore } from "../../store/adminStore";
 import showToast, { getErrorMessage } from '../../utils/toast';
 import LoadingSpinner from "../../components/common/LoadingSpinner";
+import DashboardLayout from "../../components/layout/DashboardLayout";
 
 const StaffManagement = () => {
   const navigate = useNavigate();
@@ -25,8 +26,6 @@ const StaffManagement = () => {
   } = useStaffStore();
   const { notifications: storeNotifications, fetchNotifications } = useAdminStore();
   
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState(null);
@@ -39,60 +38,16 @@ const StaffManagement = () => {
   const [performanceOpen, setPerformanceOpen] = useState(false);
   const [performanceData, setPerformanceData] = useState(null);
 
-  // Thêm state cho dropdown menus
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const userMenuRef = useRef(null);
-  const notificationsRef = useRef(null);
+  // Notification handler for layout
+  const handleNotificationRead = async (notificationId) => {
+    // Implement notification read logic if needed
+  };
 
   // Fetch staff on mount
   useEffect(() => {
     fetchStaff();
     fetchNotifications({ limit: 20 });
   }, [fetchStaff, fetchNotifications]);
-
-  // Hàm xử lý đăng xuất
-  const handleLogout = () => {
-    logout();
-    navigate("/");
-  };
-
-  // useEffect để đóng dropdown khi click ra ngoài
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
-        setUserMenuOpen(false);
-      }
-      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
-        setNotificationsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-  // Menu items cho sidebar
-  const menuItems = [
-    { id: "overview", label: "Tổng quan", icon: <BarChart3 className="w-5 h-5" />, link: "/admin" },
-    { id: "cars", label: "Quản lý xe", icon: <Car className="w-5 h-5" />, link: "/admin/cars" },
-    { id: "staff", label: "Nhân viên", icon: <Users className="w-5 h-5" />, link: "/admin/staff" },
-    { id: "contracts", label: "Hợp đồng", icon: <FileText className="w-5 h-5" />, link: "/admin/contracts" },
-    { id: "services", label: "Dịch vụ xe", icon: <Wrench className="w-5 h-5" />, link: "/admin/services" },
-    { id: "checkinout", label: "Check in/out", icon: <QrCode className="w-5 h-5" />, link: "/admin/checkin" },
-    { id: "disputes", label: "Tranh chấp", icon: <AlertTriangle className="w-5 h-5" />, link: "/admin/disputes" },
-    { id: "reports", label: "Báo cáo TC", icon: <PieChart className="w-5 h-5" />, link: "/admin/financial-reports" }
-  ];
-
-  const getActiveTab = () => {
-    const currentPath = location.pathname;
-    const menuItem = menuItems.find(item => item.link === currentPath);
-    return menuItem ? menuItem.id : "overview";
-  };
-
-  const activeTab = getActiveTab();
 
   // Use staff from store, fallback to empty array
   const staffList = staffMembers || [];
@@ -186,6 +141,8 @@ const StaffManagement = () => {
       phone: staff.phone || '',
       position: staff.position || staff.role || '',
       employeeId: staff.employeeId || '',
+      department: staff.department || '',
+      hireDate: staff.hireDate || '',
       permissions: getPermissionsArray(staff.permissions || {}),
       isActive: staff.isActive ?? (staff.status === 'active')
     });
@@ -202,6 +159,8 @@ const StaffManagement = () => {
         phone: formData.phone,
         position: formData.position,
         employeeId: formData.employeeId,
+        department: formData.department,
+        hireDate: formData.hireDate,
         // backend expects permissions object in some shape; convert array to object with true values
         permissions: (formData.permissions || []).reduce((acc, p) => ({ ...acc, [p]: true }), {}),
         isActive: !!formData.isActive
@@ -324,246 +283,25 @@ const StaffManagement = () => {
 
   // Show loading spinner
   if (loading && staffList.length === 0) {
-    return <LoadingSpinner />;
+    return (
+      <DashboardLayout
+        userRole="admin"
+        notifications={notifications}
+        onNotificationRead={handleNotificationRead}
+      >
+        <div className="flex items-center justify-center min-h-screen">
+          <LoadingSpinner />
+        </div>
+      </DashboardLayout>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Mobile Menu Button */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 rounded-lg bg-white shadow-lg border border-gray-200"
-        >
-          {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
-      </div>
-
-      {/* Sidebar */}
-      <AnimatePresence>
-        {(sidebarOpen || mobileMenuOpen) && (
-          <motion.div
-            initial={{ x: -300 }}
-            animate={{ x: 0 }}
-            exit={{ x: -300 }}
-            transition={{ type: "spring", damping: 30 }}
-            className="w-64 bg-white shadow-xl fixed h-full z-40 lg:z-30"
-          >
-            <div className="p-6 border-b border-gray-100">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-sm">
-                  <Car className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">EV Co-ownership</h1>
-                  <p className="text-xs text-gray-600">Admin Dashboard</p>
-                </div>
-              </div>
-            </div>
-
-            <nav className="p-4 space-y-1">
-              {menuItems.map((item) => (
-                <Link
-                  key={item.id}
-                  to={item.link}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
-                    activeTab === item.id
-                      ? "bg-blue-50 text-blue-600 border border-blue-100 shadow-sm"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  }`}
-                >
-                  {item.icon}
-                  <span className="font-medium">{item.label}</span>
-                </Link>
-              ))}
-            </nav>
-
-            {/* User Info */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 bg-white">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-sm">
-                  <User className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">Admim</p>
-                  <p className="text-xs text-gray-600">Quản trị viên</p>
-                </div>
-                <button 
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  onClick={handleLogout}
-                >
-                  <LogOut className="w-4 h-4 text-gray-600" />
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Performance Modal */}
-      <AnimatePresence>
-        {performanceOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Hiệu suất nhân viên</h3>
-                <button onClick={() => { setPerformanceOpen(false); setPerformanceData(null); }} className="p-2"><X /></button>
-              </div>
-              <div>
-                {performanceData ? (
-                  <div className="space-y-3">
-                    <pre className="text-xs bg-gray-100 p-3 rounded overflow-x-auto">{JSON.stringify(performanceData, null, 2)}</pre>
-                    <p className="text-sm text-gray-600">(Hiện là dữ liệu thô từ API; có thể hiển thị đồ thị sau khi xác nhận schema)</p>
-                  </div>
-                ) : (
-                  <p>Đang tải dữ liệu...</p>
-                )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Main Content */}
-      <div className={`flex-1 transition-all ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-0'} ${mobileMenuOpen ? 'ml-0' : ''}`}>
-        {/* Header */}
-        <header className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-20">
-          <div className="px-4 lg:px-8 py-4 flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors hidden lg:block"
-              >
-                <Menu className="w-5 h-5 text-gray-600" />
-              </button>
-              <div>
-                <h1 className="text-xl lg:text-2xl font-bold text-gray-900">Quản lý nhân viên</h1>
-                <p className="text-gray-600 text-sm lg:text-base">Quản lý staff và phân quyền hệ thống</p>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              {/* Search Bar */}
-              <div className="relative hidden md:block">
-                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64 text-sm bg-gray-50 focus:bg-white transition-colors"
-                />
-              </div>
-
-              {/* Notifications */}
-              <div className="relative" ref={notificationsRef}>
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setNotificationsOpen(!notificationsOpen);
-                  }}
-                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative"
-                >
-                  <Bell className="w-5 h-5 text-gray-600" />
-                  {unreadNotifications > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white text-xs text-white flex items-center justify-center">
-                      {unreadNotifications}
-                    </span>
-                  )}
-                </button>
-
-                <AnimatePresence>
-                  {notificationsOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-10"
-                    >
-                      <div className="p-4 border-b border-gray-100">
-                        <h3 className="font-semibold text-gray-900">Thông báo</h3>
-                      </div>
-                      <div className="max-h-96 overflow-y-auto">
-                        {notifications.map((notification) => (
-                          <div key={notification.id} className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${!notification.read ? 'bg-blue-50' : ''}`}>
-                            <div className="flex items-start space-x-3">
-                              <div className={`w-2 h-2 rounded-full mt-2 ${
-                                notification.type === 'success' ? 'bg-green-500' :
-                                notification.type === 'warning' ? 'bg-amber-500' :
-                                notification.type === 'info' ? 'bg-blue-500' : 'bg-red-500'
-                              }`} />
-                              <div className="flex-1">
-                                <p className="font-medium text-gray-900 text-sm">{notification.title}</p>
-                                <p className="text-gray-600 text-sm mt-1">{notification.message}</p>
-                                <p className="text-gray-400 text-xs mt-2">{notification.time}</p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="p-4 border-t border-gray-100">
-                        <button className="text-blue-600 text-sm font-medium w-full text-center hover:text-blue-800 transition-colors">
-                          Xem tất cả thông báo
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* User Menu */}
-              <div className="relative" ref={userMenuRef}>
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setUserMenuOpen(!userMenuOpen);
-                  }}
-                  className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  <div className="text-right hidden md:block">
-                    <p className="text-sm font-medium text-gray-900">Admin</p>
-                    <p className="text-xs text-gray-600">Quản trị viên</p>
-                  </div>
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-sm">
-                    <User className="w-4 h-4 text-white" />
-                  </div>
-                  <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                <AnimatePresence>
-                  {userMenuOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute right-0 top-12 w-48 bg-white rounded-xl shadow-lg border border-gray-200 z-10"
-                    >
-                      <div className="p-2">
-                        <button
-                          onClick={() => navigate("/admin/profile")}
-                          className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm text-gray-700"
-                        >
-                          <User className="w-4 h-4" />
-                          <span>Hồ sơ cá́ nhân</span>
-                        </button>
-                        <div className="border-t border-gray-100 my-1" />
-                        <button 
-                          onClick={handleLogout}
-                          className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors text-sm text-red-600"
-                        >
-                          <LogOut className="w-4 h-4" />
-                          <span>Đăng xuất</span>
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
-          </div>
-        </header>
-
+    <DashboardLayout
+      userRole="admin"
+      notifications={notifications}
+      onNotificationRead={handleNotificationRead}
+    >
         {/* Content */}
         <main className="p-4 lg:p-8">
           {/* Stats Overview */}
@@ -816,7 +554,30 @@ const StaffManagement = () => {
             </motion.div>
           )}
         </main>
-      </div>
+
+      {/* Performance Modal */}
+      <AnimatePresence>
+        {performanceOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Hiệu suất nhân viên</h3>
+                <button onClick={() => { setPerformanceOpen(false); setPerformanceData(null); }} className="p-2"><X /></button>
+              </div>
+              <div>
+                {performanceData ? (
+                  <div className="space-y-3">
+                    <pre className="text-xs bg-gray-100 p-3 rounded overflow-x-auto">{JSON.stringify(performanceData, null, 2)}</pre>
+                    <p className="text-sm text-gray-600">(Hiện là dữ liệu thô từ API; có thể hiển thị đồ thị sau khi xác nhận schema)</p>
+                  </div>
+                ) : (
+                  <p>Đang tải dữ liệu...</p>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Staff Detail Modal */}
       <AnimatePresence>
@@ -981,10 +742,28 @@ const StaffManagement = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                     <input value={formData.email || ''} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} type="email" className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Số điện thoại</label>
-                    <input value={formData.phone || ''} onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))} type="tel" className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                  </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Số điện thoại</label>
+                      <input value={formData.phone || ''} onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))} type="tel" className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Mã nhân viên</label>
+                      <input value={formData.employeeId || ''} onChange={(e) => setFormData(prev => ({ ...prev, employeeId: e.target.value }))} type="text" className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="VD: NV-12345" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Phòng ban</label>
+                      <select value={formData.department || ''} onChange={(e) => setFormData(prev => ({ ...prev, department: e.target.value }))} className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">Chọn phòng ban</option>
+                        <option value="support">Hỗ trợ</option>
+                        <option value="finance">Kế toán</option>
+                        <option value="operations">Vận hành</option>
+                        <option value="admin">Quản trị</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Ngày tuyển dụng</label>
+                      <input value={formData.hireDate || ''} onChange={(e) => setFormData(prev => ({ ...prev, hireDate: e.target.value }))} type="date" className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                    </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Chức vụ</label>
                     <select value={formData.position || ''} onChange={(e) => setFormData(prev => ({ ...prev, position: e.target.value }))} className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
@@ -1035,7 +814,7 @@ const StaffManagement = () => {
           </div>
         )}
       </AnimatePresence>
-    </div>
+    </DashboardLayout>
   );
 };
 

@@ -34,8 +34,16 @@ export const notificationAPI = {
   // Lấy số lượng chưa đọc (computed locally as backend stats route requires userId)
   getUnreadCount: async () => {
     const response = await axios.get('/notifications');
-    const list = Array.isArray(response.data?.data) ? response.data.data : (response.data || []);
-    const count = list.filter(n => !n.isRead && !n.read).length;
+    // backend returns { data: { notifications: [...], pagination: {...} } }
+    const notifications = Array.isArray(response.data?.data?.notifications)
+      ? response.data.data.notifications
+      : Array.isArray(response.data?.data)
+      ? response.data.data
+      : Array.isArray(response.data)
+      ? response.data
+      : [];
+
+    const count = notifications.filter(n => !(n.isRead || n.read)).length;
     // return an axios-like shape to be compatible with callers
     return { data: { data: { count } } };
   },
@@ -87,4 +95,54 @@ export const notificationAPI = {
     const response = await axios.get(`/notifications/preferences/devices/${userId}`);
     return response.data;
   },
+
+  // === FCM PUSH NOTIFICATION ENDPOINTS ===
+
+  // Register FCM token
+  registerToken: async (data) => {
+    const response = await axios.post('/notifications/register-token', data);
+    return response.data;
+  },
+
+  // Remove FCM token
+  removeToken: async (token) => {
+    const response = await axios.delete(`/notifications/token/${token}`);
+    return response.data;
+  },
+
+  // Get user FCM tokens
+  getUserTokens: async (userId) => {
+    const response = await axios.get(`/notifications/tokens/${userId}`);
+    return response.data;
+  },
+
+  // Send push notification
+  sendPushNotification: async (data) => {
+    const response = await axios.post('/notifications/send', data);
+    return response.data;
+  },
+
+  // Send topic notification
+  sendTopicNotification: async (data) => {
+    const response = await axios.post('/notifications/topic/send', data);
+    return response.data;
+  },
+
+  // Subscribe to topic
+  subscribeToTopic: async (data) => {
+    const response = await axios.post('/notifications/topic/subscribe', data);
+    return response.data;
+  },
+
+  // Unsubscribe from topic
+  unsubscribeFromTopic: async (data) => {
+    const response = await axios.post('/notifications/topic/unsubscribe', data);
+    return response.data;
+  },
+
+  // Mark all as read
+  markAllAsRead: async () => {
+    const response = await axios.put('/notifications/read-all');
+    return response.data;
+  }
 };

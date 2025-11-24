@@ -1,0 +1,27 @@
+# frontend/Dockerfile.dev
+# Development Dockerfile for the Vite React frontend
+# - installs dependencies with npm ci
+# - exposes the dev server port 5173
+# - runs the dev server listening on 0.0.0.0 so it's reachable from the host
+
+FROM node:20-bullseye-slim
+
+WORKDIR /app
+
+# ensure we can run binaries from node_modules
+ENV PATH /app/node_modules/.bin:$PATH
+
+# copy only package files first to leverage docker layer caching
+COPY package.json package-lock.json* ./
+
+# install dependencies
+RUN npm ci --silent
+
+# copy the rest of the app
+COPY . .
+
+# expose vite dev port
+EXPOSE 5173
+
+# Dev command (compose overrides command, but this is a safe default)
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

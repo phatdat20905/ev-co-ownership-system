@@ -7,6 +7,7 @@ import Footer from "../../../../components/layout/Footer";
 import { useAuthStore } from "../../../../store";
 import { useNavigate } from 'react-router-dom';
 import { userAPI, authAPI } from "../../../../api";
+import { showToast, getErrorMessage } from '../../../../utils/toast';
 
 export default function Profile() {
   const { user, logout } = useAuthStore();
@@ -94,7 +95,9 @@ export default function Profile() {
         }
       } catch (err) {
         console.error('Error fetching profile:', err);
-        setError('Không thể tải thông tin người dùng');
+        const msg = getErrorMessage(err) || 'Không thể tải thông tin người dùng';
+        setError(msg);
+        showToast.error(msg);
       } finally {
         setLoading(false);
       }
@@ -169,11 +172,11 @@ export default function Profile() {
 
     // Validate size and type
     if (file.size > 5 * 1024 * 1024) {
-      alert("Kích thước ảnh không được vượt quá 5MB");
+      showToast.error("Kích thước ảnh không được vượt quá 5MB");
       return;
     }
     if (!file.type.startsWith('image/')) {
-      alert("Vui lòng chọn file ảnh");
+      showToast.error("Vui lòng chọn file ảnh");
       return;
     }
 
@@ -219,17 +222,19 @@ export default function Profile() {
       // Submit to auth-service KYC endpoint
       const submitResult = await authAPI.submitKYC(fd);
 
-      // The auth-service returns uploaded URLs and id numbers in data
-      const kycData = submitResult.data || {};
+      // The auth-service returns uploaded URLs and id numbers in data. It now also returns
+      // { existing: true, kyc } when a prior submission exists (so submission is idempotent).
+      const respData = submitResult?.data?.data ?? submitResult?.data ?? submitResult ?? {};
+      const respMessage = submitResult?.data?.message || submitResult?.message || '';
+      const statusCode = submitResult?.status;
 
-      // Do NOT persist KYC files/ids into UserProfile.preferences here.
-      // The KYC is managed by auth-service. We will refresh only KYC status and local previews.
+      // Prepare a UI preview to show immediately while we re-fetch authoritative status
       const preview = {
-        idNumber: kycData.idCardNumber || idNumberInput || formData.idNumber || null,
-        idCardFrontUrl: kycData.idCardFrontUrl || formData.idCardFrontUrl || null,
-        idCardBackUrl: kycData.idCardBackUrl || formData.idCardBackUrl || null,
-        driverLicenseNumber: kycData.driverLicenseNumber || driverLicenseNumberInput || formData.driverLicenseNumber || null,
-        driverLicenseUrl: kycData.driverLicenseUrl || formData.driverLicenseUrl || null,
+        idNumber: respData.idCardNumber || idNumberInput || formData.idNumber || null,
+        idCardFrontUrl: respData.idCardFrontUrl || formData.idCardFrontUrl || null,
+        idCardBackUrl: respData.idCardBackUrl || formData.idCardBackUrl || null,
+        driverLicenseNumber: respData.driverLicenseNumber || driverLicenseNumberInput || formData.driverLicenseNumber || null,
+        driverLicenseUrl: respData.driverLicenseUrl || formData.driverLicenseUrl || null,
         status: 'pending',
         submittedAt: new Date().toISOString()
       };
@@ -238,14 +243,35 @@ export default function Profile() {
       setFormData(prev => ({ ...prev, ...preview }));
       setUserData(prev => ({ ...prev, ...preview }));
 
+      // If the server indicates the KYC was already submitted, show an informative toast
+      if (statusCode === 200 && /already/i.test(String(respMessage))) {
+        showToast.info('Bạn đã gửi KYC trước đó. Trạng thái sẽ được hiển thị dưới đây.');
+      } else {
+        showToast.info('Tài liệu KYC đã được gửi. Trạng thái sẽ được cập nhật sau khi kiểm duyệt.');
+      }
+
       // Fetch KYC status again (auth-service source of truth)
       const statusResp = await authAPI.getKYCStatus();
       setKycStatus(statusResp.data);
-
-      alert('Tài liệu KYC đã được gửi. Trạng thái sẽ được cập nhật sau khi kiểm duyệt.');
     } catch (err) {
       console.error('KYC submit error', err);
-      setError(err.response?.data?.message || 'Không thể gửi tài liệu KYC');
+      // If server responded that KYC is already submitted, surface it as informational instead of error
+      const code = err?.response?.data?.error?.code || err?.response?.data?.code || err?.code;
+      if (code === 'KYC_ALREADY_SUBMITTED') {
+        const msg = 'Bạn đã gửi KYC trước đó. Trạng thái sẽ được hiển thị.';
+        showToast.info(msg);
+        try {
+          const statusResp = await authAPI.getKYCStatus();
+          setKycStatus(statusResp.data);
+        } catch (e) {
+          // ignore
+        }
+        return;
+      }
+
+      const msg = getErrorMessage(err) || 'Không thể gửi tài liệu KYC';
+      setError(msg);
+      showToast.error(msg);
     } finally {
       setUploadingKyc(false);
     }
@@ -318,9 +344,11 @@ export default function Profile() {
       setFormData(mappedData);
       setAvatarFile(null);
       setIsEditing(false);
-      alert('Cập nhật thông tin thành công!');
+      showToast.success('Cập nhật thông tin thành công!');
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể cập nhật thông tin');
+      const msg = getErrorMessage(err) || 'Không thể cập nhật thông tin';
+      setError(msg);
+      showToast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -802,10 +830,12 @@ export default function Profile() {
                                   } catch (e) {
                                     // ignore logout errors
                                   }
-                                  alert('Đổi mật khẩu thành công. Bạn sẽ được chuyển tới trang đăng nhập.');
+                                  showToast.success('Đổi mật khẩu thành công. Bạn sẽ được chuyển tới trang đăng nhập.');
                                   navigate('/login', { replace: true });
                                 } catch (err) {
-                                  setPasswordError(err.response?.data?.message || 'Không thể đổi mật khẩu');
+                                  const msg = getErrorMessage(err) || 'Không thể đổi mật khẩu';
+                                  setPasswordError(msg);
+                                  showToast.error(msg);
                                 } finally {
                                   setChangingPassword(false);
                                 }

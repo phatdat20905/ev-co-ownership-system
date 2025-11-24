@@ -1,44 +1,36 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   FileText,
   Plus,
   Search,
-  Edit,
   Trash2,
   Users,
-  Calendar,
   Download,
   Eye,
   CheckCircle,
   XCircle,
   Clock,
   AlertTriangle,
-  BarChart3,
-  Shield,
   ChevronDown,
   X,
-  Menu,
-  LogOut,
-  User,
-  Bell,
-  PieChart,
-  Car,
-  Wrench,
-  QrCode,
   DollarSign,
   Loader2,
 } from "lucide-react";
 import { useContractStore } from "../../store/contractStore";
 import { useAuthStore } from "../../store/authStore";
+import { useAdminStore } from "../../store/adminStore";
 import { showToast } from "../../utils/toast";
 import { contractAPI, vehicleAPI } from "../../api";
+import DashboardLayout from "../../components/layout/DashboardLayout";
 
 const ContractManagement = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuthStore();
+  const userRole = user?.role || "staff";
+  const { notifications: storeNotifications, fetchNotifications } = useAdminStore();
   const { 
     contracts, 
     loading, 
@@ -53,12 +45,16 @@ const ContractManagement = () => {
   
   // Local user state
   const [userData, setUserData] = useState(user || { name: '', role: 'staff' });
-  const [userRole, setUserRole] = useState((user?.role || 'staff').toString().trim().toLowerCase());
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  // Notification handler for layout
+  const handleNotificationRead = async (notificationId) => {
+    // Implement notification read logic if needed
+  };
+
+  // Fetch notifications on mount
+  useEffect(() => {
+    fetchNotifications({ limit: 20 });
+  }, [fetchNotifications]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -70,22 +66,14 @@ const ContractManagement = () => {
     vehicleId: "",
     groupId: "",
     contractType: "co_ownership",
+    title: "",
+    content: "",
     startDate: "",
     endDate: "",
     terms: "",
     value: "",
+    parties: [],
   });
-
-  const [notifications] = useState([
-    {
-      id: 1,
-      title: "Hợp đồng mới",
-      message: "HD-2024-010 đã được tạo thành công",
-      time: "5 phút trước",
-      type: "success",
-      read: false,
-    },
-  ]);
 
   // Load contracts on mount
   useEffect(() => {
@@ -162,104 +150,18 @@ const ContractManagement = () => {
         name: user.name || user.fullName || "User",
         role: user.role || "staff",
       });
-      setUserRole((user.role || "staff").trim().toLowerCase());
     } else {
       const storedUserData = localStorage.getItem("userData");
       if (storedUserData) {
         try {
           const parsedData = JSON.parse(storedUserData);
           setUserData(parsedData);
-          const cleanRole = (parsedData.role || "staff").trim().toLowerCase();
-          setUserRole(cleanRole);
         } catch (error) {
           console.error("Lỗi khi parse userData:", error);
-          setUserRole("staff");
         }
       }
     }
   }, [user]);
-
-  // Menu items cho Admin
-  const adminMenuItems = [
-    {
-      id: "overview",
-      label: "Tổng quan",
-      icon: <BarChart3 className="w-5 h-5" />,
-      link: "/admin",
-    },
-    {
-      id: "cars",
-      label: "Quản lý xe",
-      icon: <Car className="w-5 h-5" />,
-      link: "/admin/cars",
-    },
-    {
-      id: "contracts",
-      label: "Quản lý hợp đồng",
-      icon: <FileText className="w-5 h-5" />,
-      link: "/admin/contracts",
-    },
-    {
-      id: "services",
-      label: "Quản lý dịch vụ",
-      icon: <Wrench className="w-5 h-5" />,
-      link: "/admin/services",
-    },
-    {
-      id: "checkinout",
-      label: "Check-in/out",
-      icon: <QrCode className="w-5 h-5" />,
-      link: "/admin/checkinout",
-    },
-    {
-      id: "users",
-      label: "Quản lý người dùng",
-      icon: <Users className="w-5 h-5" />,
-      link: "/admin/users",
-    },
-    {
-      id: "reports",
-      label: "Báo cáo",
-      icon: <PieChart className="w-5 h-5" />,
-      link: "/admin/reports",
-    },
-  ];
-
-  // Menu items cho Staff
-  const staffMenuItems = [
-    {
-      id: "overview",
-      label: "Tổng quan",
-      icon: <BarChart3 className="w-5 h-5" />,
-      link: "/staff",
-    },
-    {
-      id: "cars",
-      label: "Quản lý xe",
-      icon: <Car className="w-5 h-5" />,
-      link: "/staff/cars",
-    },
-    {
-      id: "contracts",
-      label: "Quản lý hợp đồng",
-      icon: <FileText className="w-5 h-5" />,
-      link: "/staff/contracts",
-    },
-    {
-      id: "services",
-      label: "Quản lý dịch vụ",
-      icon: <Wrench className="w-5 h-5" />,
-      link: "/staff/services",
-    },
-    {
-      id: "checkinout",
-      label: "Check-in/out",
-      icon: <QrCode className="w-5 h-5" />,
-      link: "/staff/checkinout",
-    },
-  ];
-
-  const menuItems = userRole === "admin" ? adminMenuItems : staffMenuItems;
 
   const statusOptions = [
     { value: "all", label: "Tất cả trạng thái", color: "gray" },
@@ -393,14 +295,6 @@ const ContractManagement = () => {
   const canDeleteContract = userRole === "admin";
   const canExport = userRole === "admin";
 
-  const getActiveTab = () => {
-    const currentPath = location.pathname;
-    const menuItem = menuItems.find((item) => item.link === currentPath);
-    return menuItem ? menuItem.id : "contracts";
-  };
-
-  const activeTab = getActiveTab();
-
   // CRUD Handlers
   const handleDeleteClick = (contract) => {
     setContractToDelete(contract);
@@ -453,20 +347,59 @@ const ContractManagement = () => {
   };
 
   const handleCreateContract = async () => {
-    if (!createFormData.vehicleId || !createFormData.groupId || !createFormData.startDate || !createFormData.endDate) {
-      showToast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
+    // Validate required fields
+    if (!createFormData.groupId || !createFormData.contractType || !createFormData.title || !createFormData.content) {
+      showToast.error("Vui lòng điền đầy đủ thông tin bắt buộc (Nhóm, Loại hợp đồng, Tiêu đề, Nội dung)");
       return;
     }
+    // Build parties array - if empty, include current user as default party
+    let parties = createFormData.parties;
+    if (!parties || parties.length === 0) {
+      parties = [{
+        userId: user?.id || user?.userId,
+        role: "owner",
+      }];
+    }
 
-    const result = await createContract({
-      vehicle_id: createFormData.vehicleId,
-      group_id: createFormData.groupId,
-      contract_type: createFormData.contractType,
-      start_date: createFormData.startDate,
-      end_date: createFormData.endDate,
-      terms: createFormData.terms,
-      total_value: parseFloat(createFormData.value) || 0,
-    });
+    // Normalize parties to the shape the contract-service expects: { userId, role }
+    let normalizedParties = parties.map((p) => ({
+      userId: p.userId || p.user_id || p.id || p.user?.id || p.user?.userId,
+      role: p.role || p.party_role || p.partyRole || "co_owner",
+      // preserve any ownership fields if provided so we can validate/normalize
+      ownership: p.ownership || p.ownershipPercentage || p.ownership_percentage || p.ownershipPercentage,
+    }));
+
+    // Ownership handling:
+    // - If only one party, default ownership to 100.00
+    // - If multiple parties, require the ownership percentages sum to 100 (with small tolerance)
+    if (normalizedParties.length === 1) {
+      normalizedParties[0].ownershipPercentage = (parseFloat(normalizedParties[0].ownership) || 100).toFixed(2);
+    } else {
+      const sum = normalizedParties.reduce((s, p) => s + (parseFloat(p.ownership || p.ownershipPercentage || p.ownership_percentage || 0) || 0), 0);
+      if (Math.abs(sum - 100) > 0.01) {
+        showToast.error(`Tổng phần trăm sở hữu phải bằng 100% (hiện: ${sum.toFixed(2)}%). Vui lòng điều chỉnh.`);
+        return;
+      }
+      normalizedParties = normalizedParties.map((p) => ({
+        ...p,
+        ownershipPercentage: (parseFloat(p.ownership || p.ownershipPercentage || p.ownership_percentage || 0) || 0).toFixed(2),
+      }));
+    }
+
+    const payload = {
+      groupId: createFormData.groupId,
+      vehicleId: createFormData.vehicleId || null,
+      contractType: createFormData.contractType,
+      title: createFormData.title,
+      content: createFormData.content,
+      parties: normalizedParties,
+      effectiveDate: createFormData.startDate || new Date().toISOString().split("T")[0],
+      expiryDate: createFormData.endDate || null,
+      totalValue: parseFloat(createFormData.value) || 0,
+      terms: createFormData.terms || createFormData.content,
+    };
+
+    const result = await createContract(payload);
 
     if (result.success) {
       showToast.success(result.message || "Tạo hợp đồng thành công");
@@ -475,236 +408,26 @@ const ContractManagement = () => {
         vehicleId: "",
         groupId: "",
         contractType: "co_ownership",
+        title: "",
+        content: "",
         startDate: "",
         endDate: "",
         terms: "",
         value: "",
+        parties: [],
       });
       loadContracts();
     }
   };
 
-  // Hàm xử lý logout
-  const handleLogout = () => {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("userData");
-    localStorage.removeItem("authExpires");
-    localStorage.removeItem("rememberedLogin");
-    window.dispatchEvent(new Event("storage"));
-    navigate("/");
-  };
-
-  // Đóng menu khi click ra ngoài
-  useEffect(() => {
-    const handleClickOutside = () => {
-      setUserMenuOpen(false);
-      setNotificationsOpen(false);
-    };
-    document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
-  }, []);
-
-  const unreadNotifications = notifications.filter((n) => !n.read).length;
-
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Mobile Menu Button */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 rounded-lg bg-white shadow-lg border border-gray-200"
-        >
-          {mobileMenuOpen ? (
-            <X className="w-5 h-5" />
-          ) : (
-            <Menu className="w-5 h-5" />
-          )}
-        </button>
-      </div>
-
-      {/* Sidebar */}
-      <AnimatePresence>
-        {(sidebarOpen || mobileMenuOpen) && (
-          <motion.div
-            initial={{ x: -300 }}
-            animate={{ x: 0 }}
-            exit={{ x: -300 }}
-            transition={{ type: "spring", damping: 30 }}
-            className="w-64 bg-white shadow-xl fixed h-full z-40 lg:z-30"
-          >
-            <div className="p-6 border-b border-gray-100">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-sm">
-                  {userRole === "admin" ? (
-                    <Shield className="w-6 h-6 text-white" />
-                  ) : (
-                    <User className="w-6 h-6 text-white" />
-                  )}
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">
-                    EV Co-ownership
-                  </h1>
-                  <p className="text-xs text-gray-600">
-                    {userRole === "admin"
-                      ? "Admin Dashboard"
-                      : "Staff Dashboard"}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <nav className="p-4 space-y-1">
-              {menuItems.map((item) => (
-                <Link
-                  key={item.id}
-                  to={item.link}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
-                    activeTab === item.id
-                      ? "bg-blue-50 text-blue-600 border border-blue-100 shadow-sm"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  }`}
-                >
-                  {item.icon}
-                  <span className="font-medium">{item.label}</span>
-                </Link>
-              ))}
-            </nav>
-
-            {/* User Info */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 bg-white">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-sm">
-                  <User className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">
-                    {userData.name}
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    {userRole === "admin"
-                      ? "Quản trị viên"
-                      : "Nhân viên vận hành"}
-                  </p>
-                </div>
-                <button
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  onClick={handleLogout}
-                >
-                  <LogOut className="w-4 h-4 text-gray-600" />
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Main Content */}
-      <div
-        className={`flex-1 transition-all ${
-          sidebarOpen ? "lg:ml-64" : "lg:ml-0"
-        } ${mobileMenuOpen ? "ml-0" : ""}`}
-      >
-        {/* Header */}
-        <header className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-20">
-          <div className="px-4 lg:px-8 py-4 flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors hidden lg:block"
-              >
-                <Menu className="w-5 h-5 text-gray-600" />
-              </button>
-              <div>
-                <h2 className="text-lg lg:text-xl font-bold text-gray-900">
-                  Quản lý hợp đồng
-                </h2>
-                <p className="text-xs lg:text-sm text-gray-600">
-                  Hợp đồng pháp lý điện tử và e-contract
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-2 lg:space-x-4">
-              {/* Notifications */}
-              <div className="relative">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setNotificationsOpen(!notificationsOpen);
-                    setUserMenuOpen(false);
-                  }}
-                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative"
-                >
-                  <Bell className="w-5 h-5 text-gray-600" />
-                  {unreadNotifications > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
-                      {unreadNotifications}
-                    </span>
-                  )}
-                </button>
-              </div>
-
-              {/* User Menu */}
-              <div className="relative">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setUserMenuOpen(!userMenuOpen);
-                    setNotificationsOpen(false);
-                  }}
-                  className="flex items-center space-x-2 lg:space-x-3 p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-                    <User className="w-4 h-4 text-white" />
-                  </div>
-                  <span className="text-sm font-medium text-gray-900 hidden lg:block">
-                    {userData.name}
-                  </span>
-                  <ChevronDown className="w-4 h-4 text-gray-600 hidden lg:block" />
-                </button>
-
-                <AnimatePresence>
-                  {userMenuOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden z-50"
-                    >
-                      <div className="p-4 border-b border-gray-100">
-                        <p className="font-semibold text-gray-900">
-                          {userData.name}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {userRole === "admin"
-                            ? "Quản trị viên"
-                            : "Nhân viên"}
-                        </p>
-                      </div>
-                      <div className="p-2">
-                        <button className="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3">
-                          <User className="w-4 h-4" />
-                          <span>Thông tin cá nhân</span>
-                        </button>
-                        <button
-                          onClick={handleLogout}
-                          className="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3 text-red-600"
-                        >
-                          <LogOut className="w-4 h-4" />
-                          <span>Đăng xuất</span>
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* Contract Management Content */}
+    <DashboardLayout
+      userRole={userRole}
+      notifications={storeNotifications}
+      onNotificationRead={handleNotificationRead}
+    >
+      {/* Contract Management Content */}
+      <div className="p-4 lg:p-8">
         <div className="p-4 lg:p-8">
           {/* Stats Overview */}
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 lg:gap-6 mb-6 lg:mb-8">
@@ -1199,20 +922,21 @@ const ContractManagement = () => {
                 </div>
 
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        ID Xe <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={createFormData.vehicleId}
-                        onChange={(e) => setCreateFormData({...createFormData, vehicleId: e.target.value})}
-                        placeholder="88888888-8888-8888-8888-888888888881"
-                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
+                  {/* Title field - REQUIRED */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Tiêu đề hợp đồng <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={createFormData.title}
+                      onChange={(e) => setCreateFormData({...createFormData, title: e.target.value})}
+                      placeholder="Ví dụ: Hợp đồng đồng sở hữu xe Tesla Model 3"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
 
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         ID Nhóm <span className="text-red-500">*</span>
@@ -1228,7 +952,20 @@ const ContractManagement = () => {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Loại hợp đồng
+                        ID Xe (Tùy chọn)
+                      </label>
+                      <input
+                        type="text"
+                        value={createFormData.vehicleId}
+                        onChange={(e) => setCreateFormData({...createFormData, vehicleId: e.target.value})}
+                        placeholder="88888888-8888-8888-8888-888888888881"
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Loại hợp đồng <span className="text-red-500">*</span>
                       </label>
                       <select
                         value={createFormData.contractType}
@@ -1256,7 +993,7 @@ const ContractManagement = () => {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Ngày bắt đầu <span className="text-red-500">*</span>
+                        Ngày bắt đầu
                       </label>
                       <input
                         type="date"
@@ -1268,7 +1005,7 @@ const ContractManagement = () => {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Ngày kết thúc <span className="text-red-500">*</span>
+                        Ngày kết thúc
                       </label>
                       <input
                         type="date"
@@ -1279,14 +1016,28 @@ const ContractManagement = () => {
                     </div>
                   </div>
 
+                  {/* Content field - REQUIRED */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Điều khoản hợp đồng
+                      Nội dung hợp đồng <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={createFormData.content}
+                      onChange={(e) => setCreateFormData({...createFormData, content: e.target.value})}
+                      placeholder="Nhập nội dung chi tiết của hợp đồng, bao gồm các điều khoản, quyền và nghĩa vụ của các bên..."
+                      rows="6"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Điều khoản bổ sung (Tùy chọn)
                     </label>
                     <textarea
                       value={createFormData.terms}
                       onChange={(e) => setCreateFormData({...createFormData, terms: e.target.value})}
-                      placeholder="Nhập các điều khoản và điều kiện của hợp đồng..."
+                      placeholder="Các điều khoản và điều kiện bổ sung..."
                       rows="4"
                       className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
@@ -1314,7 +1065,7 @@ const ContractManagement = () => {
           )}
         </AnimatePresence>
       </div>
-    </div>
+    </DashboardLayout>
   );
 };
 

@@ -32,14 +32,18 @@ import {
 } from "lucide-react";
 import { useVehicleStore } from "../../store/vehicleStore";
 import { useAuthStore } from "../../store/authStore";
+import { useAdminStore } from "../../store/adminStore";
 import { showToast } from "../../utils/toast";
+import DashboardLayout from "../../components/layout/DashboardLayout";
 
 const CarManagement = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuthStore();
+  const userRole = user?.role || "staff";
+  const { notifications: storeNotifications = [], fetchNotifications, groups = [], fetchGroups } = useAdminStore();
   const {
-    vehicles,
+    vehicles = [],
     loading,
     error,
     fetchVehicles,
@@ -50,10 +54,20 @@ const CarManagement = () => {
     clearError,
   } = useVehicleStore();
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  // Notification handler for layout
+  const handleNotificationRead = async (notificationId) => {
+    // Implement notification read logic if needed
+  };
+
+  // Fetch notifications on mount
+  useEffect(() => {
+    fetchNotifications({ limit: 20 });
+  }, [fetchNotifications]);
+
+  // Fetch groups for vehicle assignment
+  useEffect(() => {
+    if (typeof fetchGroups === 'function') fetchGroups();
+  }, [fetchGroups]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -85,7 +99,6 @@ const CarManagement = () => {
   });
 
   // State cho user data
-  const [userRole, setUserRole] = useState("staff");
   const [userData, setUserData] = useState({
     name: user?.fullName || "User",
     role: user?.role || "staff",
@@ -94,7 +107,7 @@ const CarManagement = () => {
   // Load vehicles khi component mount
   useEffect(() => {
     loadVehicles();
-  }, []);
+  }, [fetchVehicles]);
 
   const loadVehicles = async () => {
     await fetchVehicles();
@@ -107,19 +120,14 @@ const CarManagement = () => {
         name: user.fullName || user.email,
         role: user.role,
       });
-      const cleanRole = (user.role || "staff").toString().trim().toLowerCase();
-      setUserRole(cleanRole);
     } else {
       const storedUserData = localStorage.getItem("userData");
       if (storedUserData) {
         try {
           const parsedData = JSON.parse(storedUserData);
           setUserData(parsedData);
-          const cleanRole = (parsedData.role || "staff").trim().toLowerCase();
-          setUserRole(cleanRole);
         } catch (error) {
           console.error("Lỗi khi parse userData:", error);
-          setUserRole("staff");
         }
       }
     }
@@ -132,122 +140,6 @@ const CarManagement = () => {
       clearError();
     }
   }, [error]);
-
-  // Thông báo (giữ nguyên mock data)
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      title: "Bảo dưỡng định kỳ",
-      message: "Xe VF e34 cần bảo dưỡng tháng 11",
-      time: "2 giờ trước",
-      type: "warning",
-      read: false,
-    },
-    {
-      id: 2,
-      title: "Check-in thành công",
-      message: "Minh Nguyễn đã check-in xe VF 8",
-      time: "5 giờ trước",
-      type: "success",
-      read: true,
-    },
-    {
-      id: 3,
-      title: "Đặt lịch mới",
-      message: "Co-owner Lan Phương đặt lịch sử dụng 15/11",
-      time: "1 ngày trước",
-      type: "info",
-      read: true,
-    },
-  ]);
-
-  // Menu items cho Admin
-  const adminMenuItems = [
-    {
-      id: "overview",
-      label: "Tổng quan",
-      icon: <BarChart3 className="w-5 h-5" />,
-      link: "/admin",
-    },
-    {
-      id: "cars",
-      label: "Quản lý xe",
-      icon: <Car className="w-5 h-5" />,
-      link: "/admin/cars",
-    },
-    {
-      id: "staff",
-      label: "Nhân viên",
-      icon: <Users className="w-5 h-5" />,
-      link: "/admin/staff",
-    },
-    {
-      id: "contracts",
-      label: "Hợp đồng",
-      icon: <FileText className="w-5 h-5" />,
-      link: "/admin/contracts",
-    },
-    {
-      id: "services",
-      label: "Dịch vụ xe",
-      icon: <Wrench className="w-5 h-5" />,
-      link: "/admin/services",
-    },
-    {
-      id: "checkin",
-      label: "Check-in/out",
-      icon: <QrCode className="w-5 h-5" />,
-      link: "/admin/checkin",
-    },
-    {
-      id: "disputes",
-      label: "Tranh chấp",
-      icon: <AlertTriangle className="w-5 h-5" />,
-      link: "/admin/disputes",
-    },
-    {
-      id: "reports",
-      label: "Báo cáo TC",
-      icon: <PieChart className="w-5 h-5" />,
-      link: "/admin/financial-reports",
-    },
-  ];
-
-  // Menu items cho Staff
-  const staffMenuItems = [
-    {
-      id: "overview",
-      label: "Tổng quan",
-      icon: <BarChart3 className="w-5 h-5" />,
-      link: "/staff",
-    },
-    {
-      id: "cars",
-      label: "Quản lý xe",
-      icon: <Car className="w-5 h-5" />,
-      link: "/staff/cars",
-    },
-    {
-      id: "contracts",
-      label: "Hợp đồng",
-      icon: <FileText className="w-5 h-5" />,
-      link: "/staff/contracts",
-    },
-    {
-      id: "services",
-      label: "Dịch vụ xe",
-      icon: <Wrench className="w-5 h-5" />,
-      link: "/staff/services",
-    },
-    {
-      id: "checkin",
-      label: "Check-in/out",
-      icon: <QrCode className="w-5 h-5" />,
-      link: "/staff/checkin",
-    },
-  ];
-
-  const menuItems = userRole === "admin" ? adminMenuItems : staffMenuItems;
 
   const statusOptions = [
     { value: "all", label: "Tất cả trạng thái", color: "gray" },
@@ -269,23 +161,26 @@ const CarManagement = () => {
   };
 
   const filteredCars = vehicles.filter((car) => {
+    const name = (car.name || car.vehicleName || "").toString();
+    const license = (car.license || car.licensePlate || "").toString();
+    const location = (car.location || car.specifications?.location || "").toString();
+
     const matchesSearch =
-      car.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      car.license.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      car.location.toLowerCase().includes(searchTerm.toLowerCase());
+      name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      license.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      location.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus =
       statusFilter === "all" || mapStatus(car.status) === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
   const stats = {
-    totalCars: vehicles.length,
-    activeCars: vehicles.filter((car) => car.status === "available").length,
-    inUseCars: vehicles.filter((car) => car.status === "in_use").length,
-    inMaintenance: vehicles.filter((car) => car.status === "maintenance")
-      .length,
-    inactiveCars: vehicles.filter((car) => car.status === "unavailable").length,
-    totalRevenue: vehicles.reduce((sum, car) => sum + (car.totalRevenue || 0), 0),
+    totalCars: vehicles?.length || 0,
+    activeCars: (vehicles || []).filter((car) => (car.status || "") === "available").length,
+    inUseCars: (vehicles || []).filter((car) => (car.status || "") === "in_use").length,
+    inMaintenance: (vehicles || []).filter((car) => (car.status || "") === "maintenance").length,
+    inactiveCars: (vehicles || []).filter((car) => (car.status || "") === "unavailable").length,
+    totalRevenue: (vehicles || []).reduce((sum, car) => sum + (car?.totalRevenue || 0), 0),
   };
 
   const getStatusColor = (status) => {
@@ -309,24 +204,6 @@ const CarManagement = () => {
   const canDeleteCar = userRole === "admin";
   const canViewRevenue = userRole === "admin";
   const canExport = userRole === "admin";
-
-  const getActiveTab = () => {
-    const currentPath = location.pathname;
-    const menuItem = menuItems.find((item) => item.link === currentPath);
-    return menuItem ? menuItem.id : "cars";
-  };
-
-  const activeTab = getActiveTab();
-
-  // Hàm xử lý logout
-  const handleLogout = () => {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("userData");
-    localStorage.removeItem("authExpires");
-    localStorage.removeItem("rememberedLogin");
-    window.dispatchEvent(new Event("storage"));
-    navigate("/");
-  };
 
   // Hàm xử lý xóa xe
   const handleDeleteCar = async (carId) => {
@@ -352,6 +229,30 @@ const CarManagement = () => {
   // Hàm xử lý thêm xe
   const handleAddVehicle = async (e) => {
     e.preventDefault();
+    // Client-side validation before sending
+    // groupId required
+    if (!formData.groupId) {
+      showToast.error('Vui lòng chọn nhóm xe (group)');
+      return;
+    }
+    // VIN: 17 alphanumeric excluding I,O,Q
+    const vin = (formData.vin || '').toUpperCase().trim();
+    const vinRegex = /^[A-HJ-NPR-Z0-9]{17}$/i;
+    if (!vinRegex.test(vin)) {
+      showToast.error('VIN phải gồm 17 ký tự chữ và số hợp lệ (không chứa I, O, Q)');
+      return;
+    }
+    // Purchase date cannot be in the future
+    if (formData.purchaseDate) {
+      const pd = new Date(formData.purchaseDate);
+      const today = new Date();
+      today.setHours(23,59,59,999);
+      if (pd > today) {
+        showToast.error('Ngày mua không được lớn hơn ngày hiện tại');
+        return;
+      }
+    }
+
     const result = await createVehicle(formData);
     if (result.success) {
       showToast.success(result.message || "Thêm xe thành công");
@@ -366,6 +267,27 @@ const CarManagement = () => {
   const handleEditVehicle = async (e) => {
     e.preventDefault();
     if (!editingCar) return;
+    // Client-side validation (same as add)
+    if (!formData.groupId) {
+      showToast.error('Vui lòng chọn nhóm xe (group)');
+      return;
+    }
+    const vin = (formData.vin || '').toUpperCase().trim();
+    const vinRegex = /^[A-HJ-NPR-Z0-9]{17}$/i;
+    if (!vinRegex.test(vin)) {
+      showToast.error('VIN phải gồm 17 ký tự chữ và số hợp lệ (không chứa I, O, Q)');
+      return;
+    }
+    if (formData.purchaseDate) {
+      const pd = new Date(formData.purchaseDate);
+      const today = new Date();
+      today.setHours(23,59,59,999);
+      if (pd > today) {
+        showToast.error('Ngày mua không được lớn hơn ngày hiện tại');
+        return;
+      }
+    }
+
     const result = await updateVehicle(editingCar.id, formData);
     if (result.success) {
       showToast.success(result.message || "Cập nhật xe thành công");
@@ -435,15 +357,16 @@ const CarManagement = () => {
   const handleExportCSV = () => {
     try {
       const headers = ["Tên xe", "Biển số", "Model", "Trạng thái", "Pin", "Vị trí", "Số chủ sở hữu"];
-      const rows = filteredCars.map(car => [
-        car.name,
-        car.license,
-        car.model,
-        statusOptions.find(s => s.value === mapStatus(car.status))?.label,
-        `${car.battery}%`,
-        car.location,
-        car.coOwners
-      ]);
+      const rows = filteredCars.map(car => {
+        const name = car.name || car.vehicleName || "";
+        const license = car.license || car.licensePlate || "";
+        const model = car.model || car.year || "";
+        const statusLabel = statusOptions.find(s => s.value === mapStatus(car.status))?.label || "";
+        const battery = (car.battery !== undefined && car.battery !== null) ? `${car.battery}%` : "";
+        const location = car.location || car.specifications?.location || "";
+        const coOwners = car.coOwners || 0;
+        return [name, license, model, statusLabel, battery, location, coOwners];
+      });
 
       const csvContent = [
         headers.join(","),
@@ -465,292 +388,14 @@ const CarManagement = () => {
     }
   };
 
-  // Đóng menu khi click ra ngoài
-  useEffect(() => {
-    const handleClickOutside = () => {
-      setUserMenuOpen(false);
-      setNotificationsOpen(false);
-    };
-    document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
-  }, []);
-
-  const unreadNotifications = notifications.filter((n) => !n.read).length;
-
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Mobile Menu Button */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 rounded-lg bg-white shadow-lg border border-gray-200"
-        >
-          {mobileMenuOpen ? (
-            <X className="w-5 h-5" />
-          ) : (
-            <Menu className="w-5 h-5" />
-          )}
-        </button>
-      </div>
-
-      {/* Sidebar */}
-      <AnimatePresence>
-        {(sidebarOpen || mobileMenuOpen) && (
-          <motion.div
-            initial={{ x: -300 }}
-            animate={{ x: 0 }}
-            exit={{ x: -300 }}
-            transition={{ type: "spring", damping: 30 }}
-            className="w-64 bg-white shadow-xl fixed h-full z-40 lg:z-30"
-          >
-            <div className="p-6 border-b border-gray-100">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-sm">
-                  {userRole === "admin" ? (
-                    <Shield className="w-6 h-6 text-white" />
-                  ) : (
-                    <User className="w-6 h-6 text-white" />
-                  )}
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">
-                    EV Co-ownership
-                  </h1>
-                  <p className="text-xs text-gray-600">
-                    {userRole === "admin"
-                      ? "Admin Dashboard"
-                      : "Staff Dashboard"}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <nav className="p-4 space-y-1">
-              {menuItems.map((item) => (
-                <Link
-                  key={item.id}
-                  to={item.link}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
-                    activeTab === item.id
-                      ? "bg-blue-50 text-blue-600 border border-blue-100 shadow-sm"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  }`}
-                >
-                  {item.icon}
-                  <span className="font-medium">{item.label}</span>
-                </Link>
-              ))}
-            </nav>
-
-            {/* User Info */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 bg-white">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-sm">
-                  <User className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">
-                    {userData.name}
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    {userRole === "admin"
-                      ? "Quản trị viên"
-                      : "Nhân viên vận hành"}
-                  </p>
-                </div>
-                <button
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  onClick={handleLogout}
-                >
-                  <LogOut className="w-4 h-4 text-gray-600" />
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Main Content */}
-      <div
-        className={`flex-1 transition-all ${
-          sidebarOpen ? "lg:ml-64" : "lg:ml-0"
-        } ${mobileMenuOpen ? "ml-0" : ""}`}
-      >
-        {/* Header */}
-        <header className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-20">
-          <div className="px-4 lg:px-8 py-4 flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors hidden lg:block"
-              >
-                <Menu className="w-5 h-5 text-gray-600" />
-              </button>
-              <h2 className="text-xl font-semibold text-gray-900">
-                {menuItems.find((item) => item.id === activeTab)?.label ||
-                  "Quản lý xe"}
-              </h2>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              {/* Search Bar */}
-              <div className="relative hidden md:block">
-                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm xe..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64 text-sm bg-gray-50 focus:bg-white transition-colors"
-                />
-              </div>
-
-              {/* Notifications */}
-              <div className="relative">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setNotificationsOpen(!notificationsOpen);
-                  }}
-                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative"
-                >
-                  <Bell className="w-5 h-5 text-gray-600" />
-                  {unreadNotifications > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white text-xs text-white flex items-center justify-center">
-                      {unreadNotifications}
-                    </span>
-                  )}
-                </button>
-
-                <AnimatePresence>
-                  {notificationsOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-10"
-                    >
-                      <div className="p-4 border-b border-gray-100">
-                        <h3 className="font-semibold text-gray-900">
-                          Thông báo
-                        </h3>
-                      </div>
-                      <div className="max-h-96 overflow-y-auto">
-                        {notifications.map((notification) => (
-                          <div
-                            key={notification.id}
-                            className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${
-                              !notification.read ? "bg-blue-50" : ""
-                            }`}
-                          >
-                            <div className="flex items-start space-x-3">
-                              <div
-                                className={`w-2 h-2 rounded-full mt-2 ${
-                                  notification.type === "success"
-                                    ? "bg-green-500"
-                                    : notification.type === "warning"
-                                    ? "bg-amber-500"
-                                    : notification.type === "info"
-                                    ? "bg-blue-500"
-                                    : "bg-red-500"
-                                }`}
-                              />
-                              <div className="flex-1">
-                                <p className="font-medium text-gray-900 text-sm">
-                                  {notification.title}
-                                </p>
-                                <p className="text-gray-600 text-sm mt-1">
-                                  {notification.message}
-                                </p>
-                                <p className="text-gray-400 text-xs mt-2">
-                                  {notification.time}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="p-4 border-t border-gray-100">
-                        <button className="text-blue-600 text-sm font-medium w-full text-center hover:text-blue-800 transition-colors">
-                          Xem tất cả thông báo
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* User Menu */}
-              <div className="relative">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setUserMenuOpen(!userMenuOpen);
-                  }}
-                  className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  <div className="text-right hidden md:block">
-                    <p className="text-sm font-medium text-gray-900">
-                      {userData.name}
-                    </p>
-                    <p className="text-xs text-gray-600">
-                      {userRole === "admin"
-                        ? "Quản trị viên"
-                        : "Nhân viên vận hành"}
-                    </p>
-                  </div>
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-sm">
-                    <User className="w-4 h-4 text-white" />
-                  </div>
-                  <ChevronDown
-                    className={`w-4 h-4 text-gray-600 transition-transform ${
-                      userMenuOpen ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
-
-                <AnimatePresence>
-                  {userMenuOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute right-0 top-12 w-48 bg-white rounded-xl shadow-lg border border-gray-200 z-10"
-                    >
-                      <div className="p-2">
-                        <button
-                          onClick={() =>
-                            navigate(
-                              userRole === "admin"
-                                ? "/admin/profile"
-                                : "/staff/profile"
-                            )
-                          }
-                          className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm text-gray-700"
-                        >
-                          <User className="w-4 h-4" />
-                          <span>Hồ sơ cá nhân</span>
-                        </button>
-                        <div className="border-t border-gray-100 my-1" />
-                        <button
-                          onClick={handleLogout}
-                          className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors text-sm text-red-600"
-                        >
-                          <LogOut className="w-4 h-4" />
-                          <span>Đăng xuất</span>
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* Car Management Content */}
-        <div className="p-4 lg:p-8">
+    <DashboardLayout
+      userRole={userRole}
+      notifications={storeNotifications}
+      onNotificationRead={handleNotificationRead}
+    >
+      {/* Car Management Content */}
+      <div className="p-4 lg:p-8">
           {/* Stats Overview */}
           <div
             className={`grid gap-3 lg:gap-6 mb-6 lg:mb-8 ${
@@ -1055,7 +700,6 @@ const CarManagement = () => {
             </motion.div>
           )}
         </div>
-      </div>
 
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
@@ -1140,6 +784,23 @@ const CarManagement = () => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="VF e34"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Nhóm xe <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      required
+                      value={formData.groupId}
+                      onChange={(e) => setFormData({ ...formData, groupId: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                    >
+                      <option value="">-- Chọn nhóm --</option>
+                      {(groups || []).map(g => (
+                        <option key={g.id} value={g.id}>{g.name || g.groupName || g.id}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>
@@ -1368,6 +1029,21 @@ const CarManagement = () => {
                       onChange={(e) => setFormData({ ...formData, vehicleName: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Nhóm xe <span className="text-red-500">*</span></label>
+                    <select
+                      required
+                      value={formData.groupId}
+                      onChange={(e) => setFormData({ ...formData, groupId: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                    >
+                      <option value="">-- Chọn nhóm --</option>
+                      {(groups || []).map(g => (
+                        <option key={g.id} value={g.id}>{g.name || g.groupName || g.id}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>
@@ -1755,7 +1431,7 @@ const CarManagement = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </DashboardLayout>
   );
 };
 

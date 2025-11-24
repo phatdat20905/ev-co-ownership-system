@@ -7,6 +7,7 @@ import { useAdminStore } from "../../store/adminStore";
 import { useAuthStore } from "../../store/authStore";
 import showToast, { getErrorMessage } from '../../utils/toast';
 import LoadingSpinner from "../../components/common/LoadingSpinner";
+import DashboardLayout from "../../components/layout/DashboardLayout";
 
 const FinancialReports = () => {
   const navigate = useNavigate();
@@ -22,79 +23,39 @@ const FinancialReports = () => {
     fetchFinancialOverview, 
     fetchRevenueReport, 
     fetchExpenseReport,
-    fetchCarPerformance,
     exportFinancialReport 
   } = useFinancialStore();
   const { notifications: storeNotifications, fetchNotifications } = useAdminStore();
   
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dateRange, setDateRange] = useState("month");
   const [selectedReport, setSelectedReport] = useState(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
-  // Thêm state cho dropdown menus
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-
-  // Refs để detect click outside
-  const userMenuRef = useRef(null);
-  const notificationsRef = useRef(null);
+  // Notification handler for layout
+  const handleNotificationRead = async (notificationId) => {
+    // Implement notification read logic if needed
+  };
 
   // Fetch financial data on mount
   useEffect(() => {
-    const params = { period: dateRange };
+    // Map UI-friendly dateRange to API expected period values
+    const periodMap = {
+      week: '7d',
+      month: '30d',
+      quarter: '90d',
+      year: '1y'
+    };
+    const apiPeriod = periodMap[dateRange] || dateRange;
+    const params = { period: apiPeriod };
+
     fetchFinancialOverview(params);
     fetchRevenueReport(params);
-  fetchExpenseReport(params);
-  // Fetch vehicle/car performance metrics
-  fetchCarPerformance(params);
+    fetchExpenseReport(params);
+    // NOTE: using mocked car performance data locally for development/testing
+    // to avoid calling upstream analytics APIs. The table below will use
+    // the mocked values instead of fetched results.
     fetchNotifications({ limit: 20 });
-  }, [dateRange, fetchFinancialOverview, fetchRevenueReport, fetchExpenseReport, fetchCarPerformance, fetchNotifications]);
-
-  // Hàm xử lý đăng xuất
-  const handleLogout = () => {
-    logout();
-    navigate("/");
-  };
-
-  // useEffect để đóng dropdown khi click ra ngoài
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
-        setUserMenuOpen(false);
-      }
-      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
-        setNotificationsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-  // Menu items cho sidebar
-  const menuItems = [
-    { id: "overview", label: "Tổng quan", icon: <BarChart3 className="w-5 h-5" />, link: "/admin" },
-    { id: "cars", label: "Quản lý xe", icon: <Car className="w-5 h-5" />, link: "/admin/cars" },
-    { id: "staff", label: "Nhân viên", icon: <Users className="w-5 h-5" />, link: "/admin/staff" },
-    { id: "contracts", label: "Hợp đồng", icon: <FileText className="w-5 h-5" />, link: "/admin/contracts" },
-    { id: "services", label: "Dịch vụ xe", icon: <Wrench className="w-5 h-5" />, link: "/admin/services" },
-    { id: "checkinout", label: "Check in/out", icon: <QrCode className="w-5 h-5" />, link: "/admin/checkin" },
-    { id: "disputes", label: "Tranh chấp", icon: <AlertTriangle className="w-5 h-5" />, link: "/admin/disputes" },
-    { id: "reports", label: "Báo cáo TC", icon: <PieChart className="w-5 h-5" />, link: "/admin/financial-reports" }
-  ];
-
-  const getActiveTab = () => {
-    const currentPath = location.pathname;
-    const menuItem = menuItems.find(item => item.link === currentPath);
-    return menuItem ? menuItem.id : "overview";
-  };
-
-  const activeTab = getActiveTab();
-
+  }, [dateRange, fetchFinancialOverview, fetchRevenueReport, fetchExpenseReport, fetchNotifications]);
   // Use data from store or fallback to default
   const notifications = storeNotifications || [];
   const financialData = financialOverview || {
@@ -138,7 +99,8 @@ const FinancialReports = () => {
         title: `Báo cáo doanh thu - ${dateLabel}`,
         type: 'Doanh thu',
         period: dateLabel,
-        generatedDate: (revenueReport.generatedAt || new Date()).toString().split('T')[0],
+        // Normalize generatedAt to YYYY-MM-DD for display
+        generatedDate: new Date(revenueReport.generatedAt || Date.now()).toISOString().split('T')[0],
         size: estimateSize(revenueReport),
         status: 'completed',
         raw: revenueReport,
@@ -151,7 +113,7 @@ const FinancialReports = () => {
         title: `Báo cáo chi phí - ${dateLabel}`,
         type: 'Chi phí',
         period: dateLabel,
-        generatedDate: (expenseReport.generatedAt || new Date()).toString().split('T')[0],
+        generatedDate: new Date(expenseReport.generatedAt || Date.now()).toISOString().split('T')[0],
         size: estimateSize(expenseReport),
         status: 'completed',
         raw: expenseReport,
@@ -164,7 +126,7 @@ const FinancialReports = () => {
         title: `Tổng quan tài chính - ${dateLabel}`,
         type: 'Tổng hợp',
         period: dateLabel,
-        generatedDate: (financialOverview.generatedAt || new Date()).toString().split('T')[0],
+        generatedDate: new Date(financialOverview.generatedAt || Date.now()).toISOString().split('T')[0],
         size: estimateSize(financialOverview),
         status: 'completed',
         raw: financialOverview,
@@ -175,7 +137,20 @@ const FinancialReports = () => {
   }, [revenueReport, expenseReport, financialOverview, dateRange]);
 
   // Prefer dedicated carPerformance from store; fallback to financialOverview.carPerformance
-  const carPerformance = (storeCarPerformance && storeCarPerformance.length) ? storeCarPerformance : (financialOverview?.carPerformance || []);
+  // Mock data for "Hiệu suất theo xe" table — used instead of calling API
+  const MOCK_CAR_PERFORMANCE = [
+    { vehicleId: 'veh_001', vehicleName: 'VinFast VF e34', revenue: 12500000, cost: 4200000, profit: 8300000, utilization: 72.4 },
+    { vehicleId: 'veh_002', vehicleName: 'Tesla Model 3', revenue: 9800000, cost: 3500000, profit: 6300000, utilization: 65.1 },
+    { vehicleId: 'veh_003', vehicleName: 'Nissan Leaf', revenue: 6400000, cost: 2800000, profit: 3600000, utilization: 51.7 },
+    { vehicleId: 'veh_004', vehicleName: 'Hyundai Ioniq 5', revenue: 15400000, cost: 6100000, profit: 9300000, utilization: 78.3 },
+    { vehicleId: 'veh_005', vehicleName: 'BMW i3', revenue: 4300000, cost: 2100000, profit: 2200000, utilization: 39.8 },
+    { vehicleId: 'veh_006', vehicleName: 'Kia EV6', revenue: 11250000, cost: 4800000, profit: 6450000, utilization: 69.2 }
+  ];
+
+  const [mockedCarPerformance, setMockedCarPerformance] = useState(MOCK_CAR_PERFORMANCE);
+
+  // Use mocked data (developer-requested) instead of upstream store data
+  const carPerformance = mockedCarPerformance;
 
   const unreadNotifications = notifications.filter(n => !n.read).length;
 
@@ -246,217 +221,49 @@ const FinancialReports = () => {
     </div>
   );
 
-  return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Mobile Menu Button */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 rounded-lg bg-white shadow-lg border border-gray-200"
-        >
-          {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
+  // Recursive renderer to display report data in a friendly, readable format
+  const RenderData = ({ data, level = 0 }) => {
+    if (data === null || data === undefined) return <div className="text-sm text-gray-700">—</div>;
+    if (typeof data !== 'object') return <div className="text-sm text-gray-700">{String(data)}</div>;
+
+    if (Array.isArray(data)) {
+      if (data.length === 0) return <div className="text-sm text-gray-700">[]</div>;
+      return (
+        <div className="space-y-2">
+          {data.map((item, idx) => (
+            <div key={idx} className="p-2 border rounded bg-white">
+              <RenderData data={item} level={level + 1} />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // Plain object
+    return (
+      <div className="w-full overflow-auto">
+        <table className="w-full text-sm">
+          <tbody>
+            {Object.entries(data).map(([key, value]) => (
+              <tr key={key} className="align-top border-b last:border-b-0">
+                <td className="py-2 pr-4 font-medium text-gray-800 w-40">{key}</td>
+                <td className="py-2 text-gray-700">
+                  <RenderData data={value} level={level + 1} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
+    );
+  };
 
-      {/* Sidebar */}
-      <AnimatePresence>
-        {(sidebarOpen || mobileMenuOpen) && (
-          <motion.div
-            initial={{ x: -300 }}
-            animate={{ x: 0 }}
-            exit={{ x: -300 }}
-            transition={{ type: "spring", damping: 30 }}
-            className="w-64 bg-white shadow-xl fixed h-full z-40 lg:z-30"
-          >
-            <div className="p-6 border-b border-gray-100">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-sm">
-                  <Car className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">EV Co-ownership</h1>
-                  <p className="text-xs text-gray-600">Admin Dashboard</p>
-                </div>
-              </div>
-            </div>
-
-            <nav className="p-4 space-y-1">
-              {menuItems.map((item) => (
-                <Link
-                  key={item.id}
-                  to={item.link}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
-                    activeTab === item.id
-                      ? "bg-blue-50 text-blue-600 border border-blue-100 shadow-sm"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  }`}
-                >
-                  {item.icon}
-                  <span className="font-medium">{item.label}</span>
-                </Link>
-              ))}
-            </nav>
-
-            {/* User Info */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 bg-white">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-sm">
-                  <User className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">Admin</p>
-                  <p className="text-xs text-gray-600">Quản trị viên</p>
-                </div>
-                <button 
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  onClick={handleLogout}
-                >
-                  <LogOut className="w-4 h-4 text-gray-600" />
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Main Content */}
-      <div className={`flex-1 transition-all ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-0'} ${mobileMenuOpen ? 'ml-0' : ''}`}>
-        {/* Header */}
-        <header className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-20">
-          <div className="px-4 lg:px-8 py-4 flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors hidden lg:block"
-              >
-                <Menu className="w-5 h-5 text-gray-600" />
-              </button>
-              <div>
-                <h1 className="text-xl lg:text-2xl font-bold text-gray-900">Báo cáo tài chính</h1>
-                <p className="text-gray-600 text-sm lg:text-base">Xuất báo cáo tài chính minh bạch cho từng nhóm</p>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              {/* Search Bar */}
-              <div className="relative hidden md:block">
-                <Download className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm báo cáo..."
-                  className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64 text-sm bg-gray-50 focus:bg-white transition-colors"
-                />
-              </div>
-
-              {/* Notifications */}
-              <div className="relative" ref={notificationsRef}>
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setNotificationsOpen(!notificationsOpen);
-                  }}
-                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative"
-                >
-                  <Bell className="w-5 h-5 text-gray-600" />
-                  {unreadNotifications > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white text-xs text-white flex items-center justify-center">
-                      {unreadNotifications}
-                    </span>
-                  )}
-                </button>
-
-                <AnimatePresence>
-                  {notificationsOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-10"
-                    >
-                      <div className="p-4 border-b border-gray-100">
-                        <h3 className="font-semibold text-gray-900">Thông báo</h3>
-                      </div>
-                      <div className="max-h-96 overflow-y-auto">
-                        {notifications.map((notification) => (
-                          <div key={notification.id} className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${!notification.read ? 'bg-blue-50' : ''}`}>
-                            <div className="flex items-start space-x-3">
-                              <div className={`w-2 h-2 rounded-full mt-2 ${
-                                notification.type === 'success' ? 'bg-green-500' :
-                                notification.type === 'warning' ? 'bg-amber-500' :
-                                notification.type === 'info' ? 'bg-blue-500' : 'bg-red-500'
-                              }`} />
-                              <div className="flex-1">
-                                <p className="font-medium text-gray-900 text-sm">{notification.title}</p>
-                                <p className="text-gray-600 text-sm mt-1">{notification.message}</p>
-                                <p className="text-gray-400 text-xs mt-2">{notification.time}</p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="p-4 border-t border-gray-100">
-                        <button className="text-blue-600 text-sm font-medium w-full text-center hover:text-blue-800 transition-colors">
-                          Xem tất cả thông báo
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* User Menu */}
-              <div className="relative" ref={userMenuRef}>
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setUserMenuOpen(!userMenuOpen);
-                  }}
-                  className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  <div className="text-right hidden md:block">
-                    <p className="text-sm font-medium text-gray-900">Admin</p>
-                    <p className="text-xs text-gray-600">Quản trị viên</p>
-                  </div>
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-sm">
-                    <User className="w-4 h-4 text-white" />
-                  </div>
-                  <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                <AnimatePresence>
-                  {userMenuOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute right-0 top-12 w-48 bg-white rounded-xl shadow-lg border border-gray-200 z-10"
-                    >
-                      <div className="p-2">
-                        <button
-                          onClick={() => navigate("/admin/profile")}
-                          className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm text-gray-700"
-                        >
-                          <User className="w-4 h-4" />
-                          <span>Hồ sơ cá́ nhân</span>
-                        </button>
-                        <div className="border-t border-gray-100 my-1" />
-                        <button 
-                          onClick={handleLogout}
-                          className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors text-sm text-red-600"
-                        >
-                          <LogOut className="w-4 h-4" />
-                          <span>Đăng xuất</span>
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
-          </div>
-        </header>
-
+  return (
+    <DashboardLayout
+      userRole="admin"
+      notifications={notifications}
+      onNotificationRead={handleNotificationRead}
+    >
         {/* Content */}
         <main className="p-4 lg:p-8">
           {/* Date Range and Actions */}
@@ -667,7 +474,10 @@ const FinancialReports = () => {
                 <div />
                 <div className="flex items-center space-x-2">
                   <button
-                    onClick={() => fetchCarPerformance({ period: dateRange })}
+                      onClick={() => {
+                        // Refresh mocked data (no upstream API call)
+                        setMockedCarPerformance(MOCK_CAR_PERFORMANCE);
+                      }}
                     className="px-3 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 text-sm"
                   >Làm mới</button>
                 </div>
@@ -691,7 +501,10 @@ const FinancialReports = () => {
                         Không có dữ liệu hiệu suất xe cho khoảng thời gian này.
                         <div className="mt-3">
                           <button
-                            onClick={() => fetchCarPerformance({ period: dateRange })}
+                              onClick={() => {
+                                // Retry using mocked data
+                                setMockedCarPerformance(MOCK_CAR_PERFORMANCE);
+                              }}
                             className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm"
                           >Thử làm mới</button>
                         </div>
@@ -764,8 +577,37 @@ const FinancialReports = () => {
                 </div>
               </div>
             </div>
-
             <div className="overflow-x-auto">
+              {/* View modal for a selected report */}
+              <AnimatePresence>
+                {selectedReport && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black opacity-40" onClick={() => setSelectedReport(null)} />
+                    <motion.div
+                      initial={{ scale: 0.95, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.95, opacity: 0 }}
+                      className="bg-white rounded-xl shadow-lg max-w-3xl w-full p-6 z-10 mx-4 overflow-y-auto max-h-[80vh]"
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <h4 className="text-lg font-semibold">{selectedReport.title}</h4>
+                        <button onClick={() => setSelectedReport(null)} className="p-2 rounded-md hover:bg-gray-100">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="text-sm text-gray-700 mb-4">
+                        <div><strong>Loại:</strong> {selectedReport.type}</div>
+                        <div><strong>Khoảng thời gian:</strong> {selectedReport.period}</div>
+                        <div><strong>Ngày tạo:</strong> {selectedReport.generatedDate}</div>
+                        <div><strong>Kích thước (approx):</strong> {selectedReport.size}</div>
+                      </div>
+                      <div className="bg-gray-50 p-4 rounded-md">
+                        <RenderData data={selectedReport.raw} />
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
+              </AnimatePresence>
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
@@ -827,111 +669,7 @@ const FinancialReports = () => {
             </div>
           </div>
         </main>
-      </div>
-
-      {/* Report Detail Modal */}
-      <AnimatePresence>
-        {selectedReport && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="bg-white rounded-xl lg:rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
-            >
-              <div className="p-4 lg:p-6 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl lg:text-2xl font-bold text-gray-900">{selectedReport.title}</h2>
-                    <p className="text-gray-600 text-sm lg:text-base">{selectedReport.period}</p>
-                  </div>
-                  <button
-                    onClick={() => setSelectedReport(null)}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <X className="w-5 h-5 text-gray-600" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-4 lg:p-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 mb-6 lg:mb-8">
-                  <div>
-                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Thông tin báo cáo</h4>
-                    <div className="space-y-3 lg:space-y-4">
-                      <div className="flex justify-between text-sm lg:text-base">
-                        <span className="text-gray-600">Tiêu đề:</span>
-                        <span className="font-medium">{selectedReport.title}</span>
-                      </div>
-                      <div className="flex justify-between text-sm lg:text-base">
-                        <span className="text-gray-600">Loại báo cáo:</span>
-                        <span className="font-medium">{selectedReport.type}</span>
-                      </div>
-                      <div className="flex justify-between text-sm lg:text-base">
-                        <span className="text-gray-600">Thời gian:</span>
-                        <span className="font-medium">{selectedReport.period}</span>
-                      </div>
-                      <div className="flex justify-between text-sm lg:text-base">
-                        <span className="text-gray-600">Ngày tạo:</span>
-                        <span className="font-medium">{selectedReport.generatedDate}</span>
-                      </div>
-                      <div className="flex justify-between text-sm lg:text-base">
-                        <span className="text-gray-600">Kích thước:</span>
-                        <span className="font-medium">{selectedReport.size}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Tóm tắt</h4>
-                    <div className="space-y-3 lg:space-y-4 p-4 lg:p-6 bg-blue-50 rounded-xl border border-blue-200">
-                      <div className="flex justify-between text-sm lg:text-base">
-                        <span className="text-blue-900">Tổng doanh thu:</span>
-                        <span className="font-semibold text-blue-900">184.5M VND</span>
-                      </div>
-                      <div className="flex justify-between text-sm lg:text-base">
-                        <span className="text-blue-900">Tổng chi phí:</span>
-                        <span className="font-semibold text-blue-900">89.2M VND</span>
-                      </div>
-                      <div className="flex justify-between text-sm lg:text-base">
-                        <span className="text-blue-900">Lợi nhuận:</span>
-                        <span className="font-semibold text-blue-900">95.3M VND</span>
-                      </div>
-                      <div className="flex justify-between text-sm lg:text-base">
-                        <span className="text-blue-900">Tỷ lệ sử dụng:</span>
-                        <span className="font-semibold text-blue-900">76%</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex flex-col lg:flex-row space-y-3 lg:space-y-0 lg:space-x-3 pt-6 border-t border-gray-200">
-                  <button
-                    onClick={() => handleExportReport(mapReportType(selectedReport.type), 'pdf')}
-                    className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 text-sm lg:text-base"
-                  >
-                    <Download className="w-4 h-4 lg:w-5 lg:h-5" />
-                    <span>Tải PDF</span>
-                  </button>
-                  <button
-                    onClick={() => handleExportReport(mapReportType(selectedReport.type), 'xlsx')}
-                    className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 text-sm lg:text-base"
-                  >
-                    <FileText className="w-4 h-4 lg:w-5 lg:h-5" />
-                    <span>Tải Excel</span>
-                  </button>
-                  <button className="flex-1 bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center space-x-2 text-sm lg:text-base">
-                    <BarChart3 className="w-4 h-4 lg:w-5 lg:h-5" />
-                    <span>Phân tích nâng cao</span>
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </div>
+    </DashboardLayout>
   );
 };
 

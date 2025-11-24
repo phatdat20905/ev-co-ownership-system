@@ -8,6 +8,11 @@ export const useAIStore = create((set, get) => ({
   loading: false,
   error: null,
 
+  // Fairness specific state (migrated from fairnessStore.js)
+  currentAnalysis: null,
+  history: [],
+  lastUpdated: null,
+
   // Get booking recommendations
   getBookingRecommendations: async (userId) => {
     set({ loading: true, error: null });
@@ -73,6 +78,59 @@ export const useAIStore = create((set, get) => ({
 
   // Clear error
   clearError: () => set({ error: null }),
+
+  // Fairness actions
+  analyzeFairness: async ({ groupId, timeRange = 'month', startDate, endDate }) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await aiAPI.analyzeFairness({ groupId, timeRange, startDate, endDate });
+
+      if (response.success) {
+        set({ currentAnalysis: response.data, loading: false, lastUpdated: new Date(), error: null });
+        return response.data;
+      } else {
+        throw new Error(response.message || 'Failed to analyze fairness');
+      }
+    } catch (error) {
+      set({ loading: false, error: error.response?.data?.message || error.message || 'Failed to analyze fairness' });
+      throw error;
+    }
+  },
+
+  fetchHistory: async (groupId, limit = 10) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await aiAPI.getFairnessHistory(groupId, { limit });
+      if (response.success) {
+        set({ history: response.data || [], loading: false, error: null });
+        return response.data;
+      } else {
+        throw new Error(response.message || 'Failed to fetch history');
+      }
+    } catch (error) {
+      set({ loading: false, error: error.response?.data?.message || error.message || 'Failed to fetch history' });
+      throw error;
+    }
+  },
+
+  fetchLatest: async (groupId) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await aiAPI.getLatestFairness(groupId);
+      if (response.success) {
+        set({ currentAnalysis: response.data, loading: false, lastUpdated: new Date(), error: null });
+        return response.data;
+      } else {
+        throw new Error(response.message || 'No fairness records found');
+      }
+    } catch (error) {
+      set({ loading: false, error: error.response?.data?.message || error.message || 'Failed to fetch latest record' });
+      throw error;
+    }
+  },
+
+  clearAnalysis: () => set({ currentAnalysis: null, error: null }),
+
 
   // Reset store
   reset: () => set({

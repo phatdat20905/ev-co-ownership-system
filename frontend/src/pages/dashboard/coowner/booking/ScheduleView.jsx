@@ -17,10 +17,15 @@ export default function ScheduleView() {
     const fetchData = async () => {
       try {
         const period = timeRange === 'week' ? '7d' : timeRange === 'month' ? '30d' : '90d';
-        await Promise.all([
-          fetchBookingHistory({ period }),
-          fetchBookingStats()
+        
+        // Fetch both stats and history (pass period so stats and history align)
+        const [statsResult, historyResult] = await Promise.all([
+          fetchBookingStats({ period }),
+          fetchBookingHistory({ period, limit: 50 })
         ]);
+
+        console.log('[ScheduleView] Stats:', statsResult);
+        console.log('[ScheduleView] History:', historyResult);
       } catch (err) {
         console.error('Error fetching schedule data:', err);
       }
@@ -31,44 +36,46 @@ export default function ScheduleView() {
 
   // Transform bookingHistory to scheduleData format
   const scheduleData = {
-    upcoming: bookingHistory?.bookings?.filter(b => 
+    upcoming: (bookingHistory?.bookings || bookingHistory || []).filter(b => 
       ['pending', 'confirmed'].includes(b.status) && new Date(b.startTime) > new Date()
     ).map(booking => ({
       id: booking.id,
-      car: booking.vehicle?.vehicleName || 'N/A',
+      car: booking.vehicle?.vehicleName || booking.vehicle?.brand || 'N/A',
       date: new Date(booking.startTime).toISOString().split('T')[0],
       startTime: new Date(booking.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
       endTime: new Date(booking.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
       duration: `${Math.round((new Date(booking.endTime) - new Date(booking.startTime)) / 3600000)} giờ`,
       purpose: booking.purpose || 'Cá nhân',
-      location: booking.destination || 'N/A',
-      cost: booking.cost || 0,
+      location: booking.destination || 'Chưa xác định',
+      cost: booking.estimatedCost || booking.cost || 0,
       status: booking.status
-    })) || [],
-    past: bookingHistory?.bookings?.filter(b => 
+    })),
+    past: (bookingHistory?.bookings || bookingHistory || []).filter(b => 
       b.status === 'completed'
     ).map(booking => ({
       id: booking.id,
-      car: booking.vehicle?.vehicleName || 'N/A',
+      car: booking.vehicle?.vehicleName || booking.vehicle?.brand || 'N/A',
       date: new Date(booking.startTime).toISOString().split('T')[0],
       startTime: new Date(booking.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
       endTime: new Date(booking.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
       duration: `${Math.round((new Date(booking.endTime) - new Date(booking.startTime)) / 3600000)} giờ`,
       purpose: booking.purpose || 'Cá nhân',
-      location: booking.destination || 'N/A',
-      cost: booking.cost || 0,
+      location: booking.destination || 'Chưa xác định',
+      cost: booking.estimatedCost || booking.cost || 0,
       status: booking.status,
-      efficiency: booking.efficiency || 'N/A',
-      distance: booking.distance ? `${booking.distance} km` : 'N/A'
-    })) || []
+      efficiency: booking.efficiency || 'Chưa có dữ liệu',
+      distance: booking.distance ? `${booking.distance} km` : 'Chưa có dữ liệu'
+    }))
   };
 
   const stats = {
     totalBookings: bookingStats?.totalBookings || 0,
     totalHours: bookingStats?.totalHours || 0,
     totalCost: bookingStats?.totalCost || 0,
-    favoriteCar: bookingStats?.favoriteCar || 'N/A',
-    efficiency: bookingStats?.averageEfficiency || 'N/A'
+    favoriteCar: bookingStats?.favoriteCar || bookingStats?.mostUsedVehicle || 'Chưa có dữ liệu',
+    efficiency: bookingStats?.averageEfficiency || bookingStats?.efficiency || 'Chưa có dữ liệu',
+    weeklyUsage: bookingStats?.weeklyUsage || 0,
+    upcomingBookings: bookingStats?.upcomingBookings || 0
   };
 
   const getStatusColor = (status) => {
@@ -94,6 +101,44 @@ export default function ScheduleView() {
   const displayData = filter === 'all' 
     ? [...scheduleData.upcoming, ...scheduleData.past]
     : scheduleData[filter];
+
+  // Export current visible schedule to CSV
+  const exportScheduleToCSV = () => {
+    if (!displayData || displayData.length === 0) {
+      alert('Không có dữ liệu để xuất');
+      return;
+    }
+
+    const safe = (v) => `"${String(v || '').replace(/"/g, '""')}"`;
+    const rows = [];
+    rows.push('ID,Ngày,Bắt đầu,Kết thúc,Thời lượng,Xe,Mục đích,Tuyến đường,Chi phí,Trạng thái,Hiệu suất,Quãng đường');
+
+    displayData.forEach((b) => {
+      rows.push([
+        b.id,
+        b.date,
+        b.startTime,
+        b.endTime,
+        b.duration,
+        safe(b.car),
+        safe(b.purpose),
+        safe(b.location),
+        b.cost,
+        b.status,
+        safe(b.efficiency),
+        safe(b.distance)
+      ].join(','));
+    });
+
+    const csvContent = rows.join('\n');
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `lich_su_su_dung_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Show loading state
   if (loading) {
@@ -142,7 +187,7 @@ export default function ScheduleView() {
               </div>
               
               <div className="flex gap-3">
-                <button className="flex items-center gap-2 px-4 py-3 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/50 hover:shadow-xl transition-all">
+                <button onClick={() => exportScheduleToCSV()} className="flex items-center gap-2 px-4 py-3 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/50 hover:shadow-xl transition-all">
                   <Download className="w-4 h-4" />
                   <span>Xuất báo cáo</span>
                 </button>
@@ -180,7 +225,10 @@ export default function ScheduleView() {
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-gray-900">
-                      {(stats.totalCost / 1000000).toFixed(1)}M
+                      {stats.totalCost > 0 
+                        ? `${(stats.totalCost / 1000000).toFixed(1)}M`
+                        : '0'
+                      }
                     </p>
                     <p className="text-sm text-gray-600">Tổng chi phí</p>
                   </div>
@@ -192,8 +240,10 @@ export default function ScheduleView() {
                     <TrendingUp className="w-6 h-6 text-amber-600" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-gray-900">{stats.efficiency}</p>
-                    <p className="text-sm text-gray-600">Hiệu suất trung bình</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {stats.efficiency !== 'Chưa có dữ liệu' ? stats.efficiency : '--'}
+                    </p>
+                    <p className="text-sm text-gray-600">Hiệu suất TB</p>
                   </div>
                 </div>
               </div>
@@ -229,11 +279,11 @@ export default function ScheduleView() {
                   </div>
                   
                   <div className="flex gap-3">
-                    <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-2xl hover:bg-gray-50 transition-colors">
-                      <Filter className="w-4 h-4" />
-                      <span>Lọc</span>
-                    </button>
-                  </div>
+                      <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-2xl hover:bg-gray-50 transition-colors">
+                        <Filter className="w-4 h-4" />
+                        <span>Lọc</span>
+                      </button>
+                    </div>
                 </div>
 
                 {/* Schedule List */}
@@ -323,13 +373,25 @@ export default function ScheduleView() {
                   {displayData.length === 0 && (
                     <div className="text-center py-12">
                       <Calendar className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                      <p className="text-gray-500 text-lg">Không có lịch đặt nào</p>
-                      <Link
-                        to="/dashboard/coowner/booking/new"
-                        className="inline-block mt-4 text-sky-600 hover:text-sky-700 font-medium"
-                      >
-                        Đặt lịch ngay
-                      </Link>
+                      <p className="text-gray-500 text-lg mb-2">
+                        {filter === 'all' && 'Bạn chưa có lịch đặt xe nào'}
+                        {filter === 'upcoming' && 'Không có lịch sắp tới'}
+                        {filter === 'past' && 'Chưa có lịch sử sử dụng'}
+                      </p>
+                      <p className="text-gray-400 text-sm mb-6">
+                        {filter === 'all' && 'Đặt lịch ngay để bắt đầu sử dụng xe'}
+                        {filter === 'upcoming' && 'Tạo lịch mới để sử dụng xe trong tương lai'}
+                        {filter === 'past' && 'Lịch sử sẽ hiển thị sau khi bạn hoàn thành các chuyến đi'}
+                      </p>
+                      {filter !== 'past' && (
+                        <Link
+                          to="/dashboard/coowner/booking/new"
+                          className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-sky-500 to-cyan-500 text-white font-semibold rounded-2xl hover:shadow-lg transition-all"
+                        >
+                          <Calendar className="w-4 h-4" />
+                          Đặt lịch ngay
+                        </Link>
+                      )}
                     </div>
                   )}
                 </div>
@@ -351,12 +413,24 @@ export default function ScheduleView() {
                     <span className="font-bold text-blue-600">{stats.favoriteCar}</span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-green-50 rounded-xl">
-                    <span className="text-gray-700">Giờ trung bình/tuần:</span>
-                    <span className="font-bold text-green-600">6h</span>
+                    <span className="text-gray-700">Giờ sử dụng/tuần:</span>
+                    <span className="font-bold text-green-600">
+                      {stats.weeklyUsage > 0 ? `${stats.weeklyUsage}h` : 'Chưa có'}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-purple-50 rounded-xl">
                     <span className="text-gray-700">Chi phí trung bình:</span>
-                    <span className="font-bold text-purple-600">240K/buổi</span>
+                    <span className="font-bold text-purple-600">
+                      {stats.totalBookings > 0 
+                        ? `${Math.round(stats.totalCost / stats.totalBookings / 1000)}K/buổi`
+                        : 'Chưa có'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-sky-50 rounded-xl">
+                    <span className="text-gray-700">Lịch sắp tới:</span>
+                    <span className="font-bold text-sky-600">
+                      {stats.upcomingBookings} lịch
+                    </span>
                   </div>
                 </div>
               </motion.div>
@@ -404,12 +478,12 @@ export default function ScheduleView() {
                   >
                     Đặt lịch mới
                   </Link>
-                  <button className="block w-full py-3 bg-white border border-gray-300 text-gray-700 text-center font-semibold rounded-2xl hover:bg-gray-50 transition-colors">
+                  <button onClick={() => exportScheduleToCSV()} className="block w-full py-3 bg-white border border-gray-300 text-gray-700 text-center font-semibold rounded-2xl hover:bg-gray-50 transition-colors">
                     Xuất báo cáo
                   </button>
-                  <button className="block w-full py-3 bg-white border border-gray-300 text-gray-700 text-center font-semibold rounded-2xl hover:bg-gray-50 transition-colors">
+                  <Link to="/dashboard/coowner/history/analytics" className="block w-full py-3 bg-white border border-gray-300 text-gray-700 text-center font-semibold rounded-2xl hover:bg-gray-50 transition-colors">
                     Xem phân tích
-                  </button>
+                  </Link>
                 </div>
               </motion.div>
             </div>

@@ -16,9 +16,11 @@ export const contractAPI = {
   getUserContracts: async () => {
     try {
       const response = await axios.get('/contracts/user/me');
-      return { success: true, data: response.data.data, message: response.data.message };
+      // API returns { data: { contracts: [...], pagination: {...} } }
+      const contracts = response.data.data?.contracts || response.data.data || [];
+      return { success: true, data: contracts, message: response.data.message };
     } catch (error) {
-      return { success: false, message: getErrorMessage(error), data: null };
+      return { success: false, message: getErrorMessage(error), data: [] };
     }
   },
 
@@ -78,9 +80,10 @@ export const contractAPI = {
       const response = await axios.get(`/contracts/${contractId}/download`, {
         responseType: 'blob',
       });
-      return { success: true, data: response.data, message: 'Tải hợp đồng thành công' };
+      // Return blob directly for download handlers
+      return response.data;
     } catch (error) {
-      return { success: false, message: getErrorMessage(error), data: null };
+      throw new Error(getErrorMessage(error));
     }
   },
 
@@ -180,7 +183,18 @@ export const contractAPI = {
       const response = await axios.get(`/contracts/documents/${contractId}/documents/${documentId}/download`, {
         responseType: 'blob',
       });
-      return { success: true, data: response.data, message: 'Tải tài liệu thành công' };
+      // Return blob directly for download handlers
+      return response.data;
+    } catch (error) {
+      throw new Error(getErrorMessage(error));
+    }
+  },
+
+  // Tài liệu - View
+  viewDocument: async (contractId, documentId) => {
+    try {
+      const response = await axios.get(`/contracts/documents/${contractId}/documents/${documentId}/view`);
+      return { success: true, data: response.data.data, message: response.data.message };
     } catch (error) {
       return { success: false, message: getErrorMessage(error), data: null };
     }

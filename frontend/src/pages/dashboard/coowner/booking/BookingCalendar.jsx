@@ -31,27 +31,34 @@ export default function BookingCalendar() {
         const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
         const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
         
-        const [personalCalendar, bookingStats, vehiclesList] = await Promise.all([
+        // Fetch calendar and stats first, then fetch vehicles into the store.
+        const [personalCalendar, bookingStats] = await Promise.all([
           fetchPersonalCalendar({
             startDate: startDate.toISOString(),
             endDate: endDate.toISOString()
           }),
-          fetchBookingStats(),
-          fetchVehicles()
+          fetchBookingStats()
         ]);
 
-        // Set calendar data and stats
+        // fetchVehicles updates the vehicle store but does not return the list.
+        // Read the fresh list from the store after fetch completes to avoid stale closure values.
+        await fetchVehicles();
+        const vehiclesList = useVehicleStore.getState().vehicles || [];
+
+        // Set calendar data and stats. We update availableVehicles regardless of whether
+        // personalCalendar.stats exists so the sidebar count reflects the latest vehicles.
         if (personalCalendar) {
           setCalendarData(personalCalendar);
-          if (personalCalendar.stats) {
-            setStats({
-              totalBookings: personalCalendar.stats.totalBookings || 0,
-              availableVehicles: vehiclesList?.filter(v => v.status === 'available')?.length || 0,
-              weeklyHours: bookingStats?.weeklyUsage || 0,
-              groupMembers: bookingStats?.groupMembers || 0
-            });
-          }
         }
+
+        const availableCount = Array.isArray(vehiclesList) ? vehiclesList.filter(v => v.status === 'available').length : 0;
+
+        setStats({
+          totalBookings: personalCalendar?.stats?.totalBookings || 0,
+          availableVehicles: availableCount,
+          weeklyHours: bookingStats?.weeklyUsage || 0,
+          groupMembers: bookingStats?.groupMembers || 0
+        });
       } catch (err) {
         console.error('Error fetching booking data:', err);
       }
@@ -143,7 +150,9 @@ export default function BookingCalendar() {
     
     return bookingsSource.filter(booking => {
       const bookingDate = new Date(booking.startTime);
-      return bookingDate.toDateString() === date.toDateString();
+      return bookingDate.getFullYear() === date.getFullYear()
+        && bookingDate.getMonth() === date.getMonth()
+        && bookingDate.getDate() === date.getDate();
     }).map(booking => ({
       ...booking,
       // Map fields for display
@@ -437,18 +446,18 @@ export default function BookingCalendar() {
                               <span className="text-gray-600">Pin:</span>
                               <div className="flex items-center gap-1">
                                 <Battery className="w-4 h-4 text-green-600" />
-                                <span className="font-medium">{vehicle.batteryLevel || vehicle.battery || 0}%</span>
+                                <span className="font-medium">{(vehicle.specifications?.current_battery_percent ?? vehicle.battery ?? 0)}%</span>
                               </div>
                             </div>
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-gray-600">Tầm hoạt động:</span>
-                              <span className="font-medium">{vehicle.range || `${vehicle.batteryLevel * 3 || 0}km`}</span>
+                              <span className="font-medium">{vehicle.specifications?.range_km ? `${vehicle.specifications.range_km} km` : (vehicle.range ? `${vehicle.range} km` : '—')}</span>
                             </div>
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-gray-600">Vị trí:</span>
                               <div className="flex items-center gap-1">
                                 <MapPin className="w-4 h-4 text-red-500" />
-                                <span className="font-medium">{vehicle.currentLocation || vehicle.location || 'TP.HCM'}</span>
+                                <span className="font-medium">{vehicle.specifications?.location || vehicle.currentLocation || vehicle.location || 'TP.HCM'}</span>
                               </div>
                             </div>
                           </div>

@@ -14,6 +14,166 @@ export default function UsageAnalytics() {
   const [error, setError] = useState(null);
   const [timeRange, setTimeRange] = useState("month");
 
+  // Process booking history to analytics (client-side)
+  const processBookingHistoryToAnalytics = (bookings) => {
+    if (!bookings || bookings.length === 0) {
+      return getEmptyAnalytics();
+    }
+
+    // Usage by day
+    const dayMap = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+    const usageByDay = {};
+    dayMap.forEach(day => usageByDay[day] = 0);
+
+    // Usage by car
+    const usageByCar = {};
+
+    // Peak hours
+    const peakHours = {};
+    for (let i = 0; i < 24; i += 2) {
+      peakHours[`${i}-${i + 2}`] = 0;
+    }
+
+    // Monthly trend
+    const monthlyTrend = {};
+
+    // Process each booking
+    let totalHours = 0;
+    let totalCost = 0;
+    const monthSet = new Set();
+
+    bookings.forEach(booking => {
+      const startTime = new Date(booking.startTime);
+      const endTime = new Date(booking.endTime);
+      const duration = (endTime - startTime) / (1000 * 60 * 60); // hours
+
+      // Usage by day
+      const dayName = dayMap[startTime.getDay()];
+      usageByDay[dayName] = (usageByDay[dayName] || 0) + duration;
+
+      // Usage by car
+      const carName = booking.vehicle?.vehicleName || booking.vehicle?.brand || 'Xe không xác định';
+      if (!usageByCar[carName]) {
+        usageByCar[carName] = { hours: 0, vehicleId: booking.vehicleId };
+      }
+      usageByCar[carName].hours += duration;
+
+      // Peak hours
+      const hour = startTime.getHours();
+      const hourRange = `${Math.floor(hour / 2) * 2}-${Math.floor(hour / 2) * 2 + 2}`;
+      if (peakHours[hourRange] !== undefined) {
+        peakHours[hourRange]++;
+      }
+
+      // Monthly trend
+      const monthKey = `T${startTime.getMonth() + 1}`;
+      if (!monthlyTrend[monthKey]) {
+        monthlyTrend[monthKey] = { hours: 0, cost: 0 };
+      }
+      monthlyTrend[monthKey].hours += duration;
+      monthlyTrend[monthKey].cost += booking.cost || 0;
+      monthSet.add(monthKey);
+
+      // Totals
+      totalHours += duration;
+      totalCost += booking.cost || 0;
+    });
+
+    // Format usage by day
+    const maxDayHours = Math.max(...Object.values(usageByDay), 1);
+    const usageByDayArray = Object.entries(usageByDay).map(([day, hours]) => ({
+      day,
+      hours: Math.round(hours * 10) / 10,
+      percentage: Math.round((hours / maxDayHours) * 100)
+    }));
+
+    // Format usage by car
+    const totalCarHours = Object.values(usageByCar).reduce((sum, v) => sum + v.hours, 0);
+    const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500'];
+    const usageByCarArray = Object.entries(usageByCar).map(([car, data], idx) => ({
+      car,
+      vehicleId: data.vehicleId,
+      hours: Math.round(data.hours * 10) / 10,
+      percentage: totalCarHours > 0 ? Math.round((data.hours / totalCarHours) * 100) : 0,
+      color: colors[idx % colors.length]
+    }));
+
+    // Format peak hours
+    const maxPeakUsage = Math.max(...Object.values(peakHours), 1);
+    const peakColorsArr = [
+      'from-blue-100 to-blue-200', 'from-blue-200 to-blue-300',
+      'from-blue-300 to-blue-400', 'from-blue-400 to-blue-500',
+      'from-blue-500 to-blue-600', 'from-blue-600 to-blue-700',
+      'from-blue-700 to-blue-800', 'from-blue-800 to-blue-900',
+      'from-blue-900 to-blue-950', 'from-indigo-500 to-indigo-600',
+      'from-indigo-600 to-indigo-700', 'from-indigo-700 to-indigo-800'
+    ];
+    const peakHoursArray = Object.entries(peakHours).map(([hour, usage], idx) => ({
+      hour,
+      usage: Math.round((usage / maxPeakUsage) * 100),
+      count: usage,
+      color: peakColorsArr[idx % peakColorsArr.length]
+    }));
+
+    // Format monthly trend
+    const monthlyTrendArray = Object.entries(monthlyTrend).map(([month, data]) => ({
+      month,
+      hours: Math.round(data.hours * 10) / 10,
+      cost: Math.round(data.cost)
+    }));
+
+    // Usage stats
+    const averagePerMonth = monthSet.size > 0 ? Math.round((totalHours / monthSet.size) * 10) / 10 : 0;
+    const costPerHour = totalHours > 0 ? Math.round(totalCost / totalHours) : 0;
+
+    return {
+      usageByDay: usageByDayArray,
+      usageByCar: usageByCarArray,
+      peakHours: peakHoursArray,
+      monthlyTrend: monthlyTrendArray,
+      usageStats: {
+        totalHours: Math.round(totalHours * 10) / 10,
+        averagePerMonth,
+        costPerHour,
+        totalCost: Math.round(totalCost),
+        totalBookings: bookings.length,
+        efficiency: 'N/A'
+      }
+    };
+  };
+
+  const getEmptyAnalytics = () => {
+    const dayMap = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+    const peakColorsArr = [
+      'from-blue-100 to-blue-200', 'from-blue-200 to-blue-300',
+      'from-blue-300 to-blue-400', 'from-blue-400 to-blue-500',
+      'from-blue-500 to-blue-600', 'from-blue-600 to-blue-700',
+      'from-blue-700 to-blue-800', 'from-blue-800 to-blue-900',
+      'from-blue-900 to-blue-950', 'from-indigo-500 to-indigo-600',
+      'from-indigo-600 to-indigo-700', 'from-indigo-700 to-indigo-800'
+    ];
+
+    return {
+      usageByDay: dayMap.map(day => ({ day, hours: 0, percentage: 0 })),
+      usageByCar: [],
+      peakHours: Array.from({ length: 12 }, (_, i) => ({
+        hour: `${i * 2}-${i * 2 + 2}`,
+        usage: 0,
+        count: 0,
+        color: peakColorsArr[i]
+      })),
+      monthlyTrend: [],
+      usageStats: {
+        totalHours: 0,
+        averagePerMonth: 0,
+        costPerHour: 0,
+        totalCost: 0,
+        totalBookings: 0,
+        efficiency: 'N/A'
+      }
+    };
+  };
+
   useEffect(() => {
     fetchAnalyticsData();
   }, [timeRange]);
@@ -55,13 +215,29 @@ export default function UsageAnalytics() {
       };
       const period = periodMap[timeRange] || '30d';
 
-      // Use new analytics endpoint (server-side processing)
-      const analyticsResponse = await bookingAPI.getBookingAnalytics({
-        period
+      // Try to fetch history first (all bookings), then fallback to analytics if needed
+      // Note: API has limit max of 50, so we'll get the most recent 50 bookings
+      const historyResponse = await bookingAPI.getBookingHistory({
+        period,
+        limit: 50 // API maximum allowed limit
       });
 
-      if (analyticsResponse.success) {
-        const data = analyticsResponse.data;
+      let data = null;
+
+      if (historyResponse.success && historyResponse.data?.bookings?.length > 0) {
+        // Process history data client-side to generate analytics
+        data = processBookingHistoryToAnalytics(historyResponse.data.bookings);
+      } else {
+        // Fallback to server-side analytics (for completed bookings only)
+        const analyticsResponse = await bookingAPI.getBookingAnalytics({
+          period
+        });
+        if (analyticsResponse.success) {
+          data = analyticsResponse.data;
+        }
+      }
+
+      if (data) {
 
         // Try to enrich with vehicle efficiency data (weighted average)
         try {
@@ -172,9 +348,13 @@ export default function UsageAnalytics() {
     return null;
   }
 
+  // Determine whether analytics is effectively empty (no hours)
+  const totalHours = analyticsData?.usageStats?.totalHours || 0;
+  const isEmptyAnalytics = totalHours === 0;
+
   // Export analytics to CSV
   const exportAnalyticsToCSV = () => {
-    if (!analyticsData) {
+    if (!analyticsData || isEmptyAnalytics) {
       alert('Không có dữ liệu để xuất');
       return;
     }
@@ -229,6 +409,29 @@ export default function UsageAnalytics() {
     link.click();
     document.body.removeChild(link);
   };
+
+  // If analytics has no meaningful data, show an empty-state with actions
+  if (isEmptyAnalytics) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <main className="pt-20">
+          <div className="max-w-7xl mx-auto px-6 py-8">
+            <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 text-center">
+              <PieChart className="mx-auto w-12 h-12 text-gray-400" />
+              <h3 className="mt-4 text-xl font-semibold">Chưa có dữ liệu phân tích</h3>
+              <p className="text-gray-600 mt-2">Hiện chưa có hoạt động để tạo báo cáo. Hãy tạo đặt lịch hoặc thử thay đổi khoảng thời gian.</p>
+              <div className="mt-4 flex justify-center gap-3">
+                <Link to="/dashboard/coowner/booking/new" className="px-4 py-2 bg-blue-600 text-white rounded-lg">Tạo đặt lịch</Link>
+                <button onClick={fetchAnalyticsData} className="px-4 py-2 bg-gray-100 rounded-lg">Làm mới</button>
+              </div>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

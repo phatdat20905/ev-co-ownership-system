@@ -10,10 +10,7 @@ import {
   Clock,
   MapPin,
   Battery,
-  Settings,
   ArrowUpRight,
-  TrendingUp,
-  AlertCircle,
   Zap,
   CheckCircle,
   Play,
@@ -30,7 +27,7 @@ export default function CoownerDashboard() {
   const { user } = useAuthStore();
   const { groups, fetchUserGroups } = useGroupStore();
   const { vehicles, fetchVehicles } = useVehicleStore();
-  const { bookings, fetchUserBookings } = useBookingStore();
+  const { fetchUserBookings } = useBookingStore();
   const { costs, fetchUserCosts } = useCostStore();
 
   // Fetch real data from API
@@ -38,20 +35,44 @@ export default function CoownerDashboard() {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        await Promise.all([
-          fetchUserGroups(),
-          fetchVehicles(),
-          fetchUserBookings(),
-          fetchUserCosts()
-        ]);
+
+        // Fetch groups first to get vehicle IDs
+        await fetchUserGroups();
+
+        // Fetch vehicles
+        await fetchVehicles();
+        const vehiclesData = useVehicleStore.getState().vehicles;
+
+        // Get first vehicle ID for bookings if available
+        const vehicleId = vehiclesData && vehiclesData.length > 0 ? vehiclesData[0].id : null;
+
+        // Fetch bookings with vehicleId if available
+        if (vehicleId) {
+          await fetchUserBookings({ vehicleId });
+        }
+
+        // Fetch costs
+        await fetchUserCosts();
       } catch (error) {
-        console.error('Error fetching dashboard data:', error);
+        console.error("Error fetching dashboard data:", error);
       } finally {
         setLoading(false);
       }
     };
 
+    // Prevent duplicate fetches in development (React StrictMode double-mount)
+    // We only apply this guard in development so production behavior unaffected.
     if (user) {
+      if (process.env.NODE_ENV === "development") {
+        // global flag prevents the same dashboard fetch from running twice during dev double-mount
+        if (window.__coownerDashboardFetched) {
+          // already fetched once during this session - skip
+          setLoading(false);
+          return;
+        }
+        window.__coownerDashboardFetched = true;
+      }
+
       fetchDashboardData();
     }
   }, [user, fetchUserGroups, fetchVehicles, fetchUserBookings, fetchUserCosts]);
@@ -67,11 +88,28 @@ export default function CoownerDashboard() {
   }, [vehicles]);
 
   // Calculate dashboard stats from real data
-  const totalCars = groups.reduce((sum, group) => sum + (group.vehicles?.length || 0), 0);
-  const totalMembers = groups.reduce((sum, group) => sum + (group.members?.length || 0), 0);
-  const monthlyCost = costs.reduce((sum, cost) => sum + (cost.amount || 0), 0);
+  const totalCars = vehicles.length;
+  const totalMembers = groups.reduce((sum, group) => {
+    const memberCount = group.members?.[0] ? 1 : 0; // Data shows single member object
+    return sum + memberCount;
+  }, 0);
+  
+  // Calculate total cost from splits for current user
+  const monthlyCost = costs.reduce((sum, cost) => {
+    // Find splits for current user
+    const userSplits = cost.splits?.filter(split => split.userId === user?.id) || [];
+    const userAmount = userSplits.reduce((total, split) => {
+      return total + parseFloat(split.splitAmount || 0);
+    }, 0);
+    return sum + userAmount;
+  }, 0);
+  
+  // Calculate average ownership percentage from groups
   const ownershipPercentage = groups.length > 0 
-    ? Math.round(groups.reduce((sum, group) => sum + (group.ownershipPercentage || 0), 0) / groups.length)
+    ? Math.round(groups.reduce((sum, group) => {
+        const ownership = group.members?.[0]?.ownershipPercentage || 0;
+        return sum + parseFloat(ownership);
+      }, 0) / groups.length)
     : 0;
 
   // Stats cards data
@@ -147,22 +185,39 @@ export default function CoownerDashboard() {
       buttonColor:
         "bg-orange-50 text-orange-600 hover:bg-orange-100 border-orange-200",
     },
+    {
+      title: "Công bằng AI",
+      description: "Phân tích công bằng sử dụng",
+      icon: Zap,
+      link: "/dashboard/coowner/fairness",
+      color: "from-indigo-500 to-purple-500",
+      buttonColor:
+        "bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border-indigo-200",
+    },
   ];
 
   // Car status - use real vehicle data
-  const carStatus = vehicles.map(vehicle => ({
-    id: vehicle.id,
-    name: vehicle.name || vehicle.model,
-    model: vehicle.year + ' ' + (vehicle.variant || ''),
-    status: vehicle.status || 'available',
-    battery: vehicle.batteryLevel || 0,
-    location: vehicle.location || 'Chưa cập nhật',
-    nextMaintenance: vehicle.nextMaintenance || 'Chưa xác định',
-    usageThisMonth: `${vehicle.usageThisMonth || 0}/30 giờ`,
-    image: vehicle.image || "/api/placeholder/400/250",
-    efficiency: vehicle.efficiency || "N/A",
-    range: vehicle.range || "N/A",
-  }));
+  const carStatus = vehicles.map(vehicle => {
+    // Parse specifications
+    const specs = vehicle.specifications || {};
+    const batteryPercent = specs.current_battery_percent || 0;
+    const location = specs.location || 'Chưa cập nhật';
+    const rangeKm = specs.range_km || 0;
+    
+    return {
+      id: vehicle.id,
+      name: vehicle.vehicleName || vehicle.model,
+      model: `${vehicle.year} ${vehicle.brand} ${vehicle.model}`,
+      status: vehicle.status || 'available',
+      battery: batteryPercent,
+      location: location,
+      nextMaintenance: 'Chưa xác định', // Not provided in API
+      usageThisMonth: '0/30 giờ', // Need to calculate from bookings
+      image: vehicle.images?.[0] || "/api/placeholder/400/250",
+      efficiency: specs.acceleration_0_100 || "N/A",
+      range: rangeKm ? `${rangeKm} km` : "N/A",
+    };
+  });
 
   // Safe active car reference - avoids reading properties from undefined when there are no vehicles
   const activeCar = carStatus[activeCarIndex] || {
@@ -545,14 +600,13 @@ export default function CoownerDashboard() {
                   Dựa trên lịch sử sử dụng, chúng tôi đề xuất bạn nên đặt lịch
                   vào cuối tuần này để tối ưu chi phí.
                 </p>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="w-full bg-white text-blue-600 font-semibold py-3 rounded-xl hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 group"
+                <Link
+                  to="/dashboard/coowner/fairness"
+                  className="w-full bg-white text-blue-600 font-semibold py-3 rounded-xl hover:bg-blue-50 transition-colors items-center justify-center gap-2 group inline-flex"
                 >
                   <Play className="w-4 h-4" />
                   <span>Xem đề xuất chi tiết</span>
-                </motion.button>
+                </Link>
               </div>
             </motion.div>
           </div>

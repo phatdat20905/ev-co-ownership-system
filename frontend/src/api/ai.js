@@ -37,6 +37,23 @@ export const aiAPI = {
     return response.data;
   },
 
+  // Fairness Analysis - Phân tích công bằng (POST /ai/fairness/analyze)
+  analyzeFairness: async ({ groupId, timeRange = 'month', startDate, endDate }) => {
+    const response = await axios.post('/ai/fairness/analyze', {
+      groupId,
+      timeRange,
+      startDate,
+      endDate
+    });
+    return response.data;
+  },
+
+  // Fairness - Get latest record
+  getLatestFairness: async (groupId) => {
+    const response = await axios.get(`/ai/fairness/latest/${groupId}`);
+    return response.data;
+  },
+
   // Analytics - Dự đoán sử dụng
   predictUsage: async (groupId, params) => {
     const response = await axios.post(`/ai/analytics/${groupId}/predict-usage`, params);

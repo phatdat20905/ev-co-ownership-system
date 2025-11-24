@@ -158,11 +158,29 @@ export const costAPI = {
   },
 
   // Hóa đơn - Download
+  // The backend may return either a PDF blob directly or a JSON { pdfUrl } with a link to the file.
+  // Handle both cases and always return a Blob.
   downloadInvoice: async (invoiceId) => {
-    const response = await axios.get(`/costs/invoices/${invoiceId}/download`, {
-      responseType: 'blob',
-    });
-    return response.data;
+    // First try to call the endpoint and inspect headers
+    const resp = await axios.get(`/costs/invoices/${invoiceId}/download`);
+    const contentType = (resp.headers && resp.headers['content-type']) || '';
+
+    // If backend returned PDF directly (content-type application/pdf), fetch as blob
+    if (contentType.includes('application/pdf')) {
+      const blobResp = await axios.get(`/costs/invoices/${invoiceId}/download`, { responseType: 'blob' });
+      return blobResp.data;
+    }
+
+    // Otherwise expect JSON with { pdfUrl } or { data: { pdfUrl } }
+    const payload = resp?.data ?? resp;
+    const pdfUrl = payload?.pdfUrl ?? payload?.data?.pdfUrl ?? null;
+    if (pdfUrl) {
+      const fileResp = await axios.get(pdfUrl, { responseType: 'blob' });
+      return fileResp.data;
+    }
+
+    // As a fallback, if resp.data looks like a Blob already, return it
+    return resp.data;
   },
 
   // Báo cáo - Lấy báo cáo tháng

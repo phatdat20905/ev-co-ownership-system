@@ -1,19 +1,34 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Download, Loader2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Download, Loader2, RefreshCw, X } from 'lucide-react';
 import Header from '../../../../components/layout/Header';
 import Footer from '../../../../components/layout/Footer';
 import { costAPI } from '../../../../api/cost';
 import { showToast, getErrorMessage } from '../../../../utils/toast';
+import { useAuthStore } from '../../../../store/authStore';
 
 export default function PaymentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { activeGroup } = useAuthStore();
   const [payment, setPayment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
 
+  // Helper: GUID validation
+  const isGuid = (v) => {
+    if (!v || typeof v !== 'string') return false;
+    return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v);
+  };
+
   useEffect(() => {
+    // Validate id early to avoid backend validation error
+    if (!id || !isGuid(id)) {
+      showToast.error('ID giao dịch không hợp lệ hoặc không tìm thấy.');
+      navigate('/dashboard/coowner/financial');
+      return;
+    }
+
     fetchDetail();
   }, [id]);
 
@@ -23,10 +38,13 @@ export default function PaymentDetail() {
     if (payment && (payment.status === 'pending' || payment.payment_status === 'pending')) {
       interval = setInterval(async () => {
         try {
-          const fresh = await costAPI.getPaymentById(id);
-          if (fresh) {
-            setPayment(fresh);
-            if (fresh.status === 'completed' || fresh.payment_status === 'completed') {
+          const response = await costAPI.getPaymentById(id);
+          const freshPayload = response?.data ?? response;
+          const raw = freshPayload?.payment ?? freshPayload;
+          if (raw) {
+            const mapped = mapPayment(raw);
+            setPayment(mapped);
+            if (mapped.status === 'completed' || mapped.payment_status === 'completed') {
               showToast.success('Thanh toán đã hoàn tất');
               clearInterval(interval);
             }
@@ -43,21 +61,93 @@ export default function PaymentDetail() {
   const fetchDetail = async () => {
     setLoading(true);
     try {
-      const data = await costAPI.getPaymentById(id);
-      setPayment(data);
+      const response = await costAPI.getPaymentById(id);
+      // Extract payment object from common response shapes:
+      // - { success, data: { payment } }
+      // - { payment }
+      // - payment object directly
+      const payload = response?.data ?? response;
+      const raw = payload?.payment ?? payload;
+      if (raw) {
+        const mapped = mapPayment(raw);
+        setPayment(mapped);
+      } else {
+        setPayment(null);
+      }
     } catch (err) {
       showToast.error(getErrorMessage(err));
+      setPayment(null);
+      // Navigate back if not found or invalid id
+      navigate('/dashboard/coowner/financial');
     } finally {
       setLoading(false);
     }
   };
 
+  // Map various backend payment shapes to the UI-friendly shape used below
+  const mapPayment = (p) => {
+    // prefer numeric amount if provided as string
+    const amt = (typeof p.amount === 'string' && p.amount !== '') ? parseFloat(p.amount) : p.amount;
+    const split = p.costSplit ?? p.cost_split ?? p.split ?? null;
+    const cost = split?.cost ?? null;
+    const description = p.description || cost?.costName || cost?.description || split?.description || '';
+    const dateRaw = p.paymentDate || split?.paidAt || p.paidAt || p.createdAt || p.updatedAt;
+    const date = dateRaw ? new Date(dateRaw).toLocaleString('vi-VN') : '';
+
+    return {
+      id: p.id,
+      costSplitId: p.costSplitId || p.cost_split_id || split?.id,
+      amount: Number.isFinite(amt) ? amt : (split?.paidAmount ? parseFloat(split.paidAmount) : 0),
+      description,
+      status: p.paymentStatus || p.payment_status || p.status || split?.paymentStatus || split?.payment_status,
+      method: p.paymentMethod || p.method || p.methodKey,
+      methodKey: p.paymentMethod || p.methodKey,
+      provider: p.providerName || p.provider || null,
+      invoiceId: p.invoiceId || null,
+      invoice: p.invoice || null,
+      qrCodeUrl: p.qrCodeUrl || p.qrCode || null,
+      date,
+      paymentUrl: p.paymentUrl || null,
+      transactionId: p.transactionId || null,
+      raw: p,
+    };
+  }
+
   const handleDownloadInvoice = async () => {
-    const invoiceId = payment?.invoiceId || payment?.invoice;
-    if (!invoiceId) return showToast.warning('Không tìm thấy hóa đơn');
+    // Resolve invoice id robustly: prefer invoiceId, fallback to invoice if looks like GUID,
+    // otherwise attempt to search invoices by invoice number (requires activeGroup)
+    if (!payment) return showToast.warning('Không tìm thấy hóa đơn');
+
+    let invoiceId = payment?.invoiceId ?? payment?.invoice;
+
+    if (invoiceId && !isGuid(invoiceId)) {
+      // If invoice field is not a GUID, prefer to search by invoice number
+      invoiceId = null;
+    }
+
+    if (!invoiceId && activeGroup?.id) {
+      try {
+        // Attempt to look up invoice by invoice number
+        const searchKey = payment?.invoice ?? '';
+        if (searchKey) {
+          const res = await costAPI.getInvoices(activeGroup.id, { search: searchKey });
+          const payload = res?.data ?? res;
+          // payload might be { invoices: [...] } or an array
+          const invoices = payload?.invoices ?? payload;
+          if (Array.isArray(invoices) && invoices.length > 0) {
+            invoiceId = invoices[0].id ?? invoices[0].invoiceId ?? invoices[0].uuid;
+          }
+        }
+      } catch (err) {
+        console.warn('Invoice lookup failed', err);
+      }
+    }
+
+    if (!invoiceId) return showToast.warning('Không tìm thấy ID hóa đơn để tải về');
 
     try {
       const blob = await costAPI.downloadInvoice(invoiceId);
+      // costAPI.downloadInvoice returns blob
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -68,7 +158,9 @@ export default function PaymentDetail() {
       window.URL.revokeObjectURL(url);
       showToast.success('Tải hóa đơn thành công');
     } catch (err) {
-      showToast.error(getErrorMessage(err));
+      // Improve error messaging for API validation errors
+      const msg = getErrorMessage(err);
+      showToast.error(msg || 'Tải hóa đơn thất bại. Vui lòng thử lại.');
     }
   };
 
@@ -88,7 +180,6 @@ export default function PaymentDetail() {
       // If payment returned a URL or QR, open or show
       if (res?.paymentUrl) window.open(res.paymentUrl, '_blank');
       if (res?.qrCodeUrl) {
-        // open new window with QR for now
         window.open(res.qrCodeUrl, '_blank');
       }
       await fetchDetail();
@@ -126,9 +217,11 @@ export default function PaymentDetail() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50">
       <Header />
       <main className="pt-20 max-w-4xl mx-auto px-6 py-8">
-        <Link to="/dashboard/coowner/financial" className="inline-flex items-center gap-2 text-sky-600 mb-4">
-          <ArrowLeft className="w-5 h-5" /> Quay lại
-        </Link>
+        <div className="flex items-center justify-between mb-4">
+          <Link to="/dashboard/coowner/financial" className="inline-flex items-center gap-2 text-sky-600">
+            <ArrowLeft className="w-5 h-5" /> Quay lại
+          </Link>
+        </div>
 
         <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-lg border border-white/50">
           <h1 className="text-2xl font-bold mb-4">Chi tiết thanh toán</h1>

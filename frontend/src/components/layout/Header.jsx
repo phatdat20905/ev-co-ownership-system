@@ -3,7 +3,8 @@ import { Search, Bell, Menu, X, Car, User, LogOut, Settings, ChevronDown } from 
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "../../store";
 import { socketClient } from "../../services/socketClient";
-import { toast } from 'react-toastify';
+import showToast from "../../utils/toast";
+import { NotificationBadge } from "../notifications";
 
 // Hàm cuộn 
 const smoothScrollTo = (targetPosition, duration = 600) => {
@@ -94,9 +95,10 @@ export default function Header() {
 
     const handler = (payload) => {
       try {
-        const title = payload.title || 'Thông báo mới';
-        const body = payload.message || payload.body || '';
-        toast.info(<div><strong>{title}</strong><div>{body}</div></div>);
+  const title = payload.title || 'Thông báo mới';
+  const body = payload.message || payload.body || '';
+  // Use centralized toast wrapper for consistent styling/behavior
+  showToast.info(<div><strong>{title}</strong><div>{body}</div></div>);
         setNotifCount(c => c + 1);
       } catch (err) {
         console.warn('Error handling notification', err);
@@ -440,17 +442,8 @@ export default function Header() {
               <Search className="h-5 w-5 text-gray-600" />
             </button>
 
-            {/* Notification icon - CHỈ hiển thị khi đã login */}
-            {isAuthenticated && (
-              <button className="relative flex items-center justify-center w-10 h-10 bg-gray-100 rounded-full hover:bg-gray-200 cursor-pointer transition-all duration-300 hover:scale-110">
-                  <Bell className="h-5 w-5 text-gray-600" />
-                  {notifCount > 0 ? (
-                    <span className="absolute top-0 -right-0 text-[10px] min-w-[16px] h-4 leading-4 px-1 bg-red-500 text-white rounded-full flex items-center justify-center">{notifCount}</span>
-                  ) : (
-                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" />
-                  )}
-                </button>
-            )}
+            {/* Notification Badge - CHỈ hiển thị khi đã login */}
+            {isAuthenticated && <NotificationBadge />}
 
             {/* Auth Buttons hoặc User Menu */}
             {isAuthenticated ? (
@@ -647,7 +640,7 @@ export default function Header() {
                 {isAuthenticated && (
                   <button className="flex-1 p-3 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors relative">
                     <Bell className="w-5 h-5 mx-auto" />
-                    <span className="absolute top-2 right-6 w-2 h-2 bg-red-500 rounded-full"></span>
+                    {notifCount > 0 && <span className="absolute top-2 right-6 w-2 h-2 bg-red-500 rounded-full"></span>}
                   </button>
                 )}
               </div>

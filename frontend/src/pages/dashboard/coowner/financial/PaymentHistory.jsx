@@ -51,14 +51,26 @@ export default function PaymentHistory() {
 
     setLoading(true);
     try {
-      const data = await fetchPaymentHistory(activeGroup.id, {
+      const response = await fetchPaymentHistory(activeGroup.id, {
         timeRange,
         status: filter !== 'all' ? filter : undefined
       });
-      setPaymentData(data);
+      // Handle API response structure: { success, data: { payments, stats, pagination } }
+      const data = response?.data || response;
+      setPaymentData({
+        payments: data?.payments || [],
+        stats: data?.stats || { totalPaid: 0, pendingAmount: 0, completedPayments: 0, failedPayments: 0 },
+        pagination: data?.pagination || { page: 1, limit: 20, total: 0, totalPages: 0 }
+      });
     } catch (error) {
       console.error('Failed to load payment history:', error);
       showToast.error(getErrorMessage(error));
+      // Set empty data on error
+      setPaymentData({
+        payments: [],
+        stats: { totalPaid: 0, pendingAmount: 0, completedPayments: 0, failedPayments: 0 },
+        pagination: { page: 1, limit: 20, total: 0, totalPages: 0 }
+      });
     } finally {
       setLoading(false);
     }
@@ -141,21 +153,42 @@ export default function PaymentHistory() {
         providerName: chosen.label
       };
 
-      result = await costAPI.createPayment(payload);
-      setPaymentResult(result || null);
+      const response = await costAPI.createPayment(payload);
+      
+      // Extract data from response structure: { success, data: {...} }
+      result = response?.data || response;
+      setPaymentResult(result);
 
-      // If the gateway returned a direct URL, open it (for VNPay deep links)
-      if (result && result.paymentUrl) {
-        window.open(result.paymentUrl, '_blank');
-        showToast.info('Đang chuyển tới cổng thanh toán...');
-      } else if (result && result.deeplink) {
-        window.open(result.deeplink, '_blank');
-        showToast.info('Mở ứng dụng thanh toán...');
-      } else if (result && result.qrCodeUrl) {
-        // We will display the QR inline in the modal using paymentResult state
+      // Check for VietQR - gatewayResponse.qrCodeUrl or paymentUrl with QR
+      const qrCodeUrl = result?.gatewayResponse?.qrCodeUrl || 
+                       (result?.paymentMethod === 'bank_transfer' && result?.paymentUrl);
+      
+      // Check for VNPay/MoMo payment URL or deeplink
+      const paymentUrl = (result?.paymentMethod === 'vnpay' || result?.paymentMethod === 'e_wallet') 
+                         ? result?.paymentUrl 
+                         : null;
+      const deeplink = result?.gatewayResponse?.deeplink || result?.deeplink;
+
+      if (qrCodeUrl) {
+        // VietQR - show QR in modal
         showToast.info('QR VietQR đã sẵn sàng. Vui lòng quét để thanh toán.');
-        // Start polling by payment id if backend returned one
-        const paymentId = result.paymentId || result.id || result.payment?.id || result.paymentId;
+        const paymentId = result?.id || result?.paymentId;
+        if (paymentId) {
+          pollPaymentStatus(paymentId, 180);
+        }
+      } else if (paymentUrl) {
+        // VNPay - open payment URL in new tab
+        window.open(paymentUrl, '_blank');
+        showToast.info('Đang chuyển tới cổng thanh toán VNPay...');
+        const paymentId = result?.id || result?.paymentId;
+        if (paymentId) {
+          pollPaymentStatus(paymentId, 180);
+        }
+      } else if (deeplink) {
+        // MoMo - open deeplink
+        window.open(deeplink, '_blank');
+        showToast.info('Mở ứng dụng thanh toán...');
+        const paymentId = result?.id || result?.paymentId;
         if (paymentId) {
           pollPaymentStatus(paymentId, 180);
         }
@@ -170,8 +203,10 @@ export default function PaymentHistory() {
       showToast.error(getErrorMessage(err));
     } finally {
       setProcessingPayment(null);
-      // keep modal open if we have QR to show; otherwise close
-      if (!(result && result.qrCodeUrl)) {
+      // Keep modal open if we have QR to show; otherwise close
+      const hasQR = result?.gatewayResponse?.qrCodeUrl || 
+                    (result?.paymentMethod === 'bank_transfer' && result?.paymentUrl);
+      if (!hasQR) {
         setShowPaymentModal(false);
         setSelectedPayment(null);
       }
@@ -199,24 +234,47 @@ export default function PaymentHistory() {
 
     pollingRef.current = setInterval(async () => {
       try {
-        const data = await costAPI.getPaymentById(paymentId);
-        // Update paymentResult if changed
+        const response = await costAPI.getPaymentById(paymentId);
+        const data = response?.data || response;
+        
+        // Update paymentResult with latest status
         setPaymentResult(prev => ({ ...(prev||{}), ...data }));
-        if (data.status === 'completed' || data.status === 'failed' || data.status === 'cancelled' || data.payment_status === 'completed') {
+        
+        // Check for completion statuses
+        const status = data.paymentStatus || data.status || data.payment_status;
+        if (status === 'completed' || status === 'failed' || status === 'cancelled' || status === 'success') {
           clearInterval(pollingRef.current);
           pollingRef.current = null;
-          showToast.info(`Trạng thái: ${data.status || data.payment_status}`);
-          // Refresh list
+          
+          if (status === 'completed' || status === 'success') {
+            showToast.success('Thanh toán thành công! 🎉');
+          } else if (status === 'failed') {
+            showToast.error('Thanh toán thất bại. Vui lòng thử lại.');
+          } else {
+            showToast.warning(`Thanh toán đã bị hủy.`);
+          }
+          
+          // Refresh payment list
           await loadPaymentHistory();
+          
+          // Close modal after delay if payment completed
+          if (status === 'completed' || status === 'success') {
+            setTimeout(() => {
+              setShowPaymentModal(false);
+              setSelectedPayment(null);
+              setPaymentResult(null);
+            }, 2000);
+          }
         }
       } catch (err) {
         console.error('Polling payment failed', err);
       }
 
+      // Check timeout
       if ((Date.now() - start) / 1000 > timeoutSec) {
         clearInterval(pollingRef.current);
         pollingRef.current = null;
-        showToast.warning('Hết thời gian chờ thanh toán. Vui lòng thử lại.');
+        showToast.warning('Hết thời gian chờ thanh toán. Vui lòng kiểm tra lại trạng thái sau.');
       }
     }, 3000);
   };
@@ -244,9 +302,43 @@ export default function PaymentHistory() {
   }, []);
 
   const handleDownloadInvoice = async (payment) => {
-    const invoiceId = payment.invoiceId || payment.invoice;
-    if (!invoiceId) {
+    // Resolve invoice id robustly: prefer invoiceId, fallback to invoice if it's a GUID,
+    // otherwise attempt to search invoices by invoice number (requires activeGroup)
+    const isGuid = (v) => {
+      if (!v || typeof v !== 'string') return false;
+      return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v);
+    };
+
+    if (!payment) {
       showToast.warning('Không tìm thấy hóa đơn để tải về');
+      return;
+    }
+
+    let invoiceId = payment.invoiceId || payment.invoice;
+
+    if (invoiceId && !isGuid(invoiceId)) {
+      // If invoice field is not a GUID, prefer to search by invoice number
+      invoiceId = null;
+    }
+
+    if (!invoiceId && activeGroup?.id) {
+      try {
+        const searchKey = payment.invoice || '';
+        if (searchKey) {
+          const res = await costAPI.getInvoices(activeGroup.id, { search: searchKey });
+          const payload = res?.data ?? res;
+          const invoices = payload?.invoices ?? payload;
+          if (Array.isArray(invoices) && invoices.length > 0) {
+            invoiceId = invoices[0].id ?? invoices[0].invoiceId ?? invoices[0].uuid;
+          }
+        }
+      } catch (err) {
+        console.warn('Invoice lookup failed', err);
+      }
+    }
+
+    if (!invoiceId) {
+      showToast.warning('Không tìm thấy ID hóa đơn để tải về');
       return;
     }
 
@@ -263,7 +355,9 @@ export default function PaymentHistory() {
       showToast.success('Tải hóa đơn thành công');
     } catch (err) {
       console.error('Failed to download invoice:', err);
-      showToast.error(getErrorMessage(err));
+      // Improve error messaging for API validation errors
+      const msg = getErrorMessage(err);
+      showToast.error(msg || 'Tải hóa đơn thất bại. Vui lòng thử lại.');
     }
   };
 
@@ -501,7 +595,7 @@ export default function PaymentHistory() {
                   {filteredPayments.length > 0 ? (
                     filteredPayments.map((payment, index) => (
                       <motion.div
-                        key={payment.id}
+                        key={payment.paymentId || payment.id}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
@@ -516,9 +610,13 @@ export default function PaymentHistory() {
                               </div>
                               <div>
                                 <h3 className="text-xl font-bold text-gray-900">
-                                  <Link to={`/dashboard/coowner/financial/payment/${payment.id}`} className="hover:underline">
-                                    {payment.description}
-                                  </Link>
+                                  {payment.paymentId ? (
+                                    <Link to={`/dashboard/coowner/financial/payment/${payment.paymentId}`} className="hover:underline">
+                                      {payment.description}
+                                    </Link>
+                                  ) : (
+                                    <span>{payment.description}</span>
+                                  )}
                                 </h3>
                                 <div className="flex items-center gap-4 mt-2">
                                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${getTypeColor(payment.type)}`}>
@@ -798,29 +896,95 @@ export default function PaymentHistory() {
                         <div className="text-sm text-gray-500">Chưa có kết quả. Sau khi bắt đầu thanh toán, QR hoặc liên kết sẽ xuất hiện ở đây.</div>
                       )}
 
-                      {paymentResult && paymentResult.qrCodeUrl && (
+                      {/* VietQR - Show QR Code */}
+                      {paymentResult && (paymentResult.gatewayResponse?.qrCodeUrl || (paymentResult.paymentMethod === 'bank_transfer' && paymentResult.paymentUrl)) && (
                         <div className="text-center">
                           <p className="text-sm text-gray-600 mb-2">Quét QR bằng ứng dụng ngân hàng/ví</p>
-                          <img src={paymentResult.qrCodeUrl} alt="VietQR" className="mx-auto w-56 h-56 object-contain" />
+                          <img 
+                            src={paymentResult.gatewayResponse?.qrCodeUrl || paymentResult.paymentUrl} 
+                            alt="VietQR" 
+                            className="mx-auto w-56 h-56 object-contain border rounded-lg" 
+                          />
                           {qrCountdown !== null && (
                             <div className="text-xs text-gray-500 mt-2">QR hết hạn trong: <strong>{qrCountdown}s</strong></div>
                           )}
                           <div className="mt-3 flex gap-2 justify-center">
-                            <button onClick={() => window.open(paymentResult.qrCodeUrl, '_blank')} className="px-3 py-2 bg-white border rounded-2xl">Mở ảnh</button>
-                            <button onClick={() => { navigator.clipboard?.writeText(paymentResult.qrCodeText || paymentResult.qrCodeUrl); showToast.success('Đã sao chép nội dung QR'); }} className="px-3 py-2 bg-sky-600 text-white rounded-2xl">Sao chép</button>
+                            <button 
+                              onClick={() => window.open(paymentResult.gatewayResponse?.qrCodeUrl || paymentResult.paymentUrl, '_blank')} 
+                              className="px-3 py-2 bg-white border rounded-2xl hover:bg-gray-50"
+                            >
+                              Mở ảnh
+                            </button>
+                            <button 
+                              onClick={() => { 
+                                const qrUrl = paymentResult.gatewayResponse?.qrCodeUrl || paymentResult.paymentUrl;
+                                navigator.clipboard?.writeText(qrUrl); 
+                                showToast.success('Đã sao chép link QR'); 
+                              }} 
+                              className="px-3 py-2 bg-sky-600 text-white rounded-2xl hover:bg-sky-700"
+                            >
+                              Sao chép link
+                            </button>
+                          </div>
+                          <div className="mt-3 text-xs text-gray-500">
+                            <p>Trạng thái: <strong className="text-amber-600">{paymentResult.paymentStatus || 'Đang chờ'}</strong></p>
+                            <p className="mt-1">Mã giao dịch: {paymentResult.transactionId || 'Đang tạo...'}</p>
                           </div>
                         </div>
                       )}
 
-                      {paymentResult && paymentResult.paymentUrl && (
+                      {/* VNPay - Show payment URL button (already opened in new tab) */}
+                      {paymentResult && paymentResult.paymentMethod === 'vnpay' && paymentResult.paymentUrl && (
                         <div className="text-center">
-                          <p className="text-sm text-gray-600 mb-2">Mở cổng thanh toán để tiếp tục</p>
-                          <button onClick={() => window.open(paymentResult.paymentUrl, '_blank')} className="px-4 py-2 bg-sky-600 text-white rounded-2xl">Mở cổng thanh toán</button>
+                          <div className="mb-3">
+                            <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-2" />
+                            <p className="text-sm text-gray-600">Cổng thanh toán VNPay đã mở trong tab mới</p>
+                          </div>
+                          <button 
+                            onClick={() => window.open(paymentResult.paymentUrl, '_blank')} 
+                            className="px-4 py-2 bg-sky-600 text-white rounded-2xl hover:bg-sky-700"
+                          >
+                            Mở lại cổng thanh toán
+                          </button>
+                          <div className="mt-3 text-xs text-gray-500">
+                            <p>Trạng thái: <strong className="text-amber-600">{paymentResult.paymentStatus || 'Đang chờ'}</strong></p>
+                            <p className="mt-1">Mã giao dịch: {paymentResult.transactionId || paymentResult.orderRef}</p>
+                          </div>
                         </div>
                       )}
 
-                      {paymentResult && paymentResult.status && (
-                        <div className="mt-3 text-sm text-gray-700">Trạng thái: <strong>{paymentResult.status}</strong></div>
+                      {/* MoMo - Show deeplink info */}
+                      {paymentResult && paymentResult.paymentMethod === 'e_wallet' && (
+                        <div className="text-center">
+                          <div className="mb-3">
+                            <CheckCircle className="w-12 h-12 text-pink-500 mx-auto mb-2" />
+                            <p className="text-sm text-gray-600">Ứng dụng MoMo đang được mở...</p>
+                          </div>
+                          {paymentResult.gatewayResponse?.deeplink && (
+                            <button 
+                              onClick={() => window.open(paymentResult.gatewayResponse.deeplink, '_blank')} 
+                              className="px-4 py-2 bg-pink-600 text-white rounded-2xl hover:bg-pink-700"
+                            >
+                              Mở lại MoMo
+                            </button>
+                          )}
+                          <div className="mt-3 text-xs text-gray-500">
+                            <p>Trạng thái: <strong className="text-amber-600">{paymentResult.paymentStatus || 'Đang chờ'}</strong></p>
+                            <p className="mt-1">Mã giao dịch: {paymentResult.transactionId || 'Đang tạo...'}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Internal Wallet - Show success */}
+                      {paymentResult && paymentResult.paymentMethod === 'internal_wallet' && (
+                        <div className="text-center">
+                          <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-2" />
+                          <p className="text-sm font-medium text-gray-900">Thanh toán thành công!</p>
+                          <p className="text-xs text-gray-500 mt-2">Đã trừ tiền từ ví nội bộ</p>
+                          <div className="mt-3 text-xs text-gray-500">
+                            <p>Trạng thái: <strong className="text-green-600">{paymentResult.paymentStatus || 'Hoàn thành'}</strong></p>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>

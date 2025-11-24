@@ -39,16 +39,17 @@ import {
 } from "lucide-react";
 import { useMaintenanceStore } from "../../store/maintenanceStore";
 import { useAuthStore } from "../../store/authStore";
+import { useAdminStore } from "../../store/adminStore";
 import { showToast } from "../../utils/toast";
 import { vehicleAPI } from "../../api";
+import DashboardLayout from "../../components/layout/DashboardLayout";
 
 const ServiceManagement = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const { user } = useAuthStore();
+  // userRole is managed via state below (setUserRole) — kept as state for UI interactions
+  const { notifications: storeNotifications, fetchNotifications } = useAdminStore();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -68,6 +69,26 @@ const ServiceManagement = () => {
     description: ''
   });
 
+  // Local user info and role state (some pages used setUserRole in previous code)
+  const [userData, setUserData] = useState({
+    name: user?.name || user?.fullName || "User",
+    role: user?.role || "staff",
+  });
+  const [userRole, setUserRole] = useState(user?.role || "staff");
+
+  // Use notifications from admin store; provide a local alias used by the UI
+  const notifications = storeNotifications || [];
+
+  // Notification handler for layout
+  const handleNotificationRead = async (notificationId) => {
+    // Implement notification read logic if needed
+  };
+
+  // Fetch notifications on mount
+  useEffect(() => {
+    fetchNotifications({ limit: 20 });
+  }, [fetchNotifications]);
+
   // Zustand stores
   const { 
     schedules, 
@@ -80,33 +101,6 @@ const ServiceManagement = () => {
     completeMaintenance,
     clearError 
   } = useMaintenanceStore();
-
-  const { user } = useAuthStore();
-
-  // State cho user data
-  const [userRole, setUserRole] = useState("staff");
-  const [userData, setUserData] = useState({
-    name: "Nguyễn Văn B",
-    role: "staff",
-  });
-
-  // Notifications mock data
-  const [notifications] = useState([
-    {
-      id: 1,
-      title: "Dịch vụ hoàn thành",
-      message: "Bảo dưỡng định kỳ cho xe VF e34 đã hoàn thành",
-      time: "5 phút trước",
-      read: false,
-    },
-    {
-      id: 2,
-      title: "Lịch mới",
-      message: "Đã lên lịch thay pin cho VF 9",
-      time: "1 giờ trước",
-      read: false,
-    },
-  ]);
 
   // Load schedules on mount
   useEffect(() => {
@@ -208,94 +202,6 @@ const ServiceManagement = () => {
       }
     }
   }, [user]);
-
-  // Menu items cho Admin
-  const adminMenuItems = [
-    {
-      id: "overview",
-      label: "Tổng quan",
-      icon: <BarChart3 className="w-5 h-5" />,
-      link: "/admin",
-    },
-    {
-      id: "cars",
-      label: "Quản lý xe",
-      icon: <Car className="w-5 h-5" />,
-      link: "/admin/cars",
-    },
-    {
-      id: "contracts",
-      label: "Quản lý hợp đồng",
-      icon: <FileText className="w-5 h-5" />,
-      link: "/admin/contracts",
-    },
-    {
-      id: "services",
-      label: "Quản lý dịch vụ",
-      icon: <Wrench className="w-5 h-5" />,
-      link: "/admin/services",
-    },
-    {
-      id: "checkinout",
-      label: "Check-in/out",
-      icon: <QrCode className="w-5 h-5" />,
-      link: "/admin/checkinout",
-    },
-    {
-      id: "users",
-      label: "Quản lý người dùng",
-      icon: <Users className="w-5 h-5" />,
-      link: "/admin/users",
-    },
-    {
-      id: "groups",
-      label: "Quản lý nhóm",
-      icon: <Building className="w-5 h-5" />,
-      link: "/admin/groups",
-    },
-    {
-      id: "reports",
-      label: "Báo cáo",
-      icon: <PieChart className="w-5 h-5" />,
-      link: "/admin/reports",
-    },
-  ];
-
-  // Menu items cho Staff
-  const staffMenuItems = [
-    {
-      id: "overview",
-      label: "Tổng quan",
-      icon: <BarChart3 className="w-5 h-5" />,
-      link: "/staff",
-    },
-    {
-      id: "cars",
-      label: "Quản lý xe",
-      icon: <Car className="w-5 h-5" />,
-      link: "/staff/cars",
-    },
-    {
-      id: "contracts",
-      label: "Quản lý hợp đồng",
-      icon: <FileText className="w-5 h-5" />,
-      link: "/staff/contracts",
-    },
-    {
-      id: "services",
-      label: "Quản lý dịch vụ",
-      icon: <Wrench className="w-5 h-5" />,
-      link: "/staff/services",
-    },
-    {
-      id: "checkinout",
-      label: "Check-in/out",
-      icon: <QrCode className="w-5 h-5" />,
-      link: "/staff/checkinout",
-    },
-  ];
-
-  const menuItems = userRole === "admin" ? adminMenuItems : staffMenuItems;
 
   const statusOptions = [
     { value: "all", label: "Tất cả trạng thái", color: "gray" },
@@ -406,14 +312,6 @@ const ServiceManagement = () => {
   const canEditService = userRole === "admin";
   const canDeleteService = userRole === "admin";
   const canExport = userRole === "admin";
-
-  const getActiveTab = () => {
-    const currentPath = location.pathname;
-    const menuItem = menuItems.find((item) => item.link === currentPath);
-    return menuItem ? menuItem.id : "services";
-  };
-
-  const activeTab = getActiveTab();
 
   // CRUD Handlers
   const handleAddService = async (e) => {
@@ -557,267 +455,18 @@ const ServiceManagement = () => {
     }
   };
 
-  // Hàm xử lý logout
-  const handleLogout = () => {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("userData");
-    localStorage.removeItem("authExpires");
-    localStorage.removeItem("rememberedLogin");
-    window.dispatchEvent(new Event("storage"));
-    navigate("/");
-  };
-
-  // Đóng menu khi click ra ngoài
-  useEffect(() => {
-    const handleClickOutside = () => {
-      setUserMenuOpen(false);
-      setNotificationsOpen(false);
-    };
-    document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
-  }, []);
-
   const unreadNotifications = notifications.filter((n) => !n.read).length;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Mobile Menu Button */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 rounded-lg bg-white shadow-lg border border-gray-200"
-        >
-          {mobileMenuOpen ? (
-            <X className="w-5 h-5" />
-          ) : (
-            <Menu className="w-5 h-5" />
-          )}
-        </button>
-      </div>
-
-      {/* Sidebar */}
-      <AnimatePresence>
-        {(sidebarOpen || mobileMenuOpen) && (
-          <motion.div
-            initial={{ x: -300 }}
-            animate={{ x: 0 }}
-            exit={{ x: -300 }}
-            transition={{ type: "spring", damping: 30 }}
-            className="w-64 bg-white shadow-xl fixed h-full z-40 lg:z-30"
-          >
-            <div className="p-6 border-b border-gray-100">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-sm">
-                  {userRole === "admin" ? (
-                    <Shield className="w-6 h-6 text-white" />
-                  ) : (
-                    <User className="w-6 h-6 text-white" />
-                  )}
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">
-                    EV Co-ownership
-                  </h1>
-                  <p className="text-xs text-gray-600">
-                    {userRole === "admin"
-                      ? "Admin Dashboard"
-                      : "Staff Dashboard"}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <nav className="p-4 space-y-1">
-              {menuItems.map((item) => (
-                <Link
-                  key={item.id}
-                  to={item.link}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
-                    activeTab === item.id
-                      ? "bg-blue-50 text-blue-600 border border-blue-100 shadow-sm"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  }`}
-                >
-                  {item.icon}
-                  <span className="font-medium">{item.label}</span>
-                </Link>
-              ))}
-            </nav>
-
-            {/* User Info */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 bg-white">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-sm">
-                  <User className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">
-                    {userData.name}
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    {userRole === "admin"
-                      ? "Quản trị viên"
-                      : "Nhân viên vận hành"}
-                  </p>
-                </div>
-                <button
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  onClick={handleLogout}
-                >
-                  <LogOut className="w-4 h-4 text-gray-600" />
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Main Content */}
-      <div
-        className={`flex-1 transition-all ${
-          sidebarOpen ? "lg:ml-64" : "lg:ml-0"
-        } ${mobileMenuOpen ? "ml-0" : ""}`}
-      >
-        {/* Header */}
-        <header className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-20">
-          <div className="px-4 lg:px-8 py-4 flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors hidden lg:block"
-              >
-                <Menu className="w-5 h-5 text-gray-600" />
-              </button>
-              <div>
-                <h2 className="text-lg lg:text-xl font-bold text-gray-900">
-                  Quản lý dịch vụ
-                </h2>
-                <p className="text-xs lg:text-sm text-gray-600">
-                  Theo dõi và quản lý các dịch vụ bảo dưỡng
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-2 lg:space-x-4">
-              {/* Notifications */}
-              <div className="relative">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setNotificationsOpen(!notificationsOpen);
-                    setUserMenuOpen(false);
-                  }}
-                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative"
-                >
-                  <Bell className="w-5 h-5 text-gray-600" />
-                  {unreadNotifications > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
-                      {unreadNotifications}
-                    </span>
-                  )}
-                </button>
-
-                <AnimatePresence>
-                  {notificationsOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden z-50"
-                    >
-                      <div className="p-4 border-b border-gray-100">
-                        <h3 className="font-semibold text-gray-900">
-                          Thông báo
-                        </h3>
-                      </div>
-                      <div className="max-h-96 overflow-y-auto">
-                        {notifications.map((notif) => (
-                          <div
-                            key={notif.id}
-                            className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${
-                              !notif.read ? "bg-blue-50" : ""
-                            }`}
-                          >
-                            <p className="font-medium text-sm text-gray-900">
-                              {notif.title}
-                            </p>
-                            <p className="text-xs text-gray-600 mt-1">
-                              {notif.message}
-                            </p>
-                            <p className="text-xs text-gray-400 mt-2">
-                              {notif.time}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* User Menu */}
-              <div className="relative">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setUserMenuOpen(!userMenuOpen);
-                    setNotificationsOpen(false);
-                  }}
-                  className="flex items-center space-x-2 lg:space-x-3 p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-                    <User className="w-4 h-4 text-white" />
-                  </div>
-                  <span className="text-sm font-medium text-gray-900 hidden lg:block">
-                    {userData.name}
-                  </span>
-                  <ChevronDown className="w-4 h-4 text-gray-600 hidden lg:block" />
-                </button>
-
-                <AnimatePresence>
-                  {userMenuOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden z-50"
-                    >
-                      <div className="p-4 border-b border-gray-100">
-                        <p className="font-semibold text-gray-900">
-                          {userData.name}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {userRole === "admin"
-                            ? "Quản trị viên"
-                            : "Nhân viên"}
-                        </p>
-                      </div>
-                      <div className="p-2">
-                        <button className="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3">
-                          <User className="w-4 h-4" />
-                          <span>Thông tin cá nhân</span>
-                        </button>
-                        <button
-                          onClick={handleLogout}
-                          className="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3 text-red-600"
-                        >
-                          <LogOut className="w-4 h-4" />
-                          <span>Đăng xuất</span>
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* Service Management Content */}
-        <div className="p-4 lg:p-8">
-          {/* Stats Overview */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 lg:gap-6 mb-6 lg:mb-8">
+    <DashboardLayout
+      userRole={userRole}
+      notifications={storeNotifications}
+      onNotificationRead={handleNotificationRead}
+    >
+      {/* Service Management Content */}
+      <div className="p-4 lg:p-8">
+        {/* Stats Overview */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 lg:gap-6 mb-6 lg:mb-8">
             <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between">
                 <div>
@@ -1809,8 +1458,7 @@ const ServiceManagement = () => {
             </div>
           )}
         </AnimatePresence>
-      </div>
-    </div>
+    </DashboardLayout>
   );
 };
 

@@ -29,13 +29,17 @@ import {
 } from "lucide-react";
 import { useBookingStore } from "../../store/bookingStore";
 import { useAuthStore } from "../../store/authStore";
+import { useAdminStore } from "../../store/adminStore";
 import { showToast } from "../../utils/toast";
 import QRScanner from "../../components/QRScanner";
+import DashboardLayout from "../../components/layout/DashboardLayout";
 
 const CheckInOutManagement = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuthStore();
+  const [userRole, setUserRole] = useState(user?.role || "staff");
+  const { notifications: storeNotifications, fetchNotifications } = useAdminStore();
   const {
     bookings,
     isLoading,
@@ -49,10 +53,15 @@ const CheckInOutManagement = () => {
     clearError,
   } = useBookingStore();
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  // Notification handler for layout
+  const handleNotificationRead = async (notificationId) => {
+    // Implement notification read logic if needed
+  };
+
+  // Fetch notifications on mount
+  useEffect(() => {
+    fetchNotifications({ limit: 20 });
+  }, [fetchNotifications]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -106,7 +115,6 @@ const CheckInOutManagement = () => {
   };
 
   // State cho user data
-  const [userRole, setUserRole] = useState("staff");
   const [userData, setUserData] = useState({
     name: user?.fullName || "User",
     role: user?.role || "staff",
@@ -166,94 +174,6 @@ const CheckInOutManagement = () => {
       read: true,
     },
   ]);
-
-  // Menu items cho Admin
-  const adminMenuItems = [
-    {
-      id: "overview",
-      label: "Tổng quan",
-      icon: <BarChart3 className="w-5 h-5" />,
-      link: "/admin",
-    },
-    {
-      id: "cars",
-      label: "Quản lý xe",
-      icon: <Car className="w-5 h-5" />,
-      link: "/admin/cars",
-    },
-    {
-      id: "staff",
-      label: "Nhân viên",
-      icon: <Users className="w-5 h-5" />,
-      link: "/admin/staff",
-    },
-    {
-      id: "contracts",
-      label: "Hợp đồng",
-      icon: <FileText className="w-5 h-5" />,
-      link: "/admin/contracts",
-    },
-    {
-      id: "services",
-      label: "Dịch vụ xe",
-      icon: <Wrench className="w-5 h-5" />,
-      link: "/admin/services",
-    },
-    {
-      id: "checkin",
-      label: "Check-in/out",
-      icon: <QrCode className="w-5 h-5" />,
-      link: "/admin/checkin",
-    },
-    {
-      id: "disputes",
-      label: "Tranh chấp",
-      icon: <AlertCircle className="w-5 h-5" />,
-      link: "/admin/disputes",
-    },
-    {
-      id: "reports",
-      label: "Báo cáo TC",
-      icon: <PieChart className="w-5 h-5" />,
-      link: "/admin/financial-reports",
-    },
-  ];
-
-  // Menu items cho Staff
-  const staffMenuItems = [
-    {
-      id: "overview",
-      label: "Tổng quan",
-      icon: <BarChart3 className="w-5 h-5" />,
-      link: "/staff",
-    },
-    {
-      id: "cars",
-      label: "Quản lý xe",
-      icon: <Car className="w-5 h-5" />,
-      link: "/staff/cars",
-    },
-    {
-      id: "contracts",
-      label: "Hợp đồng",
-      icon: <FileText className="w-5 h-5" />,
-      link: "/staff/contracts",
-    },
-    {
-      id: "services",
-      label: "Dịch vụ xe",
-      icon: <Wrench className="w-5 h-5" />,
-      link: "/staff/services",
-    },
-    {
-      id: "checkin",
-      label: "Check-in/out",
-      icon: <QrCode className="w-5 h-5" />,
-      link: "/staff/checkin",
-    },
-  ];
-
-  const menuItems = userRole === "admin" ? adminMenuItems : staffMenuItems;
 
   const statusOptions = [
     { value: "all", label: "Tất cả trạng thái", color: "gray" },
@@ -459,34 +379,6 @@ const CheckInOutManagement = () => {
     }
   };
 
-  const getActiveTab = () => {
-    const currentPath = location.pathname;
-    const menuItem = menuItems.find((item) => item.link === currentPath);
-    return menuItem ? menuItem.id : "checkin";
-  };
-
-  const activeTab = getActiveTab();
-
-  // Hàm xử lý logout
-  const handleLogout = () => {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("userData");
-    localStorage.removeItem("authExpires");
-    localStorage.removeItem("rememberedLogin");
-    window.dispatchEvent(new Event("storage"));
-    navigate("/");
-  };
-
-  // Đóng menu khi click ra ngoài
-  useEffect(() => {
-    const handleClickOutside = () => {
-      setUserMenuOpen(false);
-      setNotificationsOpen(false);
-    };
-    document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
-  }, []);
-
   const unreadNotifications = notifications.filter((n) => !n.read).length;
 
   const formatDate = (dateString) => {
@@ -502,210 +394,13 @@ const CheckInOutManagement = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Mobile Menu Button */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 rounded-lg bg-white shadow-lg border border-gray-200"
-        >
-          {mobileMenuOpen ? (
-            <X className="w-5 h-5" />
-          ) : (
-            <Menu className="w-5 h-5" />
-          )}
-        </button>
-      </div>
-
-      {/* Sidebar */}
-      <AnimatePresence>
-        {(sidebarOpen || mobileMenuOpen) && (
-          <motion.div
-            initial={{ x: -300 }}
-            animate={{ x: 0 }}
-            exit={{ x: -300 }}
-            transition={{ type: "spring", damping: 30 }}
-            className="w-64 bg-white shadow-xl fixed h-full z-40 lg:z-30"
-          >
-            <div className="p-6 border-b border-gray-100">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-sm">
-                  {userRole === "admin" ? (
-                    <Shield className="w-6 h-6 text-white" />
-                  ) : (
-                    <User className="w-6 h-6 text-white" />
-                  )}
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">
-                    EV Co-ownership
-                  </h1>
-                  <p className="text-xs text-gray-600">
-                    {userRole === "admin"
-                      ? "Admin Dashboard"
-                      : "Staff Dashboard"}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <nav className="p-4 space-y-1">
-              {menuItems.map((item) => (
-                <Link
-                  key={item.id}
-                  to={item.link}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
-                    activeTab === item.id
-                      ? "bg-blue-50 text-blue-600 border border-blue-100 shadow-sm"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  }`}
-                >
-                  {item.icon}
-                  <span className="font-medium">{item.label}</span>
-                </Link>
-              ))}
-            </nav>
-
-            {/* User Info */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 bg-white">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-sm">
-                  <User className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">
-                    {userData.name}
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    {userRole === "admin"
-                      ? "Quản trị viên"
-                      : "Nhân viên vận hành"}
-                  </p>
-                </div>
-                <button
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  onClick={handleLogout}
-                >
-                  <LogOut className="w-4 h-4 text-gray-600" />
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Main Content */}
-      <div
-        className={`flex-1 transition-all ${
-          sidebarOpen ? "lg:ml-64" : "lg:ml-0"
-        } ${mobileMenuOpen ? "ml-0" : ""}`}
-      >
-        {/* Header */}
-        <header className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-20">
-          <div className="px-4 lg:px-8 py-4 flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors hidden lg:block"
-              >
-                <Menu className="w-5 h-5 text-gray-600" />
-              </button>
-              <h2 className="text-xl font-semibold text-gray-900">
-                {menuItems.find((item) => item.id === activeTab)?.label ||
-                  "Check-in/out"}
-              </h2>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              {/* Notifications */}
-              <div className="relative">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setNotificationsOpen(!notificationsOpen);
-                  }}
-                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative"
-                >
-                  <Bell className="w-5 h-5 text-gray-600" />
-                  {unreadNotifications > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white text-xs text-white flex items-center justify-center">
-                      {unreadNotifications}
-                    </span>
-                  )}
-                </button>
-              </div>
-
-              {/* User Menu */}
-              <div className="relative">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setUserMenuOpen(!userMenuOpen);
-                  }}
-                  className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  <div className="text-right hidden md:block">
-                    <p className="text-sm font-medium text-gray-900">
-                      {userData.name}
-                    </p>
-                    <p className="text-xs text-gray-600">
-                      {userRole === "admin"
-                        ? "Quản trị viên"
-                        : "Nhân viên vận hành"}
-                    </p>
-                  </div>
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-sm">
-                    <User className="w-4 h-4 text-white" />
-                  </div>
-                  <ChevronDown
-                    className={`w-4 h-4 text-gray-600 transition-transform ${
-                      userMenuOpen ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
-
-                <AnimatePresence>
-                  {userMenuOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute right-0 top-12 w-48 bg-white rounded-xl shadow-lg border border-gray-200 z-10"
-                    >
-                      <div className="p-2">
-                        <button
-                          onClick={() =>
-                            navigate(
-                              userRole === "admin"
-                                ? "/admin/profile"
-                                : "/staff/profile"
-                            )
-                          }
-                          className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm text-gray-700"
-                        >
-                          <User className="w-4 h-4" />
-                          <span>Hồ sơ cá nhân</span>
-                        </button>
-                        <div className="border-t border-gray-100 my-1" />
-                        <button
-                          onClick={handleLogout}
-                          className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors text-sm text-red-600"
-                        >
-                          <LogOut className="w-4 h-4" />
-                          <span>Đăng xuất</span>
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* Check-in/out Content */}
-        <div className="p-4 lg:p-8">
+    <DashboardLayout
+      userRole={userRole}
+      notifications={storeNotifications}
+      onNotificationRead={handleNotificationRead}
+    >
+      {/* Check-in/out Content */}
+      <div className="p-4 lg:p-8">
           {/* Stats Overview */}
           <div className="grid gap-3 lg:gap-6 mb-6 lg:mb-8 grid-cols-2 lg:grid-cols-4">
             <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm border border-gray-100">
@@ -936,7 +631,7 @@ const CheckInOutManagement = () => {
             </motion.div>
           )}
         </div>
-      </div>
+      {/* Modals below are outside the padding div but inside DashboardLayout */}
 
       {/* Check-in Modal */}
       <AnimatePresence>
@@ -1299,7 +994,7 @@ const CheckInOutManagement = () => {
         onClose={() => setShowQRScanner(false)}
         onScanSuccess={handleQRScanSuccess}
       />
-    </div>
+    </DashboardLayout>
   );
 };
 

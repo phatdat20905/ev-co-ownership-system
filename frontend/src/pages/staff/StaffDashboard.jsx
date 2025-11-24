@@ -1,50 +1,36 @@
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { motion } from "framer-motion";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Users,
   Car,
   FileText,
-  CreditCard,
   AlertTriangle,
   TrendingUp,
   BarChart3,
-  MessageCircle,
-  Bell,
-  User,
-  LogOut,
-  Search,
   Wrench,
   CheckCircle,
   DollarSign,
   Calendar,
-  PieChart,
   ChevronDown,
-  Menu,
-  X,
   QrCode,
   Clock,
   MapPin,
   Battery,
-  Shield,
-  Loader2,
 } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import { staffAPI } from "../../api/staff";
 import { adminAPI } from "../../api/admin";
 import showToast from "../../utils/toast";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
+import DashboardLayout from "../../components/layout/DashboardLayout";
 
 const StaffDashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout, user } = useAuthStore();
+  const { user } = useAuthStore();
   
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [time, setTime] = useState(new Date());
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   // Loading state
   const [loading, setLoading] = useState(true);
@@ -71,22 +57,6 @@ const StaffDashboard = () => {
     const timer = setInterval(() => setTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
-
-  // Đóng menu khi click ra ngoài
-  useEffect(() => {
-    const handleClickOutside = () => {
-      setUserMenuOpen(false);
-      setNotificationsOpen(false);
-    };
-    document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
-  }, []);
-
-  // Hàm xử lý logout
-  const handleLogout = () => {
-    logout();
-    navigate("/");
-  };
 
   // Fetch dashboard data on mount
   useEffect(() => {
@@ -581,311 +551,43 @@ const StaffDashboard = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Mobile Menu Button */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 rounded-lg bg-white shadow-lg border border-gray-200"
+    <DashboardLayout 
+      userRole="staff" 
+      notifications={notifications} 
+      onNotificationRead={handleMarkNotificationAsRead}
+    >
+      {activeTab === "overview" && renderOverview()}
+      {activeTab !== "overview" && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center py-12"
         >
-          {mobileMenuOpen ? (
-            <X className="w-5 h-5" />
-          ) : (
-            <Menu className="w-5 h-5" />
-          )}
-        </button>
-      </div>
-
-      {/* Sidebar */}
-      <AnimatePresence>
-        {(sidebarOpen || mobileMenuOpen) && (
-          <motion.div
-            initial={{ x: -300 }}
-            animate={{ x: 0 }}
-            exit={{ x: -300 }}
-            transition={{ type: "spring", damping: 30 }}
-            className="w-64 bg-white shadow-xl fixed h-full z-40 lg:z-30"
-          >
-            <div className="p-6 border-b border-gray-100">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-sm">
-                  <Users className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">
-                    EV Co-ownership
-                  </h1>
-                  <p className="text-xs text-gray-600">Staff Dashboard</p>
-                </div>
-              </div>
-            </div>
-
-            <nav className="p-4 space-y-1">
-              {menuItems.map((item) => (
-                <Link
-                  key={item.id}
-                  to={item.link}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
-                    activeTab === item.id
-                      ? "bg-blue-50 text-blue-600 border border-blue-100 shadow-sm"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  }`}
-                >
-                  {item.icon}
-                  <span className="font-medium">{item.label}</span>
-                </Link>
-              ))}
-            </nav>
-
-            {/* User Info */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 bg-white">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-sm">
-                  <User className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">
-                    {user?.fullName || user?.email || 'Staff'}
-                  </p>
-                  <p className="text-xs text-gray-600">Nhân viên vận hành</p>
-                </div>
-                <button
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  onClick={handleLogout}
-                >
-                  <LogOut className="w-4 h-4 text-gray-600" />
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Main Content */}
-      <div
-        className={`flex-1 transition-all ${
-          sidebarOpen ? "lg:ml-64" : "lg:ml-0"
-        } ${mobileMenuOpen ? "ml-0" : ""}`}
-      >
-        {/* Header */}
-        <header className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-20">
-          <div className="px-4 lg:px-8 py-4 flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors hidden lg:block"
-              >
-                <Menu className="w-5 h-5 text-gray-600" />
-              </button>
-              <h2 className="text-xl font-semibold text-gray-900">
-                {menuItems.find((item) => item.id === activeTab)?.label ||
-                  "Tổng quan"}
-              </h2>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              {/* Search Bar */}
-              <div className="relative hidden md:block">
-                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm xe, thành viên..."
-                  className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64 text-sm bg-gray-50 focus:bg-white transition-colors"
-                />
-              </div>
-
-              {/* Notifications */}
-              <div className="relative">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setNotificationsOpen(!notificationsOpen);
-                  }}
-                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative"
-                >
-                  <Bell className="w-5 h-5 text-gray-600" />
-                  {unreadNotifications > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white text-xs text-white flex items-center justify-center">
-                      {unreadNotifications}
-                    </span>
-                  )}
-                </button>
-
-                <AnimatePresence>
-                  {notificationsOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-10"
-                    >
-                      <div className="p-4 border-b border-gray-100">
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-semibold text-gray-900">
-                            Thông báo
-                          </h3>
-                          {unreadNotifications > 0 && (
-                            <button
-                              onClick={handleMarkAllAsRead}
-                              className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                            >
-                              Đánh dấu tất cả đã đọc
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      <div className="max-h-96 overflow-y-auto">
-                        {notifications.length === 0 ? (
-                          <div className="p-8 text-center text-gray-500">
-                            <Bell className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                            <p>Không có thông báo mới</p>
-                          </div>
-                        ) : (
-                          notifications.map((notification) => (
-                            <div
-                              key={notification.id}
-                              onClick={() => {
-                                if (!notification.read) {
-                                  handleMarkNotificationAsRead(notification.id);
-                                }
-                              }}
-                              className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors ${
-                                !notification.read ? "bg-blue-50" : ""
-                              }`}
-                            >
-                              <div className="flex items-start space-x-3">
-                                <div
-                                  className={`w-2 h-2 rounded-full mt-2 ${
-                                    notification.type === "success"
-                                      ? "bg-green-500"
-                                      : notification.type === "warning"
-                                      ? "bg-amber-500"
-                                      : notification.type === "info"
-                                      ? "bg-blue-500"
-                                      : "bg-red-500"
-                                  }`}
-                                />
-                                <div className="flex-1">
-                                  <p className="font-medium text-gray-900 text-sm">
-                                    {notification.title}
-                                  </p>
-                                  <p className="text-gray-600 text-sm mt-1">
-                                    {notification.message}
-                                  </p>
-                                  <p className="text-gray-400 text-xs mt-2">
-                                    {notification.time || notification.createdAt}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                      <div className="p-4 border-t border-gray-100">
-                        <button className="text-blue-600 text-sm font-medium w-full text-center hover:text-blue-800 transition-colors">
-                          Xem tất cả thông báo
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* User Menu */}
-              <div className="relative">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setUserMenuOpen(!userMenuOpen);
-                  }}
-                  className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  <div className="text-right hidden md:block">
-                    <p className="text-sm font-medium text-gray-900">
-                      {user?.fullName || user?.email || 'Staff'}
-                    </p>
-                    <p className="text-xs text-gray-600">Nhân viên vận hành</p>
-                  </div>
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-sm">
-                    <User className="w-4 h-4 text-white" />
-                  </div>
-                  <ChevronDown
-                    className={`w-4 h-4 text-gray-600 transition-transform ${
-                      userMenuOpen ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
-
-                <AnimatePresence>
-                  {userMenuOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute right-0 top-12 w-48 bg-white rounded-xl shadow-lg border border-gray-200 z-10"
-                    >
-                      <div className="p-2">
-                        <button
-                          onClick={() => navigate("/staff/profile")}
-                          className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm text-gray-700"
-                        >
-                          <User className="w-4 h-4" />
-                          <span>Hồ sơ cá nhân</span>
-                        </button>
-                        <div className="border-t border-gray-100 my-1" />
-                        <button
-                          onClick={handleLogout}
-                          className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors text-sm text-red-600"
-                        >
-                          <LogOut className="w-4 h-4" />
-                          <span>Đăng xuất</span>
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
+          <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
+            {menuItems.find((item) => item.id === activeTab)?.icon}
           </div>
-        </header>
-
-        {/* Content */}
-        <main className="p-4 lg:p-8">
-          {activeTab === "overview" && renderOverview()}
-          {activeTab !== "overview" && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-center py-12"
-            >
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
-                {menuItems.find((item) => item.id === activeTab)?.icon}
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                {menuItems.find((item) => item.id === activeTab)?.label}
-              </h2>
-              <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                Chức năng này đã được chuyển hướng đến trang riêng. Vui lòng sử
-                dụng menu bên trái để điều hướng.
-              </p>
-              <button
-                onClick={() =>
-                  navigate(
-                    menuItems.find((item) => item.id === activeTab)?.link ||
-                      "/staff"
-                  )
-                }
-                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium"
-              >
-                Đi đến trang{" "}
-                {menuItems.find((item) => item.id === activeTab)?.label}
-              </button>
-            </motion.div>
-          )}
-        </main>
-      </div>
-    </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            {menuItems.find((item) => item.id === activeTab)?.label}
+          </h2>
+          <p className="text-gray-600 mb-6 max-w-md mx-auto">
+            Chức năng này đã được chuyển hướng đến trang riêng. Vui lòng sử
+            dụng menu bên trái để điều hướng.
+          </p>
+          <button
+            onClick={() =>
+              navigate(
+                menuItems.find((item) => item.id === activeTab)?.link ||
+                  "/staff"
+              )
+            }
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium"
+          >
+            Đi đến trang{" "}
+            {menuItems.find((item) => item.id === activeTab)?.label}
+          </button>
+        </motion.div>
+      )}
+    </DashboardLayout>
   );
 };
 

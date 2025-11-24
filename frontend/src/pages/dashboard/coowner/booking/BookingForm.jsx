@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, Car, MapPin, Users, FileText, Zap, Battery, CheckCircle, Loader2 } from 'lucide-react';
 import Header from '../../../../components/layout/Header';
 import Footer from '../../../../components/layout/Footer';
 import { useBookingStore, useVehicleStore, useAuthStore } from '../../../../store';
+import { showToast } from '../../../../utils/toast';
 
 export default function BookingForm() {
   const navigate = useNavigate();
@@ -25,6 +26,8 @@ export default function BookingForm() {
   const { createBooking } = useBookingStore();
   const { vehicles, loading, fetchVehicles } = useVehicleStore();
   const { activeGroup, fetchActiveGroup } = useAuthStore();
+  const startDateRef = useRef(null);
+  const endDateRef = useRef(null);
 
   useEffect(() => {
     const init = async () => {
@@ -62,28 +65,106 @@ export default function BookingForm() {
         throw new Error('Bạn chưa thuộc nhóm nào. Vui lòng liên hệ quản trị viên để được thêm vào nhóm.');
       }
 
-      // Combine date and time into ISO datetime strings
-      const startTime = new Date(`${formData.startDate}T${formData.startTime}`).toISOString();
-      const endTime = new Date(`${formData.endDate}T${formData.endTime}`).toISOString();
+      // Combine date and time into ISO datetime strings (local timezone)
+      const startTimeISO = new Date(`${formData.startDate}T${formData.startTime}`).toISOString();
+      const endTimeISO = new Date(`${formData.endDate}T${formData.endTime}`).toISOString();
 
       const bookingData = {
         vehicleId: formData.vehicleId,
         groupId: activeGroup.id,
-        startTime,
-        endTime,
+        startTime: startTimeISO,
+        endTime: endTimeISO,
         purpose: formData.purpose,
         destination: formData.destination || undefined,
         estimatedDistance: formData.estimatedDistance ? parseFloat(formData.estimatedDistance) : undefined,
         notes: formData.notes || undefined
       };
 
-      await createBooking(bookingData);
-      navigate('/dashboard/coowner/booking');
+      // Client-side validation to match backend rules and avoid 400 errors
+      const clientErrors = validateBookingClientSide(bookingData);
+      if (clientErrors.length > 0) {
+        const errorMsg = clientErrors.join('; ');
+        setError(errorMsg);
+        showToast.error(errorMsg);
+        setSubmitting(false);
+        return;
+      }
+
+      // Use toast.promise for better UX
+      await showToast.promise(
+        createBooking(bookingData),
+        {
+          pending: 'Đang tạo booking...',
+          success: 'Đặt lịch thành công! Đang chuyển trang...',
+          error: 'Không thể tạo booking'
+        }
+      );
+
+      // Only navigate on success
+      setTimeout(() => {
+        navigate('/dashboard/coowner/booking');
+      }, 1000);
+
     } catch (err) {
-      setError(err.message || err.response?.data?.message || 'Không thể tạo booking. Vui lòng thử lại!');
+      // Surface backend validation errors if present
+      const backendErrors = err?.response?.data?.error?.details?.errors;
+      let errorMsg = '';
+      
+      if (Array.isArray(backendErrors) && backendErrors.length > 0) {
+        errorMsg = backendErrors.join('; ');
+      } else {
+        errorMsg = err?.response?.data?.error?.message 
+          || err?.response?.data?.message 
+          || err.message 
+          || 'Không thể tạo booking. Vui lòng thử lại!';
+      }
+      
+      setError(errorMsg);
+      showToast.error(errorMsg);
       setSubmitting(false);
     }
   };
+
+  // Client-side validator (keeps same rules as backend)
+  function validateBookingClientSide(bookingData) {
+    const errors = [];
+    const MIN_DURATION_MS = 2 * 60 * 60 * 1000; // 2 hours
+    const MAX_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+    const SAME_DAY_CUTOFF_HOURS = 2;
+
+    if (!bookingData.vehicleId) errors.push('Vui lòng chọn xe');
+    if (!bookingData.groupId) errors.push('Bạn chưa thuộc nhóm nào');
+    if (!bookingData.startTime) errors.push('Vui lòng chọn ngày/Giờ bắt đầu');
+    if (!bookingData.endTime) errors.push('Vui lòng chọn ngày/Giờ kết thúc');
+
+    if (bookingData.startTime && bookingData.endTime) {
+      const start = new Date(bookingData.startTime);
+      const end = new Date(bookingData.endTime);
+      const now = new Date();
+
+      if (start <= now) errors.push('Thời gian bắt đầu phải nằm trong tương lai');
+      if (end <= start) errors.push('Thời gian kết thúc phải sau thời gian bắt đầu');
+
+      const duration = end - start;
+      if (duration < MIN_DURATION_MS) errors.push('Thời lượng tối thiểu là 2 giờ');
+      if (duration > MAX_DURATION_MS) errors.push('Thời lượng tối đa là 24 giờ');
+
+      // same-day cutoff
+      if (start.toDateString() === now.toDateString()) {
+        const cutoff = new Date(now.getTime() + SAME_DAY_CUTOFF_HOURS * 60 * 60 * 1000);
+        if (start < cutoff) {
+          // format cutoff for user's locale so they know the earliest allowed time
+          const timeStr = cutoff.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const dateStr = cutoff.toLocaleDateString();
+          errors.push(
+            `Đặt trong ngày phải trước ít nhất ${SAME_DAY_CUTOFF_HOURS} giờ (thời gian sớm nhất: ${dateStr} ${timeStr})`
+          );
+        }
+      }
+    }
+
+    return errors;
+  }
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -175,22 +256,26 @@ export default function BookingForm() {
                                 <span className="text-gray-600">Pin:</span>
                                 <div className="flex items-center gap-1">
                                   <Battery className="w-4 h-4 text-green-600" />
-                                  <span className="font-medium">{vehicle.batteryLevel || 0}%</span>
+                                  <span className="font-medium">{vehicle.specifications?.current_battery_percent ?? vehicle.batteryLevel ?? 0}%</span>
                                 </div>
                               </div>
                               <div className="flex items-center justify-between">
                                 <span className="text-gray-600">Tầm hoạt động:</span>
-                                <span className="font-medium">{vehicle.range || `${vehicle.batteryLevel * 3 || 0}km`}</span>
+                                <span className="font-medium">
+                                  {vehicle.specifications?.range_km
+                                    ? `${vehicle.specifications.range_km}km`
+                                    : vehicle.range || `${(vehicle.specifications?.current_battery_percent ?? vehicle.batteryLevel ?? 0) * 3 || 0}km`}
+                                </span>
                               </div>
                               <div className="flex items-center justify-between">
                                 <span className="text-gray-600">Hiệu suất:</span>
-                                <span className="font-medium">{vehicle.efficiency || 'N/A'}</span>
+                                <span className="font-medium">{vehicle.specifications?.efficiency ?? 'N/A'}</span>
                               </div>
                               <div className="flex items-center justify-between">
                                 <span className="text-gray-600">Vị trí:</span>
                                 <div className="flex items-center gap-1">
                                   <MapPin className="w-4 h-4 text-red-500" />
-                                  <span className="font-medium">{vehicle.currentLocation || vehicle.location || 'TP.HCM'}</span>
+                                  <span className="font-medium">{vehicle.specifications?.location ?? vehicle.currentLocation ?? vehicle.location ?? 'TP.HCM'}</span>
                                 </div>
                               </div>
                             </div>
@@ -220,13 +305,32 @@ export default function BookingForm() {
                       </label>
                       <div className="relative">
                         <input
+                          ref={startDateRef}
                           type="date"
                           value={formData.startDate}
                           onChange={(e) => handleInputChange('startDate', e.target.value)}
                           className="w-full p-4 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                           required
                         />
-                        <Calendar className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <Calendar
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
+                            if (startDateRef.current) {
+                              if (typeof startDateRef.current.showPicker === 'function') startDateRef.current.showPicker();
+                              else startDateRef.current.focus();
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              if (startDateRef.current) {
+                                if (typeof startDateRef.current.showPicker === 'function') startDateRef.current.showPicker();
+                                else startDateRef.current.focus();
+                              }
+                            }
+                          }}
+                          className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 cursor-pointer"
+                        />
                       </div>
                     </div>
                     
@@ -252,13 +356,32 @@ export default function BookingForm() {
                       </label>
                       <div className="relative">
                         <input
+                          ref={endDateRef}
                           type="date"
                           value={formData.endDate}
                           onChange={(e) => handleInputChange('endDate', e.target.value)}
                           className="w-full p-4 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                           required
                         />
-                        <Calendar className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <Calendar
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
+                            if (endDateRef.current) {
+                              if (typeof endDateRef.current.showPicker === 'function') endDateRef.current.showPicker();
+                              else endDateRef.current.focus();
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              if (endDateRef.current) {
+                                if (typeof endDateRef.current.showPicker === 'function') endDateRef.current.showPicker();
+                                else endDateRef.current.focus();
+                              }
+                            }
+                          }}
+                          className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 cursor-pointer"
+                        />
                       </div>
                     </div>
                     
