@@ -1,0 +1,388 @@
+@startuml component-diagram
+!theme plain
+title Component Diagram - EV Co-ownership System Architecture
+
+' ============================================
+' FRONTEND LAYER
+' ============================================
+package "Frontend" {
+  [Web Application] as WebApp
+  [Mobile Application] as MobileApp
+  
+  note right of WebApp
+    React/Vue.js
+    - Co-owner Portal
+    - Staff Dashboard
+    - Admin Dashboard
+  end note
+  
+  note right of MobileApp
+    React Native
+    - Booking
+    - QR Check-in/out
+    - Notifications
+  end note
+}
+
+' ============================================
+' API GATEWAY
+' ============================================
+node "API Gateway" {
+  [Kong Gateway] as Gateway
+  [Rate Limiter]
+  [Auth Middleware]
+  [Load Balancer]
+  
+  note right of Gateway
+    - Routing
+    - Authentication
+    - Authorization
+    - Rate limiting
+    - Load balancing
+    - API composition
+  end note
+}
+
+' ============================================
+' MICROSERVICES
+' ============================================
+package "Microservices" {
+  
+  component "Auth Service" {
+    [Auth API] as AuthAPI
+    [JWT Service]
+    [Password Service]
+    database "User DB" as UserDB
+  }
+  note right of AuthAPI
+    Port: 3001
+    - Đăng ký/Đăng nhập
+    - Xác thực
+    - KYC
+    - Token management
+  end note
+  
+  component "User Service" {
+    [User API] as UserAPI
+    [Profile Manager]
+    [Group Manager]
+    [Vote Manager]
+    database "User Service DB" as UserSvcDB
+  }
+  note right of UserAPI
+    Port: 3002
+    - Quản lý profile
+    - Quản lý nhóm
+    - Voting
+    - Group fund
+  end note
+  
+  component "Vehicle Service" {
+    [Vehicle API] as VehicleAPI
+    [Maintenance Manager]
+    [Insurance Manager]
+    [Charging Manager]
+    database "Vehicle DB" as VehicleDB
+  }
+  note right of VehicleAPI
+    Port: 3003
+    - Quản lý xe
+    - Bảo trì
+    - Bảo hiểm
+    - Lịch sử sạc
+  end note
+  
+  component "Booking Service" {
+    [Booking API] as BookingAPI
+    [Calendar Service]
+    [Priority Calculator]
+    [Conflict Resolver]
+    [QR Service]
+    database "Booking DB" as BookingDB
+  }
+  note right of BookingAPI
+    Port: 3004
+    - Đặt lịch
+    - Check-in/out
+    - Xung đột
+    - Priority scoring
+  end note
+  
+  component "Cost Service" {
+    [Cost API] as CostAPI
+    [Cost Splitter]
+    [Wallet Manager]
+    [Invoice Generator]
+    database "Cost DB" as CostDB
+  }
+  note right of CostAPI
+    Port: 3005
+    - Chi phí
+    - Chia phí
+    - Thanh toán
+    - Hóa đơn
+    - Ví điện tử
+  end note
+  
+  component "Contract Service" {
+    [Contract API] as ContractAPI
+    [Template Engine]
+    [E-Signature Service]
+    [PDF Generator]
+    database "Contract DB" as ContractDB
+  }
+  note right of ContractAPI
+    Port: 3006
+    - Hợp đồng điện tử
+    - Ký số
+    - Template
+    - Versioning
+  end note
+  
+  component "AI Service" {
+    [AI API] as AIAPI
+    [ML Engine]
+    [Fairness Analyzer]
+    [Recommendation Engine]
+    [Model Trainer]
+    database "AI DB" as AIDB
+  }
+  note right of AIAPI
+    Port: 3007
+    - Gợi ý lịch công bằng
+    - Dự đoán
+    - Phân tích patterns
+    - ML training
+  end note
+  
+  component "Admin Service" {
+    [Admin API] as AdminAPI
+    [Dispute Manager]
+    [Staff Manager]
+    [Analytics Service]
+    database "Admin DB" as AdminDB
+  }
+  note right of AdminAPI
+    Port: 3008
+    - Quản lý tranh chấp
+    - Staff management
+    - System settings
+    - Analytics
+  end note
+  
+  component "Notification Service" {
+    [Notification API] as NotifAPI
+    [Email Service]
+    [SMS Service]
+    [Push Service]
+    [Template Renderer]
+    database "Notification DB" as NotifDB
+  }
+  note right of NotifAPI
+    Port: 3009
+    - Email
+    - SMS
+    - Push notifications
+    - In-app notifications
+  end note
+}
+
+' ============================================
+' SHARED INFRASTRUCTURE
+' ============================================
+package "Shared Infrastructure" {
+  
+  database "Redis Cache" as Redis {
+    [Session Store]
+    [Calendar Cache]
+    [API Cache]
+  }
+  note right of Redis
+    - Session management
+    - Cache layer
+    - Rate limiting data
+  end note
+  
+  queue "RabbitMQ" as MQ {
+    [Event Bus]
+    [Message Queue]
+  }
+  note right of MQ
+    Event-driven architecture:
+    - booking.created
+    - payment.completed
+    - dispute.escalated
+    - contract.signed
+    - notification.send
+  end note
+  
+  ' Storage removed (no central object in this deployment)
+  
+  component "Service Discovery" {
+    [Consul] as ServiceDiscovery
+  }
+  note right of ServiceDiscovery
+    - Service registration
+    - Health checks
+    - Load balancing
+  end note
+}
+
+' ============================================
+' EXTERNAL SERVICES
+' ============================================
+package "External Services" {
+  
+  cloud "Payment Gateway" {
+    [VNPay]
+    [MoMo]
+    [ZaloPay]
+  }
+  note right of VNPay
+    Thanh toán trực tuyến
+  end note
+  
+  cloud "Email Service" {
+    [SendGrid] as Email
+  }
+  
+  cloud "SMS Service" {
+    [Twilio] as SMS
+  }
+  
+  cloud "Maps Service" {
+    [Google Maps API] as Maps
+  }
+  
+  cloud "AI/ML Platform" {
+    [TensorFlow Serving] as TF
+    [MLflow] as MLflow
+  }
+}
+
+' ============================================
+' MONITORING & LOGGING
+' ============================================
+package "Observability" {
+  
+  component "Monitoring" {
+    [Prometheus]
+    [Grafana]
+  }
+  
+  component "Logging" {
+    [ELK Stack]
+    [Logstash]
+  }
+  
+  component "Tracing" {
+    [Jaeger]
+  }
+}
+
+' ============================================
+' RELATIONSHIPS
+' ============================================
+
+' Frontend to Gateway
+WebApp --> Gateway : HTTPS
+MobileApp --> Gateway : HTTPS
+
+' Gateway to Services
+Gateway --> AuthAPI : REST
+Gateway --> UserAPI : REST
+Gateway --> VehicleAPI : REST
+Gateway --> BookingAPI : REST
+Gateway --> CostAPI : REST
+Gateway --> ContractAPI : REST
+Gateway --> AIAPI : REST
+Gateway --> AdminAPI : REST
+Gateway --> NotifAPI : REST
+
+' Service to Database
+AuthAPI --> UserDB
+UserAPI --> UserSvcDB
+VehicleAPI --> VehicleDB
+BookingAPI --> BookingDB
+CostAPI --> CostDB
+ContractAPI --> ContractDB
+AIAPI --> AIDB
+AdminAPI --> AdminDB
+NotifAPI --> NotifDB
+
+' Service to Redis
+AuthAPI --> Redis : Session
+BookingAPI --> Redis : Calendar cache
+Gateway --> Redis : Rate limiting
+
+' Service to Message Queue
+AuthAPI --> MQ : Publish events
+UserAPI --> MQ : Publish events
+BookingAPI --> MQ : Publish events
+CostAPI --> MQ : Publish events
+ContractAPI --> MQ : Publish events
+AIAPI --> MQ : Publish events
+AdminAPI --> MQ : Publish events
+NotifAPI ..> MQ : Consume events
+
+' Service to Storage
+' Note: storage is external/managed per-service (S3/MinIO or cloud provider). See service docs.
+
+' Service to Service Communication
+UserAPI --> AuthAPI : Verify token
+BookingAPI --> VehicleAPI : Check availability
+BookingAPI --> UserAPI : Check membership
+CostAPI --> BookingAPI : Get booking data
+AIAPI --> BookingAPI : Get history
+AIAPI --> UserAPI : Get ownership
+AdminAPI --> CostAPI : Cost adjustment
+NotifAPI --> UserAPI : Get preferences
+
+' External Services
+CostAPI --> VNPay : Payment
+CostAPI --> MoMo : Payment
+NotifAPI --> Email : Send email
+NotifAPI --> SMS : Send SMS
+BookingAPI --> Maps : Location
+AIAPI --> TF : ML inference
+AIAPI --> MLflow : Model management
+
+' Service Discovery
+AuthAPI --> ServiceDiscovery : Register
+UserAPI --> ServiceDiscovery : Register
+VehicleAPI --> ServiceDiscovery : Register
+BookingAPI --> ServiceDiscovery : Register
+CostAPI --> ServiceDiscovery : Register
+ContractAPI --> ServiceDiscovery : Register
+AIAPI --> ServiceDiscovery : Register
+AdminAPI --> ServiceDiscovery : Register
+NotifAPI --> ServiceDiscovery : Register
+
+' Monitoring
+AuthAPI --> Prometheus : Metrics
+UserAPI --> Prometheus : Metrics
+VehicleAPI --> Prometheus : Metrics
+BookingAPI --> Prometheus : Metrics
+CostAPI --> Prometheus : Metrics
+ContractAPI --> Prometheus : Metrics
+AIAPI --> Prometheus : Metrics
+AdminAPI --> Prometheus : Metrics
+NotifAPI --> Prometheus : Metrics
+
+' Logging
+AuthAPI --> Logstash : Logs
+UserAPI --> Logstash : Logs
+VehicleAPI --> Logstash : Logs
+BookingAPI --> Logstash : Logs
+CostAPI --> Logstash : Logs
+ContractAPI --> Logstash : Logs
+AIAPI --> Logstash : Logs
+AdminAPI --> Logstash : Logs
+NotifAPI --> Logstash : Logs
+
+' Tracing
+Gateway --> Jaeger : Traces
+AuthAPI --> Jaeger : Traces
+UserAPI --> Jaeger : Traces
+
+@enduml

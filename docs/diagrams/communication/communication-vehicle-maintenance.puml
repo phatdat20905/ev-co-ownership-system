@@ -1,0 +1,38 @@
+@startuml communication-vehicle-maintenance
+!theme plain
+title Communication Diagram - Bảo dưỡng xe (Vehicle Maintenance)
+
+participant "User / Staff" as Actor
+participant "Frontend" as FE
+participant "API Gateway" as GW
+participant "Vehicle Service" as VehicleSvc
+participant "Booking Service" as BookingSvc
+participant "Admin Service" as AdminSvc
+participant "External Garage API" as Garage
+participant "Database" as DB
+participant "Notification Service" as Notif
+
+Actor -> FE : 1: Report issue / schedule maintenance
+FE -> GW : 2: POST /api/vehicles/maintenance
+GW -> VehicleSvc : 3: createMaintenanceRequest(data)
+VehicleSvc -> DB : 3.1: INSERT maintenance record
+DB --> VehicleSvc : 3.2: record id
+VehicleSvc -> BookingSvc : 4: block vehicle (prevent bookings)
+BookingSvc -> DB : 4.1: update vehicle availability
+VehicleSvc -> Garage : 5: book service slot
+Garage --> VehicleSvc : 5.1: confirmation
+VehicleSvc -> DB : 5.2: save garage booking
+VehicleSvc -> Notif : 6: PUBLISH maintenance.scheduled
+Notif -> DB : 6.1: insert notification
+Notif -> Notif : 6.2: send messages
+
+AdminSvc -> VehicleSvc : 7: mark complete
+VehicleSvc -> DB : 7.1: update maintenance status
+VehicleSvc -> BookingSvc : 7.2: release vehicle
+
+note right of VehicleSvc
+  - Tracks maintenance lifecycle and blocks bookings
+  - Integrates with external garages
+end note
+
+@enduml

@@ -1,0 +1,416 @@
+@startuml sequence-payment
+!theme plain
+title Sequence Diagram - Thanh toán
+
+actor "Co-owner" as User
+participant "Frontend" as FE
+participant "API Gateway" as Gateway
+participant "Cost Service" as CostSvc
+participant "Payment Provider\n(VNPay/MoMo)" as PaymentProvider
+participant "User Service" as UserSvc
+participant "Notification Service" as NotifSvc
+participant "Database" as DB
+participant "RabbitMQ" as MQ
+
+== XEM CHI PHÍ CẦN THANH TOÁN ==
+
+User -> FE: Vào trang "Chi phí"
+activate FE
+
+FE -> Gateway: GET /api/costs/my-pending
+activate Gateway
+
+Gateway -> CostSvc: Get pending costs
+activate CostSvc
+
+CostSvc -> DB: SELECT cs.*, c.*, i.*\nFROM cost_splits cs\nJOIN costs c ON c.id = cs.cost_id\nJOIN invoices i ON i.id = cs.invoice_id\nWHERE cs.user_id = ?\nAND cs.status = 'pending'
+activate DB
+DB --> CostSvc: Pending costs data
+deactivate DB
+
+CostSvc --> Gateway: Costs list with details
+deactivate CostSvc
+
+Gateway --> FE: 200 OK {costs}
+deactivate Gateway
+
+FE --> User: Hiển thị danh sách chi phí
+deactivate FE
+
+== CHỌN PHƯƠNG THỨC THANH TOÁN ==
+
+User -> FE: Chọn chi phí cần thanh toán
+activate FE
+
+User -> FE: Chọn phương thức:\n[Ví cá nhân | Quỹ chung | Online]
+
+alt Thanh toán từ ví cá nhân
+
+    FE -> Gateway: POST /api/payments/from-wallet\n{cost_split_id, amount}
+    activate Gateway
+    
+    Gateway -> CostSvc: Process wallet payment
+    activate CostSvc
+    
+    ' Kiểm tra số dư
+    CostSvc -> DB: SELECT balance FROM user_wallets\nWHERE user_id = ?\nFOR UPDATE
+    activate DB
+    DB --> CostSvc: Wallet balance
+    deactivate DB
+    
+    alt Số dư không đủ
+        CostSvc --> Gateway: 400 Insufficient balance
+        Gateway --> FE: Error
+        FE --> User: Số dư không đủ.\nVui lòng nạp tiền.
+        
+        User -> FE: Đồng ý nạp tiền
+        
+        FE -> Gateway: POST /api/wallets/topup\n{amount, method}
+        activate Gateway
+        
+        Gateway -> CostSvc: Create topup payment
+        activate CostSvc
+        
+        CostSvc -> PaymentProvider: Create payment\n{amount, return_url}
+        activate PaymentProvider
+        PaymentProvider --> CostSvc: Payment URL & transaction_id
+        deactivate PaymentProvider
+        
+        CostSvc -> DB: INSERT INTO payments\n{type: 'wallet_topup'}
+        activate DB
+        DB --> CostSvc: Payment created
+        deactivate DB
+        
+        CostSvc --> Gateway: Payment URL
+        deactivate CostSvc
+        Gateway --> FE: Payment URL
+        deactivate Gateway
+        
+        FE --> User: Redirect to payment page
+        deactivate FE
+        
+        User -> PaymentProvider: Thực hiện thanh toán
+        activate PaymentProvider
+        
+        PaymentProvider -> PaymentProvider: Process payment
+        
+        PaymentProvider -> Gateway: IPN Callback\nGET /api/payments/ipn?transaction_id=...
+        activate Gateway
+        
+        Gateway -> CostSvc: Handle IPN
+        activate CostSvc
+        
+        CostSvc -> DB: SELECT * FROM payments\nWHERE transaction_id = ?
+        activate DB
+        DB --> CostSvc: Payment data
+        deactivate DB
+        
+        CostSvc -> PaymentProvider: Verify transaction
+        PaymentProvider --> CostSvc: Transaction verified
+        deactivate PaymentProvider
+        
+        alt Payment thành công
+            CostSvc -> DB: BEGIN TRANSACTION
+            activate DB
+            
+            CostSvc -> DB: UPDATE payments\nSET status = 'completed'
+            CostSvc -> DB: UPDATE user_wallets\nSET balance = balance + amount
+            CostSvc -> DB: INSERT INTO wallet_transactions
+            
+            CostSvc -> DB: COMMIT
+            DB --> CostSvc: Success
+            deactivate DB
+            
+            CostSvc -> MQ: Publish wallet.topup.completed
+            activate MQ
+            MQ --> CostSvc: OK
+            deactivate MQ
+            
+            CostSvc --> Gateway: 200 OK
+            deactivate CostSvc
+            Gateway --> PaymentProvider: Success response
+            deactivate Gateway
+            
+            User -> FE: Quay lại app
+            activate FE
+            
+            FE --> User: Thông báo nạp tiền thành công
+            
+            ' Retry payment từ ví
+            User -> FE: Thử lại thanh toán chi phí
+            
+        else Payment thất bại
+            CostSvc -> DB: UPDATE payments\nSET status = 'failed'
+            activate DB
+            DB --> CostSvc: Updated
+            deactivate DB
+            
+            CostSvc --> Gateway: Payment failed
+            deactivate CostSvc
+            Gateway --> PaymentProvider: Failure response
+            deactivate Gateway
+            
+            User -> FE: Quay lại app
+            activate FE
+            FE --> User: Thông báo nạp tiền thất bại
+            deactivate FE
+        end
+        
+    else Số dư đủ
+        CostSvc -> DB: BEGIN TRANSACTION
+        activate DB
+        
+        ' Trừ tiền từ ví
+        CostSvc -> DB: UPDATE user_wallets\nSET balance = balance - amount
+        
+        ' Tạo transaction
+        CostSvc -> DB: INSERT INTO wallet_transactions\n{type: 'payment', amount, ...}
+        
+        ' Cập nhật cost split
+        CostSvc -> DB: UPDATE cost_splits\nSET status = 'paid',\npaid_at = NOW()
+        
+        ' Cập nhật invoice
+        CostSvc -> DB: UPDATE invoices\nSET status = 'paid'
+        
+        ' Tạo payment record
+        CostSvc -> DB: INSERT INTO payments\n{method: 'wallet', status: 'completed'}
+        
+        CostSvc -> DB: COMMIT
+        DB --> CostSvc: Success
+        deactivate DB
+        
+        CostSvc -> MQ: Publish payment.completed
+        activate MQ
+        MQ --> CostSvc: OK
+        deactivate MQ
+        
+        CostSvc --> Gateway: 200 OK {payment, receipt}
+        deactivate CostSvc
+        Gateway --> FE: Success
+        deactivate Gateway
+        
+        FE --> User: Thanh toán thành công!
+        deactivate FE
+    end
+
+else Thanh toán từ quỹ chung
+
+    FE -> Gateway: POST /api/payments/from-group-fund\n{cost_split_id, group_id}
+    activate Gateway
+    
+    Gateway -> CostSvc: Process group fund payment
+    activate CostSvc
+    
+    ' Kiểm tra quyền
+    CostSvc -> UserSvc: Check permission
+    activate UserSvc
+    UserSvc -> DB: SELECT role FROM group_members\nWHERE group_id = ? AND user_id = ?
+    activate DB
+    DB --> UserSvc: Member role
+    deactivate DB
+    
+    alt Không có quyền
+        UserSvc --> CostSvc: 403 Forbidden
+        CostSvc --> Gateway: Error
+        Gateway --> FE: Error
+        FE --> User: Không có quyền sử dụng quỹ
+        
+    else Có quyền
+        UserSvc --> CostSvc: Authorized
+        deactivate UserSvc
+        
+        ' Kiểm tra số dư quỹ
+        CostSvc -> DB: SELECT balance FROM group_wallets\nWHERE group_id = ?\nFOR UPDATE
+        activate DB
+        DB --> CostSvc: Group wallet balance
+        deactivate DB
+        
+        alt Quỹ không đủ
+            CostSvc --> Gateway: 400 Insufficient group balance
+            Gateway --> FE: Error
+            FE --> User: Quỹ chung không đủ.\nVui lòng nạp thêm.
+            
+        else Quỹ đủ
+            CostSvc -> DB: BEGIN TRANSACTION
+            activate DB
+            
+            CostSvc -> DB: UPDATE group_wallets\nSET balance = balance - amount
+            CostSvc -> DB: INSERT INTO group_wallet_transactions
+            CostSvc -> DB: UPDATE cost_splits\nSET status = 'paid'
+            CostSvc -> DB: UPDATE invoices\nSET status = 'paid'
+            CostSvc -> DB: INSERT INTO payments\n{method: 'group_fund'}
+            
+            CostSvc -> DB: COMMIT
+            DB --> CostSvc: Success
+            deactivate DB
+            
+            CostSvc -> MQ: Publish payment.completed
+            activate MQ
+            MQ --> CostSvc: OK
+            deactivate MQ
+            
+            CostSvc --> Gateway: 200 OK
+            deactivate CostSvc
+            Gateway --> FE: Success
+            deactivate Gateway
+            
+            FE --> User: Thanh toán thành công từ quỹ chung
+            deactivate FE
+        end
+    end
+
+else Thanh toán trực tuyến (VNPay/MoMo)
+
+    FE -> Gateway: POST /api/payments/online\n{cost_split_id, provider, amount}
+    activate Gateway
+    
+    Gateway -> CostSvc: Create online payment
+    activate CostSvc
+    
+    CostSvc -> DB: INSERT INTO payments\n{method: 'online',\nprovider, status: 'pending'}
+    activate DB
+    DB --> CostSvc: Payment created {payment_id}
+    deactivate DB
+    
+    CostSvc -> PaymentProvider: Create payment request
+    activate PaymentProvider
+    note right
+      Request params:
+      - Amount
+      - Order ID
+      - Return URL
+      - IPN URL
+      - Customer info
+    end note
+    
+    PaymentProvider --> CostSvc: Payment URL & transaction_id
+    deactivate PaymentProvider
+    
+    CostSvc -> DB: UPDATE payments\nSET transaction_id = ?
+    activate DB
+    DB --> CostSvc: Updated
+    deactivate DB
+    
+    CostSvc --> Gateway: Payment URL
+    deactivate CostSvc
+    
+    Gateway --> FE: Payment URL
+    deactivate Gateway
+    
+    FE --> User: Redirect to payment gateway
+    deactivate FE
+    
+    User -> PaymentProvider: Nhập thông tin thanh toán:\n- Thẻ tín dụng/ghi nợ\n- Ví điện tử\n- Banking
+    activate PaymentProvider
+    
+    PaymentProvider -> PaymentProvider: Xử lý thanh toán
+    
+    alt Thanh toán thành công
+        PaymentProvider --> User: Thông báo thành công
+        
+        PaymentProvider -> Gateway: IPN Callback
+        activate Gateway
+        
+        Gateway -> CostSvc: Handle IPN
+        activate CostSvc
+        
+        CostSvc -> DB: SELECT * FROM payments\nWHERE transaction_id = ?
+        activate DB
+        DB --> CostSvc: Payment data
+        deactivate DB
+        
+        CostSvc -> PaymentProvider: Verify signature
+        PaymentProvider --> CostSvc: Verified
+        
+        CostSvc -> DB: BEGIN TRANSACTION
+        activate DB
+        
+        CostSvc -> DB: UPDATE payments\nSET status = 'completed'
+        CostSvc -> DB: UPDATE cost_splits\nSET status = 'paid'
+        CostSvc -> DB: UPDATE invoices\nSET status = 'paid'
+        
+        CostSvc -> DB: COMMIT
+        DB --> CostSvc: Success
+        deactivate DB
+        
+        CostSvc -> MQ: Publish payment.completed\n{payment_id, cost_split_id}
+        activate MQ
+        MQ --> CostSvc: OK
+        deactivate MQ
+        
+        CostSvc --> Gateway: 200 OK
+        deactivate CostSvc
+        
+        Gateway --> PaymentProvider: IPN acknowledged
+        deactivate Gateway
+        deactivate PaymentProvider
+        
+        ' Background notification
+        MQ -> NotifSvc: Consume payment.completed
+        activate NotifSvc
+        
+        par Parallel notifications
+            NotifSvc -> DB: INSERT notification
+            activate DB
+            DB --> NotifSvc: OK
+            deactivate DB
+        and
+            NotifSvc -> NotifSvc: Send email receipt
+        and
+            NotifSvc -> NotifSvc: Send push notification
+        end
+        
+        deactivate NotifSvc
+        
+        User -> FE: Click "Quay lại website"
+        activate FE
+        
+        FE -> Gateway: GET /api/payments/{payment_id}
+        activate Gateway
+        
+        Gateway -> CostSvc: Get payment status
+        activate CostSvc
+        
+        CostSvc -> DB: SELECT * FROM payments\nWHERE id = ?
+        activate DB
+        DB --> CostSvc: Payment data
+        deactivate DB
+        
+        CostSvc --> Gateway: Payment info
+        deactivate CostSvc
+        
+        Gateway --> FE: Payment status: completed
+        deactivate Gateway
+        
+        FE --> User: Thanh toán thành công!\n[Tải xuống hóa đơn]
+        deactivate FE
+        
+    else Thanh toán thất bại
+        PaymentProvider --> User: Thông báo thất bại
+        
+        PaymentProvider -> Gateway: IPN Callback (failed)
+        activate Gateway
+        
+        Gateway -> CostSvc: Handle failed payment
+        activate CostSvc
+        
+        CostSvc -> DB: UPDATE payments\nSET status = 'failed'
+        activate DB
+        DB --> CostSvc: Updated
+        deactivate DB
+        
+        CostSvc --> Gateway: OK
+        deactivate CostSvc
+        Gateway --> PaymentProvider: Acknowledged
+        deactivate Gateway
+        deactivate PaymentProvider
+        
+        User -> FE: Quay lại app
+        activate FE
+        
+        FE --> User: Thanh toán thất bại.\nVui lòng thử lại.
+        deactivate FE
+    end
+end
+
+@enduml

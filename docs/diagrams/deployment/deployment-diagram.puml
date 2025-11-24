@@ -1,0 +1,159 @@
+@startuml deployment-diagram
+!theme plain
+title Deployment Diagram - EV Co-ownership System
+
+' Nodes and Devices
+node "Client Tier" {
+  component [Web Browser\n(React SPA)] as WEB
+}
+
+node "Load Balancer" {
+  component [Kong API Gateway\nPort: 3000] as KONG
+}
+
+node "Microservices Cluster\n(Docker Swarm/Kubernetes)" {
+  
+  node "Auth Service\nPort: 3001" {
+    artifact [auth-service:latest] as AUTH
+    database "PostgreSQL\nauth_db" as AUTH_DB
+  }
+  
+  node "User Service\nPort: 3002" {
+    artifact [user-service:latest] as USER
+    database "PostgreSQL\nuser_db" as USER_DB
+  }
+  
+  node "Vehicle Service\nPort: 3005" {
+    artifact [vehicle-service:latest] as VEHICLE
+    database "PostgreSQL\nvehicle_db" as VEHICLE_DB
+  }
+  
+  node "Booking Service\nPort: 3003" {
+    artifact [booking-service:latest] as BOOKING
+    database "PostgreSQL\nbooking_db" as BOOKING_DB
+  }
+  
+  node "Cost Service\nPort: 3004" {
+    artifact [cost-service:latest] as COST
+    database "PostgreSQL\ncost_db" as COST_DB
+  }
+  
+  node "Contract Service\nPort: 3006" {
+    artifact [contract-service:latest] as CONTRACT
+    database "PostgreSQL\ncontract_db" as CONTRACT_DB
+  }
+  
+  node "AI Service\nPort: 3009" {
+    artifact [ai-service:latest] as AI
+    database "MongoDB\nai_models" as AI_DB
+  }
+  
+  node "Admin Service\nPort: 3007" {
+    artifact [admin-service:latest] as ADMIN
+    database "PostgreSQL\nadmin_db" as ADMIN_DB
+  }
+  
+  node "Notification Service\nPort: 3008" {
+    artifact [notification-service:latest] as NOTIF
+  }
+}
+
+node "Message Queue Cluster" {
+  queue [RabbitMQ\nPort: 5672] as RABBITMQ
+}
+
+node "Cache Cluster" {
+  database [Redis\nPort: 6379] as REDIS
+}
+
+node "Data Flow / Integration" {
+  component [Apache NiFi\nPort: 8080] as NIFI
+}
+
+' External Services
+cloud "External Services" {
+  component [VNPay API] as VNPAY
+  component [MoMo API] as MOMO
+  component [SendGrid\n(Email)] as SENDGRID
+  component [Twilio\n(SMS)] as TWILIO
+}
+
+' Connections
+WEB --> KONG : HTTPS (443)
+
+KONG --> AUTH : HTTP (3001)
+KONG --> USER : HTTP (3002)
+KONG --> VEHICLE : HTTP (3005)
+KONG --> BOOKING : HTTP (3003)
+KONG --> COST : HTTP (3004)
+KONG --> CONTRACT : HTTP (3006)
+KONG --> AI : HTTP (3009)
+KONG --> ADMIN : HTTP (3007)
+
+AUTH --> AUTH_DB : TCP (5432)
+USER --> USER_DB : TCP (5432)
+VEHICLE --> VEHICLE_DB : TCP (5432)
+BOOKING --> BOOKING_DB : TCP (5432)
+COST --> COST_DB : TCP (5432)
+CONTRACT --> CONTRACT_DB : TCP (5432)
+AI --> AI_DB : TCP (27017)
+ADMIN --> ADMIN_DB : TCP (5432)
+
+AUTH --> REDIS : TCP (6379)
+USER --> REDIS : TCP (6379)
+BOOKING --> REDIS : TCP (6379)
+
+AUTH --> RABBITMQ : AMQP (5672)
+USER --> RABBITMQ : AMQP (5672)
+VEHICLE --> RABBITMQ : AMQP (5672)
+BOOKING --> RABBITMQ : AMQP (5672)
+COST --> RABBITMQ : AMQP (5672)
+CONTRACT --> RABBITMQ : AMQP (5672)
+AI --> RABBITMQ : AMQP (5672)
+NOTIF --> RABBITMQ : AMQP (5672)
+
+COST --> VNPAY : HTTPS
+COST --> MOMO : HTTPS
+NOTIF --> SENDGRID : HTTPS
+NOTIF --> TWILIO : HTTPS
+
+BOOKING --> NIFI : HTTP (8080)
+AI --> NIFI : HTTP (8080)
+USER --> NIFI : HTTP (8080)
+
+note right of KONG
+**Kong API Gateway**
+- Load balancing
+- Rate limiting
+- Authentication
+- SSL termination
+end note
+
+note bottom of RABBITMQ
+**RabbitMQ**
+Events:
+- user.created
+- booking.created
+- payment.completed
+- cost.split
+- notification.send
+end note
+
+note bottom of REDIS
+**Redis Cache**
+- Session storage
+- Token cache
+- Rate limit counters
+- Booking locks
+end note
+
+note as deployment
+**Deployment Strategy**
+- Docker Compose (Dev)
+- Docker Swarm/Kubernetes (Prod)
+- Blue-Green Deployment
+- Auto-scaling enabled
+- Health checks: /health
+- Metrics: Prometheus + Grafana
+end note
+

@@ -1,0 +1,189 @@
+@startuml sequence-login
+!theme plain
+title Sequence Diagram - Đăng nhập
+
+actor "Co-owner" as User
+participant "Frontend" as FE
+participant "API Gateway" as Gateway
+participant "Auth Service" as Auth
+participant "Redis Cache" as Redis
+participant "Database" as DB
+participant "User Service" as UserSvc
+
+User -> FE: Nhập email & password
+activate FE
+
+FE -> FE: Validate input
+note right
+  - Email format
+  - Password không rỗng
+end note
+
+FE -> Gateway: POST /api/auth/login\n{email, password}
+activate Gateway
+
+Gateway -> Auth: Forward login request
+activate Auth
+
+Auth -> Auth: Validate request body
+
+Auth -> DB: SELECT * FROM users\nWHERE email = ?
+activate DB
+DB --> Auth: User data
+deactivate DB
+
+alt User không tồn tại
+    Auth --> Gateway: 404 User not found
+    Gateway --> FE: Error response
+    FE --> User: Thông báo lỗi:\n"Email hoặc mật khẩu không đúng"
+    
+else User tồn tại
+    Auth -> Auth: Compare password hash
+    
+    alt Password sai
+        Auth --> Gateway: 401 Invalid credentials
+        Gateway --> FE: Error response
+        FE --> User: Thông báo lỗi:\n"Email hoặc mật khẩu không đúng"
+        
+    else Password đúng
+        alt Account bị khóa
+            Auth --> Gateway: 403 Account locked
+            Gateway --> FE: Error response
+            FE --> User: Thông báo:\n"Tài khoản đã bị khóa"
+            
+        else Account active
+            Auth -> Auth: Generate JWT tokens
+            note right
+              Access Token (15 phút)
+              Refresh Token (7 ngày)
+            end note
+            
+            Auth -> DB: INSERT INTO refresh_tokens\n(user_id, token, expires_at)
+            activate DB
+            DB --> Auth: Token saved
+            deactivate DB
+            
+            Auth -> Redis: SET user:{user_id}:session\n{token_data}
+            activate Redis
+            note right
+              Cache session data
+              TTL = 15 phút
+            end note
+            Redis --> Auth: OK
+            deactivate Redis
+            
+            Auth -> DB: UPDATE users\nSET last_login = NOW()\nWHERE id = ?
+            activate DB
+            DB --> Auth: Updated
+            deactivate DB
+            
+            par Parallel calls
+                Auth -> UserSvc: GET /api/users/{user_id}/profile
+                activate UserSvc
+                UserSvc -> DB: SELECT * FROM user_profiles\nWHERE user_id = ?
+                activate DB
+                DB --> UserSvc: Profile data
+                deactivate DB
+                UserSvc --> Auth: User profile
+                deactivate UserSvc
+            and
+                Auth -> UserSvc: GET /api/users/{user_id}/groups
+                activate UserSvc
+                UserSvc -> DB: SELECT groups\nWHERE user_id = ?
+                activate DB
+                DB --> UserSvc: Groups data
+                deactivate DB
+                UserSvc --> Auth: User groups
+                deactivate UserSvc
+            end
+            
+            Auth --> Gateway: 200 OK\n{access_token, refresh_token,\nuser, profile, groups}
+            deactivate Auth
+            
+            Gateway --> FE: Success response
+            deactivate Gateway
+            
+            FE -> FE: Lưu tokens vào localStorage
+            note right
+              localStorage.setItem('access_token', ...)
+              localStorage.setItem('refresh_token', ...)
+            end note
+            
+            FE -> FE: Lưu user data vào Redux/Vuex
+            
+            FE --> User: Chuyển đến Dashboard
+            deactivate FE
+            
+            User -> FE: Xem Dashboard
+            activate FE
+            
+            FE -> Gateway: GET /api/dashboard\nAuthorization: Bearer {access_token}
+            activate Gateway
+            
+            Gateway -> Gateway: Verify JWT token
+            
+            alt Token hợp lệ
+                Gateway -> Redis: GET user:{user_id}:session
+                activate Redis
+                Redis --> Gateway: Session data
+                deactivate Redis
+                
+                Gateway -> UserSvc: Forward request
+                activate UserSvc
+                UserSvc --> Gateway: Dashboard data
+                deactivate UserSvc
+                
+                Gateway --> FE: 200 OK {dashboard_data}
+                deactivate Gateway
+                
+                FE --> User: Hiển thị Dashboard
+                deactivate FE
+                
+            else Token hết hạn
+                Gateway --> FE: 401 Token expired
+                deactivate Gateway
+                
+                FE -> Gateway: POST /api/auth/refresh\n{refresh_token}
+                activate Gateway
+                
+                Gateway -> Auth: Verify refresh token
+                activate Auth
+                
+                Auth -> DB: SELECT * FROM refresh_tokens\nWHERE token = ?
+                activate DB
+                DB --> Auth: Token data
+                deactivate DB
+                
+                alt Refresh token hợp lệ
+                    Auth -> Auth: Generate new access token
+                    
+                    Auth -> Redis: SET user:{user_id}:session
+                    activate Redis
+                    Redis --> Auth: OK
+                    deactivate Redis
+                    
+                    Auth --> Gateway: 200 OK {new_access_token}
+                    deactivate Auth
+                    
+                    Gateway --> FE: New tokens
+                    deactivate Gateway
+                    
+                    FE -> FE: Update tokens
+                    FE -> FE: Retry original request
+                    
+                else Refresh token hết hạn
+                    Auth --> Gateway: 401 Refresh token expired
+                    deactivate Auth
+                    Gateway --> FE: Error
+                    deactivate Gateway
+                    
+                    FE -> FE: Clear tokens
+                    FE --> User: Redirect to login
+                    deactivate FE
+                end
+            end
+        end
+    end
+end
+
+@enduml

@@ -1,0 +1,305 @@
+@startuml conceptual-erd
+!theme plain
+title Conceptual ERD - EV Co-ownership System
+
+' Core Entities
+entity "Người dùng" as USER {
+}
+
+entity "Hồ sơ người dùng" as PROFILE {
+}
+
+entity "Nhóm đồng sở hữu" as GROUP {
+}
+
+entity "Thành viên nhóm" as MEMBER {
+}
+
+entity "Xe điện" as VEHICLE {
+}
+
+entity "Lịch đặt xe" as BOOKING {
+}
+
+entity "Log Check-in/out" as CHECKINOUT {
+}
+
+entity "Xung đột lịch" as CONFLICT {
+}
+
+' Cost & Payment Entities
+entity "Chi phí" as COST {
+}
+
+entity "Phân chia chi phí" as COST_SPLIT {
+}
+
+entity "Danh mục chi phí" as COST_CATEGORY {
+}
+
+entity "Hóa đơn" as INVOICE {
+}
+
+entity "Mục hóa đơn" as INVOICE_ITEM {
+}
+
+entity "Thanh toán" as PAYMENT {
+}
+
+entity "Ví người dùng" as USER_WALLET {
+}
+
+entity "Ví nhóm" as GROUP_WALLET {
+}
+
+entity "Giao dịch ví" as WALLET_TRANSACTION {
+}
+
+entity "Giao dịch quỹ nhóm" as GROUP_FUND_TRANSACTION {
+}
+
+' Vehicle Management
+entity "Lịch bảo dưỡng" as MAINTENANCE_SCHEDULE {
+}
+
+entity "Lịch sử bảo dưỡng" as MAINTENANCE_HISTORY {
+}
+
+entity "Bảo hiểm xe" as VEHICLE_INSURANCE {
+}
+
+entity "Phiên sạc điện" as CHARGING_SESSION {
+}
+
+' Contract Entities
+entity "Hợp đồng" as CONTRACT {
+}
+
+entity "Bên hợp đồng" as CONTRACT_PARTY {
+}
+
+entity "Tài liệu hợp đồng" as CONTRACT_DOCUMENT {
+}
+
+entity "Mẫu hợp đồng" as CONTRACT_TEMPLATE {
+}
+
+entity "Sửa đổi hợp đồng" as CONTRACT_AMENDMENT {
+}
+
+entity "Log chữ ký" as SIGNATURE_LOG {
+}
+
+' Voting Entities
+entity "Bỏ phiếu" as VOTE {
+}
+
+entity "Lựa chọn bỏ phiếu" as VOTE_OPTION {
+}
+
+entity "Phiếu của người dùng" as USER_VOTE {
+}
+
+' Dispute Entities
+entity "Tranh chấp" as DISPUTE {
+}
+
+entity "Tin nhắn tranh chấp" as DISPUTE_MESSAGE {
+}
+
+' Notification Entities
+entity "Thông báo" as NOTIFICATION {
+}
+
+entity "Mẫu thông báo" as NOTIFICATION_TEMPLATE {
+}
+
+entity "Tùy chọn thông báo" as USER_PREFERENCE {
+}
+
+entity "Token thiết bị" as DEVICE_TOKEN {
+}
+
+' Auth Entities
+entity "Refresh Token" as REFRESH_TOKEN {
+}
+
+entity "Xác thực Email" as EMAIL_VERIFICATION {
+}
+
+entity "Đặt lại mật khẩu" as PASSWORD_RESET {
+}
+
+entity "Xác thực KYC" as KYC_VERIFICATION {
+}
+
+' Admin Entities
+entity "Hồ sơ nhân viên" as STAFF_PROFILE {
+}
+
+entity "Nhật ký hệ thống" as AUDIT_LOG {
+}
+
+entity "Cài đặt hệ thống" as SYSTEM_SETTING {
+}
+
+' AI Entities
+entity "Gợi ý AI" as RECOMMENDATION {
+}
+
+entity "Log sử dụng" as USAGE_LOG {
+}
+
+' Relationships với mô tả tiếng Việt
+
+' User relationships
+USER ||--|| PROFILE : "có"
+USER ||--o{ MEMBER : "tham gia"
+USER ||--o{ BOOKING : "đặt lịch"
+USER ||--o{ COST_SPLIT : "chịu chi phí"
+USER ||--o{ PAYMENT : "thanh toán"
+USER ||--o{ CONTRACT_PARTY : "ký kết"
+USER ||--o{ USER_VOTE : "bỏ phiếu"
+USER ||--o{ DISPUTE : "tạo tranh chấp"
+USER ||--o{ DISPUTE_MESSAGE : "gửi tin nhắn"
+USER ||--o{ NOTIFICATION : "nhận thông báo"
+USER ||--|| USER_WALLET : "sở hữu ví"
+USER ||--o{ WALLET_TRANSACTION : "giao dịch"
+USER ||--o{ REFRESH_TOKEN : "có phiên"
+USER ||--o{ DEVICE_TOKEN : "đăng ký thiết bị"
+USER ||--o{ EMAIL_VERIFICATION : "xác thực email"
+USER ||--o{ PASSWORD_RESET : "đặt lại mật khẩu"
+USER ||--|| KYC_VERIFICATION : "xác thực danh tính"
+USER ||--o{ RECOMMENDATION : "nhận gợi ý"
+USER ||--o{ SIGNATURE_LOG : "ký tên"
+USER ||--|| STAFF_PROFILE : "có hồ sơ nhân viên"
+USER ||--o{ AUDIT_LOG : "tạo nhật ký"
+USER ||--o{ CHECKINOUT : "check-in/out"
+
+' Group relationships
+GROUP ||--o{ MEMBER : "bao gồm"
+GROUP ||--|| VEHICLE : "sở hữu xe"
+GROUP ||--o{ BOOKING : "quản lý lịch"
+GROUP ||--o{ COST : "phát sinh chi phí"
+GROUP ||--o{ CONTRACT : "ký hợp đồng"
+GROUP ||--o{ VOTE : "tổ chức bỏ phiếu"
+GROUP ||--|| GROUP_WALLET : "có quỹ chung"
+GROUP ||--o{ GROUP_FUND_TRANSACTION : "giao dịch quỹ"
+GROUP ||--o{ INVOICE : "nhận hóa đơn"
+GROUP ||--o{ RECOMMENDATION : "nhận phân tích"
+
+' Vehicle relationships
+VEHICLE ||--o{ BOOKING : "được đặt"
+VEHICLE ||--o{ COST : "phát sinh chi phí"
+VEHICLE ||--o{ MAINTENANCE_SCHEDULE : "có lịch bảo dưỡng"
+VEHICLE ||--o{ MAINTENANCE_HISTORY : "có lịch sử bảo dưỡng"
+VEHICLE ||--o{ VEHICLE_INSURANCE : "được bảo hiểm"
+VEHICLE ||--o{ CHARGING_SESSION : "có phiên sạc"
+VEHICLE ||--o{ CHECKINOUT : "ghi nhận check-in/out"
+
+' Booking relationships
+BOOKING ||--o| COST : "tạo chi phí"
+BOOKING }o--o{ BOOKING : "xung đột với"
+BOOKING ||--o{ CONFLICT : "có xung đột"
+BOOKING ||--o{ CHECKINOUT : "ghi nhận log"
+
+' Cost relationships
+COST ||--o{ COST_SPLIT : "chia thành"
+COST ||--o{ INVOICE_ITEM : "ghi vào hóa đơn"
+COST }o--|| COST_CATEGORY : "thuộc danh mục"
+
+' Cost Split relationships
+COST_SPLIT ||--o{ PAYMENT : "được thanh toán"
+
+' Invoice relationships
+INVOICE ||--o{ INVOICE_ITEM : "bao gồm"
+INVOICE ||--o{ PAYMENT : "được thanh toán"
+
+' Wallet relationships
+USER_WALLET ||--o{ WALLET_TRANSACTION : "có giao dịch"
+GROUP_WALLET ||--o{ GROUP_FUND_TRANSACTION : "có giao dịch"
+
+' Contract relationships
+CONTRACT ||--o{ CONTRACT_PARTY : "có bên tham gia"
+CONTRACT ||--o{ CONTRACT_DOCUMENT : "có tài liệu"
+CONTRACT ||--o{ CONTRACT_AMENDMENT : "có sửa đổi"
+CONTRACT ||--o{ SIGNATURE_LOG : "ghi nhận chữ ký"
+CONTRACT }o--|| CONTRACT_TEMPLATE : "dựa trên mẫu"
+
+' Vote relationships
+VOTE ||--o{ VOTE_OPTION : "có lựa chọn"
+VOTE ||--o{ USER_VOTE : "nhận phiếu"
+VOTE_OPTION ||--o{ USER_VOTE : "được chọn"
+
+' Dispute relationships
+DISPUTE ||--o{ DISPUTE_MESSAGE : "có tin nhắn"
+DISPUTE }o--|| STAFF_PROFILE : "được xử lý bởi"
+
+' Notification relationships
+NOTIFICATION_TEMPLATE ||--o{ NOTIFICATION : "tạo ra"
+USER_PREFERENCE ||--|| USER : "thuộc về"
+
+' Recommendation relationships
+RECOMMENDATION ||--o{ USAGE_LOG : "dựa trên"
+
+note right of USER
+  **Người dùng**
+  Người sử dụng hệ thống
+  Vai trò: Co-owner, Staff, Admin
+end note
+
+note right of GROUP
+  **Nhóm đồng sở hữu**
+  Nhóm người cùng sở hữu xe
+  Chia sẻ chi phí và quyền sử dụng
+end note
+
+note right of VEHICLE
+  **Xe điện**
+  Tài sản được chia sẻ
+  Có lịch sử và trạng thái
+end note
+
+note right of BOOKING
+  **Lịch đặt xe**
+  Lịch sử dụng với priority
+  Dựa trên ownership ratio
+end note
+
+note right of COST
+  **Chi phí**
+  Chi phí phát sinh từ xe
+  Được phân chia tự động
+end note
+
+note right of COST_SPLIT
+  **Phân chia chi phí**
+  Chi phí của từng thành viên
+  Theo ownership hoặc usage
+end note
+
+note right of CONTRACT
+  **Hợp đồng điện tử**
+  Thỏa thuận giữa co-owners
+  Có chữ ký số và PDF
+end note
+
+note right of VOTE
+  **Bỏ phiếu nhóm**
+  Quyết định theo ownership
+  Cần >= 60% để thông qua
+end note
+
+note right of DISPUTE
+  **Tranh chấp**
+  Xử lý mâu thuẫn
+  Staff/Admin giải quyết
+end note
+
+note right of RECOMMENDATION
+  **Gợi ý AI**
+  Phân tích fairness
+  Đề xuất lịch công bằng
+end note
+
+@enduml

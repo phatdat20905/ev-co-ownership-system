@@ -1,0 +1,29 @@
+@startuml kyc_uc
+title Use Case - KYC & Tài khoản (Co-owner)
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Co-owner" as CoOwner
+actor "Staff" as Staff
+actor "Admin" as Admin
+
+
+rectangle "KYC & Tài khoản" {
+  usecase "Đăng ký" as UC_Register
+  usecase "Yêu cầu cập nhật KYC" as UC_RequestKYCUpdate
+  usecase "Xác minh KYC (thủ công)" as UC_VerifyKYC
+  usecase "Yêu cầu KYC bổ sung" as UC_RequestAdditionalKYC
+}
+
+' relations
+UC_Register ..> UC_RequestKYCUpdate : <<include>>
+UC_RequestKYCUpdate ..> UC_VerifyKYC : <<include>>
+UC_RequestKYCUpdate ..> UC_RequestAdditionalKYC : <<include>>
+
+' actor connections (top-level only)
+CoOwner -- UC_Register
+CoOwner -- UC_RequestKYCUpdate
+Staff -- UC_VerifyKYC
+Admin -- UC_VerifyKYC
+
+@enduml

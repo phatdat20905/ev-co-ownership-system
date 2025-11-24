@@ -1,0 +1,88 @@
+@startuml coowner_uc
+title Use Case - Co-owner (Chủ xe đồng sở hữu)
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Co-owner (Chủ xe đồng sở hữu)" as CoOwner
+
+rectangle "Chức năng Co-owner" {
+  usecase "Đăng ký" as UC_Register
+  usecase "Tải lên CCCD/GPLX" as UC_UploadID
+  usecase "Đăng nhập" as UC_Login
+  usecase "Xác thực danh tính" as UC_Identity
+  usecase "Kiểm tra tính hợp lệ giấy tờ" as UC_CheckDoc
+  usecase "Xem tỷ lệ sở hữu" as UC_ViewShare
+  usecase "Quản lý hợp đồng đồng sở hữu" as UC_ManageContract
+  usecase "Xem hợp đồng" as UC_ViewContract
+  usecase "Ký hợp đồng điện tử" as UC_SignContract
+
+  usecase "Xem lịch xe" as UC_ViewSchedule
+  usecase "Đặt lịch" as UC_Book
+  usecase "Kiểm tra quyền ưu tiên" as UC_CheckPriority
+  usecase "Hủy lịch" as UC_CancelBooking
+  usecase "Check-in / Check-out" as UC_CheckInOut
+  usecase "Quét mã QR" as UC_ScanQR
+
+  usecase "Xem chi phí" as UC_ViewCost
+  usecase "Tính toán chi phí theo tỉ lệ" as UC_CalcShareCost
+  usecase "Thanh toán" as UC_Payment
+  usecase "Kết nối ví điện tử / banking" as UC_PaymentGateway
+  usecase "Xem tổng kết tài chính cá nhân" as UC_PersonalSummary
+
+  usecase "Xem lịch sử sử dụng" as UC_ViewHistory
+  usecase "Xem thống kê cá nhân" as UC_ViewStats
+  usecase "Phân tích AI" as UC_AIAnalysis
+  usecase "Gợi ý tối ưu lịch sử sử dụng" as UC_RecommendSchedule
+
+  usecase "Xem nhóm" as UC_ViewGroup
+  usecase "Quản lý thành viên" as UC_ManageMembers
+  usecase "Thêm thành viên" as UC_AddMember
+  usecase "Xóa thành viên" as UC_RemoveMember
+  usecase "Phân quyền thành viên" as UC_RoleAssign
+  usecase "Bỏ phiếu" as UC_Vote
+  usecase "Đề xuất nâng cấp xe" as UC_UpgradeProposal
+  usecase "Xem quỹ chung" as UC_ViewFund
+  usecase "Lịch sử quỹ" as UC_FundHistory
+}
+
+ ' include relations (standardized: Main ..> Sub for <<include>>; Extension ..> Main for <<extend>>)
+UC_Register ..> UC_UploadID : <<include>>
+UC_Identity ..> UC_CheckDoc : <<include>>
+UC_ManageContract ..> UC_SignContract : <<include>>
+
+UC_Book ..> UC_CheckPriority : <<include>>
+UC_Book <.. UC_CancelBooking : <<extend>>
+UC_CheckInOut ..> UC_ScanQR : <<include>>
+
+UC_ViewCost ..> UC_CalcShareCost : <<include>>
+UC_Payment ..> UC_PaymentGateway : <<include>>
+
+UC_ViewStats ..> UC_AIAnalysis : <<include>>
+UC_ViewStats <.. UC_RecommendSchedule : <<extend>>
+
+UC_ManageMembers ..> UC_AddMember : <<include>>
+UC_ManageMembers ..> UC_RemoveMember : <<include>>
+UC_ViewGroup <.. UC_Vote : <<extend>>
+UC_ViewFund ..> UC_FundHistory : <<include>>
+
+ ' actor connections (pruned: only top-level/base usecases)
+CoOwner -- UC_Register
+CoOwner -- UC_Login
+CoOwner -- UC_Identity
+CoOwner -- UC_ViewShare
+CoOwner -- UC_ManageContract
+CoOwner -- UC_ViewContract
+CoOwner -- UC_ViewSchedule
+CoOwner -- UC_Book
+CoOwner -- UC_CheckInOut
+CoOwner -- UC_ViewCost
+CoOwner -- UC_Payment
+CoOwner -- UC_PersonalSummary
+CoOwner -- UC_ViewHistory
+CoOwner -- UC_ViewStats
+CoOwner -- UC_ViewGroup
+CoOwner -- UC_ManageMembers
+CoOwner -- UC_UpgradeProposal
+CoOwner -- UC_ViewFund
+
+@enduml

@@ -1,0 +1,30 @@
+@startuml booking_priority_uc
+title Use Case - Đặt lịch & Phân bổ ưu tiên
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Co-owner" as CoOwner
+actor "Staff" as Staff
+
+rectangle "Đặt lịch & Sử dụng" {
+  usecase "Xem lịch chung" as UC_ViewSchedule
+  usecase "Đặt lịch" as UC_Book
+  usecase "Tính toán phân bổ ưu tiên" as UC_PriorityAllocation
+  usecase "Hủy lịch" as UC_CancelBooking
+  usecase "Check-in / Check-out" as UC_CheckInOut
+  usecase "Quét mã QR" as UC_ScanQR
+}
+
+' relations
+UC_Book ..> UC_PriorityAllocation : <<include>>
+UC_Book <.. UC_CancelBooking : <<extend>>
+UC_CheckInOut ..> UC_ScanQR : <<include>>
+
+' actor links
+CoOwner -- UC_ViewSchedule
+CoOwner -- UC_Book
+CoOwner -- UC_CheckInOut
+Staff -- UC_ScanQR
+Staff -- UC_CheckInOut
+
+@enduml

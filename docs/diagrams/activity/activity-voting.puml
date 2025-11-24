@@ -1,0 +1,261 @@
+@startuml activity-voting
+!theme plain
+title Activity Diagram - Bỏ phiếu trong nhóm đồng sở hữu
+skinparam linetype ortho
+skinparam nodesep 80
+skinparam ranksep 100
+|Co-owner (Initiator)|
+start
+
+:Truy cập trang quản lý nhóm;
+
+:Click "Tạo bỏ phiếu mới";
+
+:Nhập thông tin bỏ phiếu:
+- Tiêu đề
+- Mô tả
+- Loại bỏ phiếu
+- Thời gian bắt đầu
+- Thời gian kết thúc
+- Quyền bỏ phiếu;
+
+note right
+  Loại bỏ phiếu:
+  - simple_majority (>50%)
+  - qualified_majority (>66%)
+  - unanimous (100%)
+  - weighted (theo ownership %)
+end note
+
+:Thêm các lựa chọn:
+- Option 1
+- Option 2
+- Option N;
+
+if (Có đính kèm tài liệu?) then (Có)
+  :Upload tài liệu liên quan;
+endif
+
+:Gửi tạo bỏ phiếu;
+
+|System|
+:Validate thông tin;
+
+if (Thông tin hợp lệ?) then (Không)
+  :Thông báo lỗi;
+  stop
+else (Có)
+  :Tạo GroupVote record;
+  :Tạo VoteOption records;
+  :Cập nhật status = "active";
+endif
+
+:Lấy danh sách eligible voters;
+
+note right
+  Eligible voters là:
+  - Members có role >= "member"
+  - Members active
+  - Dựa vào voting_rights setting
+end note
+
+fork
+  repeat
+    :Gửi thông báo cho mỗi voter;
+  repeat while (Còn voter?)
+fork again
+  :Gửi email thông báo;
+fork again
+  :Đẩy notification;
+fork again
+  :Ghi log vào audit;
+end fork
+
+|Co-owner (Voter)|
+:Nhận thông báo bỏ phiếu mới;
+
+:Xem chi tiết bỏ phiếu:
+- Tiêu đề & mô tả
+- Các lựa chọn
+- Deadline
+- Số người đã bỏ phiếu
+- Tài liệu đính kèm;
+
+if (Cần thêm thông tin?) then (Có)
+  :Xem tài liệu;
+  :Đọc discussion;
+  :Đặt câu hỏi (nếu cần);
+endif
+
+:Chọn lựa chọn ưa thích;
+
+if (Có comment?) then (Có)
+  :Nhập comment/lý do;
+endif
+
+:Gửi phiếu bầu;
+
+|System|
+:Validate vote;
+
+if (Đã bỏ phiếu trước đó?) then (Có)
+  if (Cho phép thay đổi?) then (Không)
+    :Thông báo đã bỏ phiếu;
+    stop
+  else (Có)
+    :Cập nhật phiếu bầu cũ;
+  endif
+else (Không)
+  :Tạo UserVote record mới;
+endif
+
+:Lưu vote:
+- vote_id
+- user_id
+- option_id
+- comment
+- weight (nếu weighted voting);
+
+:Cập nhật vote count cho option;
+
+fork
+  :Gửi xác nhận đã bỏ phiếu;
+fork again
+  :Cập nhật participation rate;
+fork again
+  :Thông báo cho initiator;
+end fork
+
+|System (Background)|
+
+repeat
+  :Chờ thời gian;
+  
+  note right
+    Kiểm tra định kỳ mỗi phút
+    hoặc khi có vote mới
+  end note
+  
+  if (Hết hạn?) then (Có)
+    :Cập nhật status = "closed";
+    
+    partition "Tính kết quả" {
+      :Lấy tất cả votes;
+      
+      if (Loại bỏ phiếu?) then (weighted)
+        :Tính weighted votes:
+        = vote_count × ownership_percentage;
+        
+        repeat
+          :Tính điểm cho mỗi option;
+        repeat while (Còn option?)
+        
+      else (simple/qualified/unanimous)
+        repeat
+          :Đếm số vote cho mỗi option;
+        repeat while (Còn option?)
+      endif
+      
+      :Tìm option có điểm cao nhất;
+      
+      :Kiểm tra điều kiện thắng;
+      
+      if (Đạt điều kiện?) then (Có)
+        :Xác định winner;
+        :Cập nhật result = "passed";
+      else (Không)
+        :Không có winner;
+        :Cập nhật result = "rejected";
+      endif
+    }
+    
+    :Tính statistics:
+    - Total votes
+    - Participation rate
+    - Vote distribution
+    - Comments summary;
+    
+    fork
+      repeat
+        :Gửi thông báo kết quả cho members;
+      repeat while (Còn member?)
+    fork again
+      :Gửi email kết quả;
+    fork again
+      :Tạo báo cáo chi tiết;
+    fork again
+      :Ghi log vào audit;
+    end fork
+    
+    if (Result = "passed"?) then (Có)
+      partition "Thực thi quyết định" {
+        if (Loại quyết định?) then (Thay đổi ownership)
+          :Cập nhật ownership percentages;
+          :Tạo contract amendment;
+          
+        else if (Loại quyết định?) then (Thêm/Xóa member)
+          :Thực hiện thêm/xóa member;
+          :Cập nhật group structure;
+          
+        else if (Loại quyết định?) then (Chi tiêu lớn)
+          :Tạo expense approval;
+          :Thông báo cho admin;
+          
+        else (Khác)
+          :Ghi nhận quyết định;
+          :Chờ action thủ công;
+        endif
+      }
+    endif
+    
+  else (Chưa)
+    if (100% đã vote?) then (Có)
+      note right
+        Nếu tất cả đã vote,
+        có thể đóng sớm
+      end note
+      :Hỏi initiator đóng sớm?;
+      
+      |Co-owner (Initiator)|
+      if (Đóng sớm?) then (Có)
+        :Xác nhận đóng;
+        |System|
+        :Đóng vote;
+        :Tính kết quả;
+      endif
+    endif
+  endif
+  
+repeat while (Vote còn active?) is (Có)
+
+|Co-owner (Members)|
+:Nhận thông báo kết quả;
+
+:Xem chi tiết kết quả:
+- Option thắng
+- Số vote cho mỗi option
+- Phân bố vote
+- Comments;
+
+if (Không đồng ý kết quả?) then (Có)
+  :Tạo appeal/dispute;
+  :Gửi cho Admin xem xét;
+  
+  |Admin|
+  :Xem xét appeal;
+  :Kiểm tra quy trình;
+  
+  if (Appeal hợp lệ?) then (Có)
+    :Mở lại vote;
+    hoặc
+    :Vô hiệu vote;
+  else (Không)
+    :Từ chối appeal;
+  endif
+else (Đồng ý)
+  :Chấp nhận kết quả;
+endif
+
+stop
+
+@enduml

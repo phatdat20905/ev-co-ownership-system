@@ -1,0 +1,680 @@
+@startuml class-diagram
+skinparam classAttributeIconSize 0
+!theme plain
+title Class Diagram - EV Co-ownership System (cleaned)
+
+' -------------------------
+' Core: Authentication & User
+' -------------------------
+package "Auth & User Management" {
+  class User <<Entity>> {
+    - id: UUID
+    - email: String
+    - phone: String
+    - passwordHash: String
+    - role: Enum
+    - isVerified: Boolean
+    - isActive: Boolean
+    - lastLoginAt: DateTime
+    + validatePassword(password: String): Boolean
+    + toJSON(): Object
+  }
+
+  class RefreshToken <<Entity>> {
+    - id: UUID
+    - userId: UUID
+    - token: String
+    - expiresAt: DateTime
+    - isRevoked: Boolean
+  }
+
+  class EmailVerification <<Entity>> {
+    - id: UUID
+    - userId: UUID
+    - token: String
+    - expiresAt: DateTime
+    - verifiedAt: DateTime
+  }
+
+  class PasswordReset <<Entity>> {
+    - id: UUID
+    - userId: UUID
+    - token: String
+    - expiresAt: DateTime
+    - usedAt: DateTime
+  }
+
+  class KYCVerification <<Entity>> {
+    - id: UUID
+    - userId: UUID
+    - documentType: Enum
+    - documentNumber: String
+    - documentImages: JSON
+    - selfieImage: String
+    - status: Enum
+    - verifiedBy: UUID
+    - verifiedAt: DateTime
+    - rejectionReason: Text
+  }
+
+  class UserProfile <<Entity>> {
+    - id: UUID
+    - userId: UUID
+    - firstName: String
+    - lastName: String
+    - dateOfBirth: Date
+    - address: Text
+    - city: String
+    - postalCode: String
+    - country: String
+    - avatarUrl: String
+    - drivingLicenseNumber: String
+    - drivingLicenseExpiry: Date
+    - emergencyContactName: String
+    - emergencyContactPhone: String
+  }
+}
+
+' -------------------------
+' Group & Ownership
+' -------------------------
+package "Group & Ownership" {
+  class CoOwnershipGroup <<Entity>> {
+    - id: UUID
+    - groupName: String
+    - description: Text
+    - createdBy: UUID
+    - groupFundBalance: Decimal
+    - isActive: Boolean
+    + addMember(userId, percentage, role): void
+    + removeMember(userId): void
+    + updateFundBalance(amount): void
+  }
+
+  class GroupMember <<Entity>> {
+    - id: UUID
+    - groupId: UUID
+    - userId: UUID
+    - ownershipPercentage: Decimal
+    - role: Enum
+    - joinedAt: DateTime
+    - leftAt: DateTime
+    - isActive: Boolean
+    + calculateUsageRight(): Decimal
+  }
+
+  class GroupVote <<Entity>> {
+    - id: UUID
+    - groupId: UUID
+    - createdBy: UUID
+    - title: String
+    - description: Text
+    - voteType: Enum
+    - startTime: DateTime
+    - endTime: DateTime
+    - status: Enum
+    - result: String
+  }
+
+  class VoteOption <<Entity>> {
+    - id: UUID
+    - voteId: UUID
+    - optionText: String
+    - displayOrder: Integer
+    - voteCount: Integer
+  }
+
+  class UserVote <<Entity>> {
+    - id: UUID
+    - voteId: UUID
+    - userId: UUID
+    - optionId: UUID
+    - comment: Text
+    - votedAt: DateTime
+  }
+
+  class GroupFundTransaction <<Entity>> {
+    - id: UUID
+    - groupId: UUID
+    - userId: UUID
+    - transactionType: Enum
+    - amount: Decimal
+    - description: String
+    - balanceBefore: Decimal
+    - balanceAfter: Decimal
+  }
+}
+
+' -------------------------
+' Vehicle Management
+' -------------------------
+package "Vehicle Management" {
+  class Vehicle <<Entity>> {
+    - id: UUID
+    - groupId: UUID
+    - vehicleName: String
+    - brand: String
+    - model: String
+    - year: Integer
+    - licensePlate: String
+    - vin: String
+    - color: String
+    - batteryCapacityKwh: Decimal
+    - currentOdometer: Integer
+    - status: Enum
+    - purchaseDate: Date
+    - purchasePrice: Decimal
+    - images: JSON
+    - specifications: JSON
+    + updateOdometer(km): void
+    + isAvailable(): Boolean
+  }
+
+  class VehicleInsurance <<Entity>> {
+    - id: UUID
+    - vehicleId: UUID
+    - provider: String
+    - policyNumber: String
+    - startDate: Date
+    - endDate: Date
+    - coverageAmount: Decimal
+    - premiumAmount: Decimal
+    - documentUrl: String
+    - status: Enum
+  }
+
+  class MaintenanceSchedule <<Entity>> {
+    - id: UUID
+    - vehicleId: UUID
+    - maintenanceType: Enum
+    - scheduledDate: Date
+    - estimatedDuration: Integer
+    - description: Text
+    - status: Enum
+    - createdBy: UUID
+  }
+
+  class MaintenanceHistory <<Entity>> {
+    - id: UUID
+    - vehicleId: UUID
+    - maintenanceType: Enum
+    - performedDate: Date
+    - performedBy: UUID
+    - description: Text
+    - cost: Decimal
+    - odometerReading: Integer
+    - invoiceUrl: String
+    - notes: Text
+  }
+
+  class ChargingSession <<Entity>> {
+    - id: UUID
+    - vehicleId: UUID
+    - userId: UUID
+    - startTime: DateTime
+    - endTime: DateTime
+    - startBatteryLevel: Integer
+    - endBatteryLevel: Integer
+    - energyConsumed: Decimal
+    - cost: Decimal
+    - chargingStationId: String
+    - location: String
+  }
+}
+
+' -------------------------
+' Booking System
+' -------------------------
+package "Booking System" {
+  class Booking <<Entity>> {
+    - id: UUID
+    - vehicleId: UUID
+    - userId: UUID
+    - groupId: UUID
+    - startTime: DateTime
+    - endTime: DateTime
+    - status: Enum
+    - priorityScore: Integer
+    - purpose: String
+    - destination: String
+    - estimatedDistance: Decimal
+    - actualDistance: Decimal
+    - cost: Decimal
+    - notes: Text
+    - cancellationReason: Text
+    - autoConfirmed: Boolean
+    + calculatePriority(): Integer
+    + canCancel(): Boolean
+    + getCancellationFee(): Decimal
+  }
+
+  class BookingConflict <<Entity>> {
+    - id: UUID
+    - bookingId_1: UUID
+    - bookingId_2: UUID
+    - conflictType: Enum
+    - resolvedBy: Enum
+    - resolvedAt: DateTime
+    - resolution: Text
+  }
+
+  class CheckInOutLog <<Entity>> {
+    - id: UUID
+    - bookingId: UUID
+    - logType: Enum
+    - timestamp: DateTime
+    - location: String
+    - odometerReading: Integer
+    - batteryLevel: Integer
+    - condition: Text
+    - photos: JSON
+    - notes: Text
+    - verifiedBy: UUID
+  }
+
+  class CalendarCache <<Entity>> {
+    - id: UUID
+    - vehicleId: UUID
+    - date: Date
+    - bookings: JSON
+    - cachedAt: DateTime
+    - expiresAt: DateTime
+  }
+}
+
+' -------------------------
+' Cost & Payment
+' -------------------------
+package "Cost & Payment" {
+  class Cost <<Entity>> {
+    - id: UUID
+    - groupId: UUID
+    - vehicleId: UUID
+    - bookingId: UUID
+    - categoryId: UUID
+    - costType: Enum
+    - amount: Decimal
+    - currency: String
+    - description: Text
+    - incurredDate: Date
+    - createdBy: UUID
+    + splitCost(): void
+  }
+
+  class CostCategory <<Entity>> {
+    - id: UUID
+    - name: String
+    - description: Text
+    - splitMethod: Enum
+    - isActive: Boolean
+  }
+
+  class CostSplit <<Entity>> {
+    - id: UUID
+    - costId: UUID
+    - userId: UUID
+    - amount: Decimal
+    - percentage: Decimal
+    - status: Enum
+    - dueDate: Date
+    - paidAt: DateTime
+    - invoiceId: UUID
+  }
+
+  class Invoice <<Entity>> {
+    - id: UUID
+    - userId: UUID
+    - groupId: UUID
+    - invoiceNumber: String
+    - totalAmount: Decimal
+    - status: Enum
+    - issueDate: Date
+    - dueDate: Date
+    - paidDate: Date
+    - pdfUrl: String
+  }
+
+  class InvoiceItem <<Entity>> {
+    - id: UUID
+    - invoiceId: UUID
+    - costSplitId: UUID
+    - description: String
+    - quantity: Decimal
+    - unitPrice: Decimal
+    - amount: Decimal
+  }
+
+  class Payment <<Entity>> {
+    - id: UUID
+    - invoiceId: UUID
+    - userId: UUID
+    - amount: Decimal
+    - paymentMethod: Enum
+    - provider: String
+    - transactionId: String
+    - status: Enum
+    - paidAt: DateTime
+    - receiptUrl: String
+  }
+
+  class UserWallet <<Entity>> {
+    - id: UUID
+    - userId: UUID
+    - balance: Decimal
+    - currency: String
+    + deposit(amount): void
+    + withdraw(amount): void
+  }
+
+  class GroupWallet <<Entity>> {
+    - id: UUID
+    - groupId: UUID
+    - balance: Decimal
+    - currency: String
+    + deposit(amount, userId): void
+    + withdraw(amount, userId): void
+  }
+
+  class WalletTransaction <<Entity>> {
+    - id: UUID
+    - walletId: UUID
+    - transactionType: Enum
+    - amount: Decimal
+    - balanceBefore: Decimal
+    - balanceAfter: Decimal
+    - description: String
+    - relatedEntityType: String
+    - relatedEntityId: UUID
+  }
+
+  class GroupWalletTransaction <<Entity>> {
+    - id: UUID
+    - groupWalletId: UUID
+    - userId: UUID
+    - transactionType: Enum
+    - amount: Decimal
+    - balanceBefore: Decimal
+    - balanceAfter: Decimal
+    - description: String
+  }
+}
+
+' -------------------------
+' Contract Management
+' -------------------------
+package "Contract Management" {
+  class Contract <<Entity>> {
+    - id: UUID
+    - groupId: UUID
+    - templateId: UUID
+    - contractNumber: String
+    - title: String
+    - content: Text
+    - status: Enum
+    - startDate: Date
+    - endDate: Date
+    - sentForSigningAt: DateTime
+    - activatedAt: DateTime
+    - terminatedAt: DateTime
+    + sendForSigning(): void
+    + isFullySigned(): Boolean
+  }
+
+  class ContractTemplate <<Entity>> {
+    - id: UUID
+    - name: String
+    - description: Text
+    - content: Text
+    - variables: JSON
+    - version: String
+    - isActive: Boolean
+  }
+
+  class ContractParty <<Entity>> {
+    - id: UUID
+    - contractId: UUID
+    - userId: UUID
+    - partyType: String
+    - role: String
+    - ownershipPercentage: Decimal
+    - signingOrder: Integer
+    - signedAt: DateTime
+    - signatureUrl: String
+    - ipAddress: String
+    - userAgent: String
+  }
+
+  class ContractDocument <<Entity>> {
+    - id: UUID
+    - contractId: UUID
+    - documentType: Enum
+    - fileName: String
+    - fileUrl: String
+    - fileSize: Integer
+    - mimeType: String
+    - uploadedAt: DateTime
+  }
+
+  class ContractAmendment <<Entity>> {
+    - id: UUID
+    - contractId: UUID
+    - amendmentNumber: Integer
+    - description: Text
+    - changes: JSON
+    - proposedBy: UUID
+    - status: Enum
+    - effectiveDate: Date
+  }
+
+  class SignatureLog <<Entity>> {
+    - id: UUID
+    - contractId: UUID
+    - userId: UUID
+    - signedAt: DateTime
+    - ipAddress: String
+    - userAgent: String
+    - signatureHash: String
+  }
+}
+
+' -------------------------
+' AI & Analytics
+' -------------------------
+package "AI & Analytics" {
+  class Recommendation <<Entity>> {
+    - id: UUID
+    - userId: UUID
+    - groupId: UUID
+    - recommendationType: Enum
+    - content: JSON
+    - confidence: Decimal
+    - reasoning: Text
+    - status: Enum
+    - generatedAt: DateTime
+    - expiresAt: DateTime
+    - acceptedAt: DateTime
+  }
+
+  class UsageLog <<Entity>> {
+    - id: UUID
+    - userId: UUID
+    - groupId: UUID
+    - vehicleId: UUID
+    - bookingId: UUID
+    - usageDate: Date
+    - durationMinutes: Integer
+    - distance: Decimal
+    - cost: Decimal
+    - fairnessScore: Decimal
+  }
+}
+
+' -------------------------
+' Admin & Support
+' -------------------------
+package "Admin & Support" {
+  ' StaffProfile defined in Auth package; reuse the same class there to avoid duplication
+  class Dispute <<Entity>> {
+    - id: UUID
+    - createdBy: UUID
+    - assignedTo: UUID
+    - groupId: UUID
+    - relatedEntityType: String
+    - relatedEntityId: UUID
+    - disputeType: Enum
+    - priority: Enum
+    - status: Enum
+    - description: Text
+    - resolution: Text
+    - resolvedAt: DateTime
+    - escalatedAt: DateTime
+  }
+
+  class DisputeMessage <<Entity>> {
+    - id: UUID
+    - disputeId: UUID
+    - senderId: UUID
+    - senderType: Enum
+    - message: Text
+    - attachments: JSON
+  }
+
+  class AuditLog <<Entity>> {
+    - id: UUID
+    - userId: UUID
+    - action: String
+    - entityType: String
+    - entityId: UUID
+    - changes: JSON
+    - ipAddress: String
+    - userAgent: String
+  }
+
+  class SystemSetting <<Entity>> {
+    - id: UUID
+    - settingKey: String
+    - settingValue: String
+    - dataType: Enum
+    - category: String
+    - description: Text
+    - isPublic: Boolean
+  }
+}
+
+' -------------------------
+' Notification
+' -------------------------
+package "Notification" {
+  class Notification <<Entity>> {
+    - id: UUID
+    - userId: UUID
+    - type: Enum
+    - title: String
+    - message: Text
+    - data: JSON
+    - isRead: Boolean
+    - readAt: DateTime
+    - priority: Enum
+  }
+
+  class NotificationTemplate <<Entity>> {
+    - id: UUID
+    - name: String
+    - type: Enum
+    - subject: String
+    - bodyHtml: Text
+    - bodyText: Text
+    - variables: JSON
+    - isActive: Boolean
+  }
+
+  class UserPreference <<Entity>> {
+    - id: UUID
+    - userId: UUID
+    - emailNotifications: Boolean
+    - pushNotifications: Boolean
+    - smsNotifications: Boolean
+    - notificationTypes: JSON
+  }
+
+  class DeviceToken <<Entity>> {
+    - id: UUID
+    - userId: UUID
+    - deviceType: Enum
+    - token: String
+    - isActive: Boolean
+  }
+}
+
+' -------------------------
+' Relationships (multiplicities kept explicit)
+' -------------------------
+User "1" -- "0..*" RefreshToken
+User "1" -- "0..*" EmailVerification
+User "1" -- "0..*" PasswordReset
+User "1" -- "0..1" KYCVerification
+User "1" -- "0..1" UserProfile
+User "1" -- "0..*" GroupMember
+User "1" -- "0..*" Booking
+User "1" -- "0..1" UserWallet
+User "1" -- "0..*" Payment
+User "1" -- "0..*" Notification
+User "1" -- "0..1" UserPreference
+User "1" -- "0..*" DeviceToken
+
+CoOwnershipGroup "1" -- "1..*" GroupMember : has
+CoOwnershipGroup "1" -- "0..*" GroupVote
+CoOwnershipGroup "1" -- "0..*" GroupFundTransaction
+CoOwnershipGroup "1" -- "0..1" Vehicle : owns
+CoOwnershipGroup "1" -- "0..1" GroupWallet
+CoOwnershipGroup "1" -- "0..*" Cost
+CoOwnershipGroup "1" -- "0..*" Contract
+CoOwnershipGroup "1" -- "0..*" Recommendation
+
+GroupVote "1" -- "1..*" VoteOption
+GroupVote "1" -- "0..*" UserVote
+VoteOption "1" -- "0..*" UserVote
+
+Vehicle "1" -- "0..*" VehicleInsurance
+Vehicle "1" -- "0..*" MaintenanceSchedule
+Vehicle "1" -- "0..*" MaintenanceHistory
+Vehicle "1" -- "0..*" ChargingSession
+Vehicle "1" -- "0..*" Booking
+Vehicle "1" -- "0..*" CalendarCache
+
+Booking "1" -- "0..*" CheckInOutLog
+Booking "1" -- "0..*" BookingConflict : conflict1
+Booking "1" -- "0..*" BookingConflict : conflict2
+Booking "1" -- "0..1" Cost
+
+Cost "1" -- "1..*" CostSplit
+Cost "1" -- "1" CostCategory
+CostSplit "1" -- "0..1" Invoice
+Invoice "1" -- "1..*" InvoiceItem
+Invoice "1" -- "0..*" Payment
+InvoiceItem "1" -- "1" CostSplit
+
+UserWallet "1" -- "0..*" WalletTransaction
+GroupWallet "1" -- "0..*" GroupWalletTransaction
+
+Contract "1" -- "0..*" ContractParty
+Contract "1" -- "0..*" ContractDocument
+Contract "1" -- "0..*" ContractAmendment
+Contract "1" -- "0..*" SignatureLog
+Contract "1" -- "1" ContractTemplate
+
+Dispute "1" -- "0..*" DisputeMessage
+
+Recommendation "1" -- "0..1" Booking : suggests
+
+NotificationTemplate "1" -- "0..*" Notification : uses
+
+User "1" -- "0..*" UsageLog
+Vehicle "1" -- "0..*" UsageLog
+Booking "1" -- "0..*" UsageLog
+CoOwnershipGroup "1" -- "0..*" UsageLog
+
+User "1" -- "0..*" AuditLog
+StaffProfile "1" -- "0..*" SystemSetting : manages
+
+@enduml

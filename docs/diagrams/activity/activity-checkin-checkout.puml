@@ -1,0 +1,237 @@
+@startuml activity-checkin-checkout
+!theme plain
+title Activity Diagram - Check-in/Check-out
+skinparam linetype ortho
+skinparam nodesep 80
+skinparam ranksep 100
+
+|Co-owner|
+start
+
+:Đến điểm lấy xe;
+
+note right
+  Trước giờ bắt đầu booking
+  tối đa 15 phút
+end note
+
+:Mở app;
+
+:Vào mục "Lịch đặt của tôi";
+
+:Chọn booking sắp diễn ra;
+
+:Click "Check-in";
+
+:Quét QR code trên xe;
+
+|System|
+:Xác thực QR code;
+
+if (QR code hợp lệ?) then (Không)
+  :Thông báo QR không hợp lệ;
+  stop
+else (Có)
+  if (Trong thời gian cho phép?) then (Không)
+    :Thông báo chưa đến giờ check-in;
+    note right
+      Chỉ cho phép check-in
+      trong khoảng: [start_time - 15 phút]
+      đến [start_time + 30 phút]
+    end note
+    stop
+  else (Có)
+    :Tạo check-in request;
+    :Gửi thông báo đến Staff;
+  endif
+endif
+
+|Staff|
+:Nhận thông báo check-in;
+
+:Đến vị trí xe;
+
+:Kiểm tra tình trạng xe:
+- Ngoại thất (vết xước, móp méo)
+- Nội thất (ghế, vô lăng, thiết bị)
+- Mức pin
+- Thiết bị an toàn
+- Vệ sinh;
+
+:Chụp ảnh xe (nếu cần);
+
+if (Tình trạng xe tốt?) then (Không)
+  :Ghi nhận vấn đề;
+  :Chụp ảnh bằng chứng;
+  :Tạo báo cáo hư hỏng;
+  
+  if (Có thể sử dụng?) then (Không)
+    :Từ chối check-in;
+    :Thông báo Co-owner;
+    :Hủy booking;
+    :Hoàn tiền (nếu có);
+    stop
+  else (Có)
+    :Ghi chú vào check-in log;
+    :Thông báo Co-owner về vấn đề;
+  endif
+endif
+
+:Xác nhận check-in;
+
+|System|
+:Cập nhật check-in log:
+- Check-in time
+- Odometer reading
+- Battery level
+- Condition notes
+- Photos;
+
+:Cập nhật booking status = "in_progress";
+
+:Cập nhật vehicle status = "in_use";
+
+fork
+  :Gửi thông báo check-in thành công;
+fork again
+  :Gửi SMS chứa mã khóa xe;
+fork again
+  :Bắt đầu tracking usage;
+end fork
+
+|Co-owner|
+:Nhận xác nhận check-in;
+
+:Sử dụng xe;
+
+note right
+  Trong quá trình sử dụng:
+  - Tracking GPS
+  - Monitoring battery
+  - Recording usage metrics
+end note
+
+:Kết thúc sử dụng;
+
+:Đưa xe về điểm trả;
+
+:Click "Check-out";
+
+:Quét QR code;
+
+|System|
+:Xác thực QR code;
+
+if (QR code hợp lệ?) then (Không)
+  :Thông báo lỗi;
+  stop
+else (Có)
+  :Yêu cầu báo cáo tình trạng xe;
+endif
+
+|Co-owner|
+:Báo cáo tình trạng xe:
+- Có vấn đề không?
+- Mức pin hiện tại
+- Ghi chú (nếu có);
+
+:Chụp ảnh xe (nếu có vấn đề);
+
+:Gửi check-out request;
+
+|System|
+:Tạo check-out request;
+:Gửi thông báo đến Staff;
+
+|Staff|
+:Nhận thông báo check-out;
+
+:Đến vị trí xe;
+
+:Kiểm tra tình trạng xe;
+
+:So sánh với tình trạng check-in;
+
+if (Có hư hỏng mới?) then (Có)
+  :Chụp ảnh bằng chứng;
+  :Ghi nhận hư hỏng;
+  :Ước tính chi phí sửa chữa;
+  
+  partition "Xử lý hư hỏng" {
+    if (Hư hỏng nghiêm trọng?) then (Có)
+      :Tạo dispute tự động;
+      :Thông báo Admin;
+    else (Không)
+      :Ghi nhận vào maintenance log;
+      :Tính phí sửa chữa;
+    endif
+  }
+endif
+
+if (Mức pin < 20%?) then (Có)
+  :Cảnh báo pin thấp;
+  :Tính phí sạc bổ sung;
+endif
+
+:Xác nhận check-out;
+
+|System|
+:Cập nhật check-out log:
+- Check-out time
+- Final odometer
+- Final battery level
+- Damages (if any)
+- Photos;
+
+:Tính toán chi phí:
+- Distance traveled
+- Time used
+- Battery consumed
+- Damages
+- Late fees (if any);
+
+:Cập nhật booking status = "completed";
+
+:Cập nhật vehicle status = "available";
+
+:Tạo cost record;
+
+:Phân bổ chi phí;
+
+fork
+  :Gửi thông báo check-out thành công;
+fork again
+  :Gửi hóa đơn chi phí;
+fork again
+  :Cập nhật usage statistics;
+fork again
+  :Cập nhật fairness score;
+fork again
+  :Ghi log vào audit trail;
+end fork
+
+|Co-owner|
+:Nhận xác nhận check-out;
+
+:Xem hóa đơn chi phí;
+
+if (Có tranh chấp?) then (Có)
+  :Tạo dispute;
+  note right
+    Co-owner có thể
+    tranh chấp về:
+    - Chi phí sửa chữa
+    - Tình trạng xe
+    - Phí phát sinh
+  end note
+else (Không)
+  if (Thanh toán ngay?) then (Có)
+    :Thực hiện thanh toán;
+  else (Không)
+    :Lưu vào công nợ;
+  endif
+endif
+
+stop
+
+@enduml

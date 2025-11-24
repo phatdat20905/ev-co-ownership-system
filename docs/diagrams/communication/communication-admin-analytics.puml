@@ -1,0 +1,27 @@
+@startuml communication-admin-analytics
+!theme plain
+title Communication Diagram - Admin Analytics (ETL / Reporting)
+
+participant "Apache NiFi" as NiFi
+participant "AI Service / ML" as AI
+participant "Admin Service" as AdminSvc
+participant "Data Warehouse" as DW
+participant "Database" as DB
+participant "Notification Service" as Notif
+
+AdminSvc -> NiFi : 1: requestReport(params)
+NiFi -> DB : 2: extract (POSTGRES queries)
+DB --> NiFi : 2.1: raw data
+NiFi -> AI : 3: transform & enrich
+AI -> DW : 3.1: store features / aggregates
+DW --> AdminSvc : 4: query report data
+AdminSvc -> Notif : 5: publish report.ready
+Notif -> DB : 5.1: insert notification
+Notif -> Notif : 5.2: send email to admins
+
+note right of NiFi
+  - Orchestrates ETL: extract, transform, load
+  - Schedules pipelines and connects to multiple DBs
+end note
+
+@enduml

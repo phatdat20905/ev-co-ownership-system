@@ -1,0 +1,109 @@
+@startuml state-payment
+title State Diagram - Thanh toán (Payment)
+skinparam linetype ortho
+skinparam nodesep 80
+skinparam ranksep 100
+
+[*] --> Initiated : Payment request created
+
+state Initiated {
+  Initiated : Payment request received
+  Initiated : Validate amount & order
+}
+
+Initiated --> Authorized : Payment method authorized
+Initiated --> Failed : Validation failed
+
+state Authorized {
+  Authorized : Authorization successful (hold)
+  Authorized : Awaiting capture or provider callback
+}
+
+Authorized --> Captured : Capture requested / auto-capture
+Authorized --> Voided : Authorization voided / expired
+Authorized --> Failed : Capture failed
+
+state Captured {
+  Captured : Funds captured
+  Captured : Create invoice / update booking
+}
+
+Captured --> Settled : Settlement completed
+Captured --> PendingRefund : Refund requested
+Captured --> Chargeback : Chargeback initiated
+
+state Settled {
+  Settled : Funds settled to merchant
+  Settled : Mark invoice paid
+}
+
+state PendingRefund {
+  PendingRefund : Refund initiated
+  PendingRefund : Awaiting provider processing
+}
+
+PendingRefund --> Refunded : Refund completed
+PendingRefund --> RefundFailed : Refund failed
+
+state Refunded {
+  Refunded : User credited / reversal applied
+}
+
+state RefundFailed {
+  RefundFailed : Provider returned error
+  RefundFailed : Retry logic or manual review
+}
+
+state Chargeback {
+  Chargeback : Dispute from cardholder/provider
+  Chargeback : Mark invoice disputed
+}
+
+Chargeback --> ChargebackResolved : Chargeback resolved
+Chargeback --> ChargebackWon : Issuer rules in favor of merchant
+Chargeback --> ChargebackLost : Issuer rules in favor of cardholder
+
+state Reconciled {
+  Reconciled : Accounting reconciliation complete
+}
+
+Settled --> Reconciled
+Refunded --> Reconciled
+ChargebackWon --> Reconciled
+
+Reconciled --> [*]
+Failed --> [*]
+Refunded --> [*]
+ChargebackResolved --> [*]
+ChargebackLost --> [*]
+
+' Async / Provider callbacks
+Authorized --> AwaitingProvider : wait_for_webhook
+Captured --> AwaitingProvider : wait_for_settlement_webhook
+PendingRefund --> AwaitingProvider : wait_for_refund_webhook
+
+state AwaitingProvider {
+  AwaitingProvider : Waiting for asynchronous callback
+  AwaitingProvider : Implement retry/backoff
+}
+
+AwaitingProvider --> Captured : received_capture
+AwaitingProvider --> Settled : received_settlement
+AwaitingProvider --> Refunded : received_refund
+AwaitingProvider --> Failed : provider_error
+
+note right of Initiated
+  Typical events:
+  - payment_request (from UI)
+  - authorize (3DS / wallet auth)
+  - capture (immediate or delayed)
+  - webhook callbacks (async)
+  - refund / chargeback flows
+end note
+
+note left of Chargeback
+  Chargebacks are external disputes handled by payment networks.
+  They may result in funds reversal and penalties.
+end note
+
+@enduml

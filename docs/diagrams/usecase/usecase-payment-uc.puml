@@ -1,0 +1,35 @@
+@startuml payment_uc
+title Use Case - Thanh toán & Hóa đơn
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Co-owner" as CoOwner
+actor "Staff" as Staff
+actor "Admin" as Admin
+
+
+rectangle "Thanh toán & Hóa đơn" {
+  usecase "Xem chi phí" as UC_ViewCost
+  usecase "Tính toán chi phí (chia theo tỉ lệ)" as UC_CalcShareCost
+  usecase "Thanh toán" as UC_Payment
+  usecase "Kết nối ví / Payment Gateway" as UC_PaymentGateway
+  usecase "Xem hóa đơn (Invoices)" as UC_ViewInvoices
+  usecase "Yêu cầu hoàn tiền" as UC_RequestRefund
+  usecase "Kết nối nhà cung cấp thanh toán" as UC_ConnectPaymentProvider
+}
+
+' relations
+UC_ViewCost ..> UC_CalcShareCost : <<include>>
+UC_Payment ..> UC_PaymentGateway : <<include>>
+UC_Payment ..> UC_ViewInvoices : <<include>>
+UC_ViewInvoices ..> UC_RequestRefund : <<include>>
+UC_PaymentGateway ..> UC_ConnectPaymentProvider : <<include>>
+
+' actor links
+CoOwner -- UC_ViewCost
+CoOwner -- UC_Payment
+CoOwner -- UC_ViewInvoices
+Staff -- UC_PaymentGateway
+Admin -- UC_ConnectPaymentProvider
+ 
+@enduml

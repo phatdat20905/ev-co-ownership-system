@@ -1,0 +1,337 @@
+@startuml logical-erd
+!theme plain
+title Logical ERD - EV Co-ownership System
+
+' Core Entities với PK/FK
+entity "users" as USER {
+  * <<PK>> id : UUID
+  --
+  * email : String
+  * password_hash : String
+  * role : Enum
+  is_verified : Boolean
+  is_active : Boolean
+}
+
+entity "user_profiles" as PROFILE {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> user_id : UUID
+  first_name : String
+  last_name : String
+  phone : String
+  address : Text
+}
+
+entity "co_ownership_groups" as GROUP {
+  * <<PK>> id : UUID
+  --
+  * group_name : String
+  description : Text
+  * <<FK>> created_by : UUID
+  group_fund_balance : Decimal
+  <<FK>> vehicle_id : UUID
+}
+
+entity "group_members" as MEMBER {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> group_id : UUID
+  * <<FK>> user_id : UUID
+  * ownership_percentage : Decimal
+  role : Enum
+}
+
+entity "vehicles" as VEHICLE {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> group_id : UUID
+  * vehicle_name : String
+  * license_plate : String
+  brand : String
+  model : String
+  status : Enum
+}
+
+entity "bookings" as BOOKING {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> vehicle_id : UUID
+  * <<FK>> user_id : UUID
+  * <<FK>> group_id : UUID
+  * start_time : DateTime
+  * end_time : DateTime
+  status : Enum
+  priority_score : Integer
+}
+
+entity "costs" as COST {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> group_id : UUID
+  <<FK>> vehicle_id : UUID
+  <<FK>> booking_id : UUID
+  * amount : Decimal
+  cost_type : Enum
+}
+
+entity "cost_splits" as SPLIT {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> cost_id : UUID
+  * <<FK>> user_id : UUID
+  * amount : Decimal
+  status : Enum
+}
+
+entity "payments" as PAYMENT {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> invoice_id : UUID
+  * <<FK>> user_id : UUID
+  * amount : Decimal
+  payment_method : Enum
+  status : Enum
+}
+
+entity "contracts" as CONTRACT {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> group_id : UUID
+  * contract_number : String
+  content : Text
+  status : Enum
+}
+
+entity "contract_parties" as PARTY {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> contract_id : UUID
+  * <<FK>> user_id : UUID
+  signed_at : DateTime
+}
+
+entity "disputes" as DISPUTE {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> created_by : UUID
+  <<FK>> assigned_to : UUID
+  dispute_type : Enum
+  status : Enum
+}
+
+entity "recommendations" as RECOMMENDATION {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> user_id : UUID
+  * <<FK>> group_id : UUID
+  recommendation_type : Enum
+  content : JSON
+  status : Enum
+}
+
+entity "invoices" as INVOICE {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> user_id : UUID
+  * <<FK>> group_id : UUID
+  invoice_number : String
+  total_amount : Decimal
+  status : Enum
+}
+
+entity "invoice_items" as INVOICE_ITEM {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> invoice_id : UUID
+  description : String
+  quantity : Decimal
+  unit_price : Decimal
+  amount : Decimal
+}
+
+entity "user_wallets" as USER_WALLET {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> user_id : UUID
+  balance : Decimal
+  currency : String
+}
+
+entity "group_wallets" as GROUP_WALLET {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> group_id : UUID
+  balance : Decimal
+  currency : String
+}
+
+entity "wallet_transactions" as WALLET_TRANSACTION {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> wallet_id : UUID
+  * <<FK>> user_id : UUID
+  amount : Decimal
+  transaction_type : Enum
+  balance_before : Decimal
+  balance_after : Decimal
+}
+
+entity "notifications" as NOTIFICATION {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> user_id : UUID
+  title : String
+  message : Text
+  data : JSON
+  is_read : Boolean
+}
+
+entity "notification_templates" as NOTIFICATION_TEMPLATE {
+  * <<PK>> id : UUID
+  --
+  name : String
+  type : Enum
+  subject : String
+  body_html : Text
+}
+
+entity "device_tokens" as DEVICE_TOKEN {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> user_id : UUID
+  device_type : Enum
+  token : String
+  is_active : Boolean
+}
+
+entity "refresh_tokens" as REFRESH_TOKEN {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> user_id : UUID
+  token : String
+  expires_at : DateTime
+  is_revoked : Boolean
+}
+
+entity "email_verifications" as EMAIL_VERIFICATION {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> user_id : UUID
+  token : String
+  expires_at : DateTime
+  verified_at : DateTime
+}
+
+entity "password_resets" as PASSWORD_RESET {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> user_id : UUID
+  token : String
+  expires_at : DateTime
+  used_at : DateTime
+}
+
+entity "kyc_verifications" as KYC_VERIFICATION {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> user_id : UUID
+  document_type : Enum
+  document_number : String
+  status : Enum
+}
+
+entity "contract_documents" as CONTRACT_DOCUMENT {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> contract_id : UUID
+  file_url : String
+  type : Enum
+}
+
+entity "signature_logs" as SIGNATURE_LOG {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> contract_id : UUID
+  * <<FK>> user_id : UUID
+  signed_at : DateTime
+  ip_address : String
+}
+
+entity "dispute_messages" as DISPUTE_MESSAGE {
+  * <<PK>> id : UUID
+  --
+  * <<FK>> dispute_id : UUID
+  * <<FK>> sender_id : UUID
+  message : Text
+}
+
+' Relationships (Cardinality)
+USER ||--|| PROFILE : "1:1"
+USER ||--o{ MEMBER : "1:N"
+USER ||--o{ BOOKING : "1:N"
+USER ||--o{ SPLIT : "1:N"
+USER ||--o{ PAYMENT : "1:N"
+USER ||--o{ PARTY : "1:N"
+USER ||--o{ DISPUTE : "1:N"
+USER ||--o{ RECOMMENDATION : "1:N"
+USER ||--o{ INVOICE : "1:N"
+INVOICE ||--o{ INVOICE_ITEM : "1:N"
+USER ||--o{ USER_WALLET : "1:1"
+GROUP ||--o{ GROUP_WALLET : "1:1"
+USER_WALLET ||--o{ WALLET_TRANSACTION : "1:N"
+USER ||--o{ WALLET_TRANSACTION : "1:N"
+USER ||--o{ NOTIFICATION : "1:N"
+NOTIFICATION_TEMPLATE ||--o{ NOTIFICATION : "1:N"
+USER ||--o{ DEVICE_TOKEN : "1:N"
+USER ||--o{ REFRESH_TOKEN : "1:N"
+USER ||--o{ EMAIL_VERIFICATION : "1:N"
+USER ||--o{ PASSWORD_RESET : "1:N"
+USER ||--o{ KYC_VERIFICATION : "1:1"
+CONTRACT ||--o{ CONTRACT_DOCUMENT : "1:N"
+CONTRACT ||--o{ SIGNATURE_LOG : "1:N"
+DISPUTE ||--o{ DISPUTE_MESSAGE : "1:N"
+
+GROUP ||--o{ MEMBER : "1:N"
+GROUP ||--|| VEHICLE : "1:1"
+GROUP ||--o{ BOOKING : "1:N"
+GROUP ||--o{ COST : "1:N"
+GROUP ||--o{ CONTRACT : "1:N"
+
+VEHICLE ||--o{ BOOKING : "1:N"
+
+BOOKING ||--o| COST : "1:0..1"
+
+COST ||--o{ SPLIT : "1:N"
+
+CONTRACT ||--o{ PARTY : "1:N"
+
+note right of USER
+  **Người dùng**
+  PK: id (UUID)
+  Unique: email
+end note
+
+note right of MEMBER
+  **Thành viên nhóm**
+  PK: id
+  FK: group_id, user_id
+  Unique: (group_id, user_id)
+  ownership_percentage: 0.01-100
+end note
+
+note right of BOOKING
+  **Lịch đặt xe**
+  PK: id
+  FK: vehicle_id, user_id, group_id
+  Constraint: start_time < end_time
+end note
+
+note right of SPLIT
+  **Phân bổ chi phí**
+  PK: id
+  FK: cost_id, user_id
+  Tổng % phải = 100%
+end note
+
+@enduml

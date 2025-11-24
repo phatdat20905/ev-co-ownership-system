@@ -1,0 +1,54 @@
+@startuml communication-dispute
+!theme plain
+title Communication Diagram - Xử lý tranh chấp (Dispute Resolution)
+
+participant "User" as User
+participant "Frontend" as FE
+participant "API Gateway" as GW
+participant "Dispute Service" as DisputeSvc
+participant "Booking Service" as BookingSvc
+participant "Admin/Staff Service" as StaffSvc
+participant "Database" as DB
+participant "RabbitMQ" as MQ
+participant "Notification Service" as Notif
+
+User -> FE : 1: Create dispute (bookingId, evidence)
+FE -> GW : 2: POST /api/disputes
+GW -> DisputeSvc : 3: createDispute(data)
+DisputeSvc -> DB : 3.1: INSERT dispute
+DB --> DisputeSvc : 3.2: dispute id
+DisputeSvc -> SQS : 3.3: (optional) enqueue for triage
+DisputeSvc -> MQ : 4: PUBLISH dispute.created
+MQ -> StaffSvc : 4.1: consume -> alert staff
+StaffSvc -> DB : 4.2: SELECT dispute details
+DB --> StaffSvc : 4.3: details
+StaffSvc -> DisputeSvc : 5: assign(to_staff_id)
+DisputeSvc -> DB : 5.1: UPDATE dispute.assigned_to
+
+' Evidence upload
+FE -> GW : 6: POST /api/disputes/{id}/evidence
+GW -> DisputeSvc : 7: uploadEvidence(file)
+DisputeSvc -> S3 : 7.1: upload file
+S3 --> DisputeSvc : 7.2: file url
+DisputeSvc -> DB : 7.3: save evidence link
+
+' Mediation
+StaffSvc -> DisputeSvc : 8: proposeResolution(resolution)
+DisputeSvc -> DB : 8.1: save proposal
+DisputeSvc -> MQ : 9: PUBLISH dispute.update
+MQ -> Notif : 9.1: notify involved parties
+Notif -> DB : 9.2: insert notification
+Notif -> Notif : 9.3: send email
+
+alt Resolved
+  DisputeSvc -> DB : 10: UPDATE dispute.status -> resolved
+  DB --> DisputeSvc : 10.1: updated
+  DisputeSvc -> BookingSvc : 11: applyResolution(bookingId, action)
+end
+
+note right of DisputeSvc
+  - Tracks lifecycle: open -> in_review -> resolved
+  - Integrates evidence storage and notifications
+end note
+
+@enduml

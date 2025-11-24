@@ -1,0 +1,40 @@
+@startuml communication-contract-signing
+!theme plain
+title Communication Diagram - Ký hợp đồng điện tử (Contract Signing)
+
+participant "Frontend" as FE
+participant "API Gateway" as GW
+participant "Contract Service" as ContractSvc
+participant "E-Sign Provider" as ESign
+participant "Storage (S3)" as S3
+participant "Database" as DB
+participant "Notification Service" as Notif
+participant "User" as User
+
+User -> FE : 1: Initiate contract (fill form)
+FE -> GW : 2: POST /api/contracts
+GW -> ContractSvc : 3: createDraft(data)
+ContractSvc -> DB : 3.1: INSERT contract (draft)
+DB --> ContractSvc : 3.2: contract id
+ContractSvc -> S3 : 4: upload draft document
+S3 --> ContractSvc : 4.1: file url
+ContractSvc -> ESign : 5: createSigningRequest(fileUrl, parties)
+ESign --> ContractSvc : 5.1: signing_url
+ContractSvc --> GW : 6: return signing_url
+GW --> FE : 7: response
+
+' User signs via provider (redirect)
+User -> ESign : 8: Open signing_url & sign
+ESign -> ContractSvc : 9: webhook signatureCompleted(contractId, signerId)
+ContractSvc -> DB : 9.1: UPDATE contract status -> signed
+DB --> ContractSvc : 9.2: updated
+ContractSvc -> Notif : 10: publish contract.signed
+Notif -> DB : 10.1: INSERT notification
+Notif -> Notif : 10.2: send email to parties
+
+note right of ContractSvc
+  - Orchestrates upload, e-sign request, and webhook handling
+  - Stores final signed doc in S3
+end note
+
+@enduml

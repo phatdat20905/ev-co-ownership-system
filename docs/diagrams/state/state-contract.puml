@@ -1,0 +1,211 @@
+@startuml state-contract
+title State Diagram - Trạng thái hợp đồng (Contract)
+skinparam linetype ortho
+skinparam nodesep 80
+skinparam ranksep 100
+
+[*] --> Draft : Tạo hợp đồng từ template
+
+state Draft {
+  Draft : Hợp đồng nháp
+  Draft : Nội dung có thể chỉnh sửa
+  Draft : Chưa gửi cho parties
+  Draft : Variables được điền
+}
+
+Draft --> PendingSignature : Gửi đi để ký\n(sent_for_signing)
+Draft --> Cancelled : Hủy bỏ hợp đồng\n(trước khi gửi)
+
+state PendingSignature {
+  state "Awaiting Signatures" as PS_Awaiting
+  state "Partially Signed" as PS_Partial
+  
+  [*] --> PS_Awaiting : Gửi cho tất cả parties
+  
+  PS_Awaiting : Chưa có ai ký
+  PS_Awaiting : Đã gửi email + notification
+  PS_Awaiting : QR code/Link active
+  PS_Awaiting : Countdown timer (7 ngày)
+  
+  PS_Awaiting --> PS_Partial : Party đầu tiên ký
+  
+  PS_Partial : Một số parties đã ký
+  PS_Partial : Tracking: X/N signed
+  PS_Partial : Reminder cho chưa ký
+  PS_Partial : Display signatures
+  
+  PS_Partial --> PS_Partial : Party khác ký tiếp
+  PS_Partial --> [*] : Tất cả parties đã ký
+}
+
+PendingSignature --> Active : Tất cả đã ký\n+ Verification successful
+PendingSignature --> Expired : Quá hạn ký\n(> 7 ngày chưa đủ chữ ký)
+PendingSignature --> Cancelled : Một party từ chối ký\nhoặc creator hủy
+
+state Active {
+  Active : Hợp đồng có hiệu lực
+  Active : Tất cả parties đã ký
+  Active : PDF final đã tạo
+  Active : Có digital signatures
+  Active : Có timestamp & hash
+  Active : Có thể enforce
+}
+
+Active --> Amended : Yêu cầu sửa đổi hợp đồng\n(contract amendment)
+Active --> Terminated : Chấm dứt hợp đồng\n(mutual agreement hoặc breach)
+Active --> Expired : Hết hạn hợp đồng\n(reach end_date)
+
+state Amended {
+  state "Amendment Proposed" as A_Proposed
+  state "Amendment Pending" as A_Pending
+  state "Amendment Signed" as A_Signed
+  
+  [*] --> A_Proposed : Party đề xuất amendment
+  
+  A_Proposed : Đề xuất sửa đổi
+  A_Proposed : Mô tả thay đổi
+  A_Proposed : Upload amendment document
+  A_Proposed : Chờ approval
+  
+  A_Proposed --> A_Pending : Tất cả parties đồng ý\nnegotiate
+  A_Proposed --> [*] : Một party từ chối\n→ Giữ nguyên contract
+  
+  A_Pending : Amendment đang được ký
+  A_Pending : Process tương tự signing
+  A_Pending : New version created
+  
+  A_Pending --> A_Signed : Tất cả đã ký amendment
+  
+  A_Signed : Amendment có hiệu lực
+  A_Signed : Version tăng lên
+  A_Signed : Old version archived
+}
+
+Amended --> Active : Apply amendment\n(create new version)
+
+state Terminated {
+  state "Mutual Termination" as T_Mutual
+  state "Breach Termination" as T_Breach
+  
+  [*] --> T_Mutual : Tất cả parties đồng ý\nchấm dứt
+  [*] --> T_Breach : Vi phạm hợp đồng\nnghiêm trọng
+  
+  T_Mutual : Chấm dứt hòa bình
+  T_Mutual : Không có tranh chấp
+  T_Mutual : Settlement agreement
+  T_Mutual : Close group (optional)
+  
+  T_Breach : Chấm dứt do vi phạm
+  T_Breach : Có party vi phạm
+  T_Breach : Có thể có penalty
+  T_Breach : Có thể có dispute
+  T_Breach : Legal consequences
+}
+
+Terminated --> [*] : Hoàn tất procedures\n+ Archive
+
+state Expired {
+  Expired : Hết hạn tự nhiên
+  Expired : Đã đến end_date
+  Expired : Không gia hạn
+  Expired : Archive contract
+}
+
+Expired --> Active : Gia hạn hợp đồng\n(renew with new dates)
+Expired --> [*] : Không gia hạn\n→ Archive
+
+state Cancelled {
+  Cancelled : Hợp đồng đã hủy
+  Cancelled : Lý do hủy ghi nhận
+  Cancelled : Chưa có signature
+  Cancelled : hoặc không đủ chữ ký
+}
+
+Cancelled --> [*] : Archive
+
+note right of Draft
+  Có thể chỉnh sửa:
+  - Điều khoản
+  - Thời hạn
+  - Ownership percentages
+  - Special conditions
+  - Thêm/Xóa parties
+end note
+
+note right of PendingSignature
+  Signature process:
+  1. Email with link
+  2. Review contract
+  3. E-signature (draw/type/upload)
+  4. Capture IP & timestamp
+  5. Store signature image
+  6. Log signature event
+  
+  Reminder schedule:
+  - Day 0: Initial notification
+  - Day 2: First reminder
+  - Day 5: Urgent reminder
+  - Day 7: Final warning
+end note
+
+note right of Active
+  Digital signature includes:
+  - Party signature image
+  - Timestamp (ISO 8601)
+  - IP address
+  - Device info
+  - SHA-256 hash of document
+  - Blockchain proof (optional)
+  
+  Legal validity:
+  ✓ Vietnamese E-Transaction Law
+  ✓ UNCITRAL Model Law
+end note
+
+note right of Amended
+  Amendment process:
+  1. Propose changes
+  2. Negotiate terms
+  3. Draft amendment doc
+  4. All parties review
+  5. Sign amendment
+  6. Apply changes
+  7. Create new version
+  8. Old version → archived
+  
+  Version control:
+  v1.0 → v1.1 → v2.0 ...
+end note
+
+note bottom of Terminated
+  Termination reasons:
+  
+  Mutual:
+  - Project ended
+  - Vehicle sold
+  - Group dissolved
+  - All agreed to end
+  
+  Breach:
+  - Non-payment
+  - Contract violation
+  - Fraud
+  - Misconduct
+  - Court order
+end note
+
+note bottom of Expired
+  Auto-expire:
+  - Cron job daily check
+  - end_date <= TODAY
+  - Send expiry notifications
+  - Offer renewal option
+  
+  Renewal:
+  - All parties must agree
+  - May adjust terms
+  - Create new version
+  - Reset start/end dates
+end note
+
+@enduml

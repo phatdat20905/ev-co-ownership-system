@@ -1,0 +1,43 @@
+@startuml communication-notification-push
+!theme plain
+title Communication Diagram - Push Notification Flow
+
+participant "Notification Service" as Notif
+participant "API Gateway" as GW
+participant "RabbitMQ" as MQ
+participant "Push Providers\n(FCM / APNs / Web Push)" as PUSH
+participant "Database (tokens)" as DB
+participant "Frontend (Web)" as WEB
+participant "User Device (Mobile)" as MOBILE
+
+GW -> Notif : 1: POST /api/notifications (create notification)
+Notif -> DB : 2: SELECT device_tokens WHERE user_id
+DB --> Notif : 2.1: tokens
+Notif -> MQ : 3: PUBLISH notification.created
+MQ -> Notif : 3.1: consume
+loop deliver to tokens
+  Notif -> PUSH : 4: POST /send (token, payload)
+  alt success
+    PUSH --> Notif : 4.1: 200
+    Notif -> DB : 4.2: UPDATE delivery_status
+  else failure
+    PUSH --> Notif : 4.1: error
+    Notif -> Notif : 4.2: scheduleRetry(token)
+  end
+end
+
+' Web Push specific
+Notif -> WEB : 5: WebPush (send push via service worker)
+WEB --> User : 6: show notification
+
+' Mobile device
+Notif -> MOBILE : 7: FCM / APNs push
+MOBILE --> User : 7.1: show notification
+
+note right of Notif
+  - Manages tokens, retries, dedup
+  - Sends events: notification.push
+  - Logs delivery receipts
+end note
+
+@enduml

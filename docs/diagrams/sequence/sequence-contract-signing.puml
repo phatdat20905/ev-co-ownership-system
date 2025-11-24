@@ -1,0 +1,373 @@
+@startuml sequence-contract-signing
+!theme plain
+title Sequence Diagram - Ký hợp đồng điện tử
+
+actor "Co-owner" as User
+participant "Frontend" as FE
+participant "API Gateway" as Gateway
+participant "Contract Service" as ContractSvc
+participant "User Service" as UserSvc
+participant "Notification Service" as NotifSvc
+participant "Database" as DB
+participant "Storage\n(S3/MinIO)" as Storage
+participant "RabbitMQ" as MQ
+
+== TẠO HỢP ĐỒNG TỪ TEMPLATE ==
+
+User -> FE: Vào trang "Hợp đồng nhóm"
+activate FE
+
+FE -> Gateway: GET /api/groups/{group_id}/contracts
+activate Gateway
+
+Gateway -> ContractSvc: Get group contracts
+activate ContractSvc
+
+ContractSvc -> DB: SELECT * FROM contracts\nWHERE group_id = ?
+activate DB
+DB --> ContractSvc: Contracts list
+deactivate DB
+
+ContractSvc --> Gateway: Contracts
+deactivate ContractSvc
+
+Gateway --> FE: 200 OK {contracts}
+deactivate Gateway
+
+FE --> User: Hiển thị danh sách hợp đồng
+deactivate FE
+
+alt Chưa có hợp đồng
+
+    User -> FE: Click "Tạo hợp đồng mới"
+    activate FE
+    
+    FE -> Gateway: GET /api/contract-templates
+    activate Gateway
+    
+    Gateway -> ContractSvc: Get templates
+    activate ContractSvc
+    
+    ContractSvc -> DB: SELECT * FROM contract_templates\nWHERE is_active = true
+    activate DB
+    DB --> ContractSvc: Templates
+    deactivate DB
+    
+    ContractSvc --> Gateway: Templates list
+    deactivate ContractSvc
+    
+    Gateway --> FE: Templates
+    deactivate Gateway
+    
+    FE --> User: Hiển thị templates có sẵn
+    deactivate FE
+    
+    User -> FE: Chọn template:\n"Co-ownership Agreement"
+    activate FE
+    
+    FE -> Gateway: POST /api/contracts/from-template\n{template_id, group_id}
+    activate Gateway
+    
+    Gateway -> ContractSvc: Create contract from template
+    activate ContractSvc
+    
+    ' Lấy template
+    ContractSvc -> DB: SELECT * FROM contract_templates\nWHERE id = ?
+    activate DB
+    DB --> ContractSvc: Template data
+    deactivate DB
+    
+    ' Lấy thông tin nhóm
+    ContractSvc -> UserSvc: GET /api/groups/{group_id}
+    activate UserSvc
+    
+    UserSvc -> DB: SELECT g.*, gm.*\nFROM co_ownership_groups g\nJOIN group_members gm\nWHERE g.id = ?
+    activate DB
+    DB --> UserSvc: Group & members data
+    deactivate DB
+    
+    UserSvc --> ContractSvc: Group info
+    deactivate UserSvc
+    
+    ' Tạo hợp đồng
+    ContractSvc -> ContractSvc: Generate contract content:\n- Replace {{variables}}\n- Fill member details\n- Set ownership percentages
+    
+    ContractSvc -> DB: BEGIN TRANSACTION
+    activate DB
+    
+    ContractSvc -> DB: INSERT INTO contracts\n{group_id, template_id,\ncontent, status: 'draft'}
+    DB --> ContractSvc: Contract created {contract_id}
+    
+    ' Tạo parties
+    loop For each member
+        ContractSvc -> DB: INSERT INTO contract_parties\n{contract_id, user_id,\nrole, ownership_percentage,\nsigning_order}
+        DB --> ContractSvc: Party created
+    end
+    
+    ContractSvc -> DB: COMMIT
+    deactivate DB
+    
+    ' Tạo PDF
+    ContractSvc -> ContractSvc: Generate PDF from content
+    
+    ContractSvc -> Storage: Upload PDF\n/contracts/{contract_id}/draft.pdf
+    activate Storage
+    Storage --> ContractSvc: File URL
+    deactivate Storage
+    
+    ContractSvc -> DB: INSERT INTO contract_documents\n{contract_id, type: 'draft',\nfile_url}
+    activate DB
+    DB --> ContractSvc: Document saved
+    deactivate DB
+    
+    ContractSvc --> Gateway: 201 Created {contract}
+    deactivate ContractSvc
+    
+    Gateway --> FE: Contract created
+    deactivate Gateway
+    
+    FE --> User: Hợp đồng đã tạo (Draft)
+    deactivate FE
+
+end
+
+== GỬI HỢP ĐỒNG ĐỂ KÝ ==
+
+User -> FE: Xem chi tiết hợp đồng
+activate FE
+
+FE -> Gateway: GET /api/contracts/{contract_id}
+activate Gateway
+
+Gateway -> ContractSvc: Get contract details
+activate ContractSvc
+
+ContractSvc -> DB: SELECT c.*, cp.*, cd.*\nFROM contracts c\nLEFT JOIN contract_parties cp\nLEFT JOIN contract_documents cd
+activate DB
+DB --> ContractSvc: Full contract data
+deactivate DB
+
+ContractSvc --> Gateway: Contract details
+deactivate ContractSvc
+
+Gateway --> FE: Contract data
+deactivate Gateway
+
+FE --> User: Hiển thị nội dung hợp đồng\n+ Danh sách bên ký\n+ Tình trạng ký
+deactivate FE
+
+User -> FE: Click "Gửi để ký"
+activate FE
+
+FE -> FE: Confirm dialog
+
+User -> FE: Xác nhận
+
+FE -> Gateway: POST /api/contracts/{contract_id}/send-for-signing
+activate Gateway
+
+Gateway -> ContractSvc: Send contract for signing
+activate ContractSvc
+
+ContractSvc -> DB: UPDATE contracts\nSET status = 'pending_signature',\nsent_for_signing_at = NOW()
+activate DB
+DB --> ContractSvc: Updated
+deactivate DB
+
+' Gửi thông báo cho tất cả parties
+ContractSvc -> DB: SELECT * FROM contract_parties\nWHERE contract_id = ?
+activate DB
+DB --> ContractSvc: Parties list
+deactivate DB
+
+ContractSvc -> MQ: Publish contract.sent_for_signing\n{contract_id, parties}
+activate MQ
+MQ --> ContractSvc: Published
+deactivate MQ
+
+ContractSvc --> Gateway: 200 OK
+deactivate ContractSvc
+
+Gateway --> FE: Success
+deactivate Gateway
+
+FE --> User: Hợp đồng đã gửi đi
+deactivate FE
+
+' Background notification
+MQ -> NotifSvc: Consume event
+activate NotifSvc
+
+loop For each party
+    par Parallel notifications
+        NotifSvc -> DB: INSERT notification\n{user_id, type: 'contract_signing'}
+        activate DB
+        DB --> NotifSvc: OK
+        deactivate DB
+    and
+        NotifSvc -> NotifSvc: Send email với link ký
+    and
+        NotifSvc -> NotifSvc: Send push notification
+    end
+end
+
+deactivate NotifSvc
+
+== KÝ HỢP ĐỒNG ==
+
+User -> FE: Click notification:\n"Hợp đồng cần ký"
+activate FE
+
+FE -> Gateway: GET /api/contracts/{contract_id}/for-signing
+activate Gateway
+
+Gateway -> ContractSvc: Get contract for signing
+activate ContractSvc
+
+ContractSvc -> DB: SELECT * FROM contracts\nWHERE id = ?
+activate DB
+DB --> ContractSvc: Contract
+deactivate DB
+
+ContractSvc -> DB: SELECT * FROM contract_parties\nWHERE contract_id = ?\nAND user_id = ?
+activate DB
+DB --> ContractSvc: Party info
+deactivate DB
+
+alt Đã ký rồi
+    ContractSvc --> Gateway: 400 Already signed
+    Gateway --> FE: Error
+    FE --> User: Bạn đã ký hợp đồng này
+    
+else Chưa ký
+    ContractSvc --> Gateway: Contract data + PDF URL
+    deactivate ContractSvc
+    
+    Gateway --> FE: Contract info
+    deactivate Gateway
+    
+    FE --> User: Hiển thị PDF hợp đồng\n[Đọc kỹ nội dung]
+    deactivate FE
+    
+    User -> FE: Đọc hợp đồng
+    activate FE
+    
+    User -> FE: Tick "Tôi đồng ý với các điều khoản"
+    
+    User -> FE: Click "Ký hợp đồng"
+    
+    FE -> FE: Hiển thị signature pad
+    
+    User -> FE: Vẽ chữ ký
+    
+    FE -> FE: Capture signature as image
+    
+    User -> FE: Click "Xác nhận ký"
+    
+    FE -> Gateway: POST /api/contracts/{contract_id}/sign\n{signature_image_base64,\nip_address, user_agent}
+    activate Gateway
+    
+    Gateway -> ContractSvc: Process signature
+    activate ContractSvc
+    
+    ' Upload signature image
+    ContractSvc -> Storage: Upload signature\n/contracts/{contract_id}/signatures/{user_id}.png
+    activate Storage
+    Storage --> ContractSvc: Signature URL
+    deactivate Storage
+    
+    ContractSvc -> DB: BEGIN TRANSACTION
+    activate DB
+    
+    ' Update party status
+    ContractSvc -> DB: UPDATE contract_parties\nSET signed_at = NOW(),\nsignature_url = ?,\nip_address = ?,\nuser_agent = ?
+    
+    ' Log signature
+    ContractSvc -> DB: INSERT INTO signature_logs\n{contract_id, user_id,\nsigned_at, ip_address}
+    
+    ' Check if all signed
+    ContractSvc -> DB: SELECT COUNT(*) as total,\nSUM(CASE WHEN signed_at IS NOT NULL THEN 1 ELSE 0 END) as signed\nFROM contract_parties\nWHERE contract_id = ?
+    DB --> ContractSvc: {total: 5, signed: 5}
+    
+    alt Tất cả đã ký
+        ' Finalize contract
+        ContractSvc -> DB: UPDATE contracts\nSET status = 'active',\nactivated_at = NOW()
+        
+        ' Generate final signed PDF
+        ContractSvc -> ContractSvc: Generate final PDF\n+ Add all signatures\n+ Add timestamp\n+ Add unique hash
+        
+        ContractSvc -> Storage: Upload final PDF
+        activate Storage
+        Storage --> ContractSvc: Final PDF URL
+        deactivate Storage
+        
+        ContractSvc -> DB: INSERT INTO contract_documents\n{type: 'signed', file_url}
+        
+        ContractSvc -> MQ: Publish contract.fully_signed
+        activate MQ
+        MQ --> ContractSvc: OK
+        deactivate MQ
+        
+    else Còn người chưa ký
+        ContractSvc -> DB: -- Keep status = 'pending_signature'
+    end
+    
+    ContractSvc -> DB: COMMIT
+    deactivate DB
+    
+    ContractSvc --> Gateway: 200 OK\n{message, all_signed: true/false}
+    deactivate ContractSvc
+    
+    Gateway --> FE: Success
+    deactivate Gateway
+    
+    FE --> User: Ký thành công!\n[Tải xuống hợp đồng]
+    deactivate FE
+end
+
+== HỢP ĐỒNG HOÀN TẤT ==
+
+alt Tất cả đã ký
+    MQ -> NotifSvc: Consume contract.fully_signed
+    activate NotifSvc
+    
+    loop For each party
+        par
+            NotifSvc -> DB: INSERT notification
+            activate DB
+            DB --> NotifSvc: OK
+            deactivate DB
+        and
+            NotifSvc -> NotifSvc: Send email với\nfinal signed contract
+        and
+            NotifSvc -> NotifSvc: Send push notification
+        end
+    end
+    
+    deactivate NotifSvc
+    
+    User -> FE: Nhận thông báo\n"Hợp đồng đã hoàn tất"
+    activate FE
+    
+    FE -> Gateway: GET /api/contracts/{contract_id}/download
+    activate Gateway
+    
+    Gateway -> ContractSvc: Get final contract
+    activate ContractSvc
+    
+    ContractSvc -> DB: SELECT file_url\nFROM contract_documents\nWHERE contract_id = ?\nAND type = 'signed'
+    activate DB
+    DB --> ContractSvc: Final PDF URL
+    deactivate DB
+    
+    ContractSvc --> Gateway: PDF URL
+    deactivate ContractSvc
+    
+    Gateway --> FE: Download URL
+    deactivate Gateway
+    
+    FE --> User: Tải xuống hợp đồng PDF
+    deactivate FE
+end
+
+@enduml

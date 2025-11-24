@@ -1,0 +1,57 @@
+@startuml overview_uc
+title Use Case Tổng Quan - EV Co-ownership & Cost-sharing
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Co-owner (Chủ xe đồng sở hữu)" as CoOwner
+actor "Staff (Nhân viên vận hành)" as Staff
+actor "Admin (Quản trị hệ thống)" as Admin
+
+rectangle "Hệ thống EV Co-ownership" {
+  usecase "Quản lý tài khoản" as UC_Account
+  usecase "Xác thực danh tính" as UC_Verify
+
+  usecase "Xem lịch xe" as UC_ViewSchedule
+  usecase "Đặt lịch xe" as UC_Book
+
+  usecase "Tính toán chi phí" as UC_CalcCost
+  usecase "Thanh toán" as UC_Payment
+
+  usecase "Lấy dữ liệu lịch sử" as UC_HistoryData
+  usecase "Phân tích cá nhân" as UC_Analytics
+
+  usecase "Xem nhóm đồng sở hữu" as UC_ViewGroup
+  usecase "Bỏ phiếu" as UC_Vote
+
+  usecase "Quản lý hợp đồng e-contract" as UC_Contract
+  usecase "Quản lý xe & bảo dưỡng" as UC_Vehicle
+  usecase "Quản lý tranh chấp & báo cáo" as UC_Dispute
+}
+
+ ' include / extend relations (standardized per Option B)
+UC_Account ..> UC_Verify : <<include>>
+UC_ViewSchedule <.. UC_Book : <<extend>>
+UC_Payment ..> UC_CalcCost : <<include>>
+UC_Analytics ..> UC_HistoryData : <<include>>
+UC_ViewGroup <.. UC_Vote : <<extend>>
+
+' Actor connections (high-level)
+CoOwner -- UC_Account
+CoOwner -- UC_ViewSchedule
+CoOwner -- UC_Payment
+CoOwner -- UC_Analytics
+CoOwner -- UC_ViewGroup
+CoOwner -- UC_Book
+
+Staff -- UC_ViewSchedule
+Staff -- UC_Contract
+Staff -- UC_Vehicle
+Staff -- UC_Dispute
+
+Admin -- UC_Account
+Admin -- UC_ViewGroup
+Admin -- UC_Contract
+Admin -- UC_Dispute
+Admin -- UC_Payment
+
+@enduml

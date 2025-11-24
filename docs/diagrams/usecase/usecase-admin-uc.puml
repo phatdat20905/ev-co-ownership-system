@@ -1,0 +1,52 @@
+@startuml admin_uc
+title Use Case - Admin (Quản trị hệ thống)
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Admin (Quản trị hệ thống)" as Admin
+
+rectangle "Chức năng Admin" {
+  usecase "Xem danh sách người dùng" as UC_ViewUsers
+  usecase "Khóa/Mở khóa tài khoản" as UC_LockUnlock
+  usecase "Yêu cầu xác minh bổ sung" as UC_ExtraVerify
+
+  usecase "Tạo nhóm mới" as UC_CreateGroup
+  usecase "Gán quyền quản lý" as UC_AssignManager
+  usecase "Xóa nhóm" as UC_DeleteGroup
+  usecase "Kiểm tra ràng buộc hợp đồng" as UC_CheckContractConstraint
+
+  usecase "Xem hợp đồng" as UC_ViewContract
+  usecase "Phê duyệt hợp đồng" as UC_ApproveContract
+  usecase "Kiểm tra hợp lệ pháp lý" as UC_LegalCheck
+
+  usecase "Xem danh sách tranh chấp" as UC_ViewDisputes
+  usecase "Phân công xử lý" as UC_AssignDispute
+  usecase "Gửi thông báo đến Co-owner" as UC_NotifyCoowner
+
+  usecase "Xem báo cáo tài chính" as UC_ViewReports
+  usecase "Xem audit log" as UC_ViewAudit
+  usecase "Giám sát hoạt động" as UC_Monitor
+}
+
+ ' include / extend relations (standardized per Option B)
+UC_LockUnlock <.. UC_ExtraVerify : <<extend>>
+UC_CreateGroup ..> UC_AssignManager : <<include>>
+UC_DeleteGroup ..> UC_CheckContractConstraint : <<include>>
+UC_ApproveContract ..> UC_LegalCheck : <<include>>
+UC_AssignDispute ..> UC_NotifyCoowner : <<include>>
+
+' connections (pruned: only top-level usecases)
+Admin -- UC_ViewUsers
+Admin -- UC_LockUnlock
+Admin -- UC_CreateGroup
+Admin -- UC_DeleteGroup
+Admin -- UC_ViewContract
+Admin -- UC_ApproveContract
+Admin -- UC_ViewDisputes
+Admin -- UC_AssignDispute
+Admin -- UC_ViewReports
+Admin -- UC_ViewAudit
+Admin -- UC_Monitor
+
+
+@enduml

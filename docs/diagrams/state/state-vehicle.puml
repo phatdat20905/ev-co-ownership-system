@@ -1,0 +1,108 @@
+@startuml state-vehicle
+title State Diagram - Trạng thái xe (Vehicle)
+skinparam linetype ortho
+skinparam nodesep 80
+skinparam ranksep 100
+
+[*] --> Available : Thêm xe mới vào hệ thống
+
+state Available {
+  Available : Xe sẵn sàng cho booking
+  Available : Không có booking active
+  Available : Không có maintenance scheduled
+  Available : Battery level > 20%
+}
+
+Available --> InUse : Check-in thành công\n(Booking starts)
+Available --> Maintenance : Lên lịch bảo trì\nhoặc sửa chữa
+Available --> Unavailable : Admin/Staff\nvô hiệu hóa xe
+
+state InUse {
+  InUse : Xe đang được sử dụng
+  InUse : Có booking active
+  InUse : Tracking location
+  InUse : Monitor battery & distance
+  InUse : User có trách nhiệm
+}
+
+InUse --> Available : Check-out thành công\n(Booking completed)
+InUse --> Maintenance : Phát hiện vấn đề\ntrong quá trình sử dụng
+
+state Maintenance {
+  state "Scheduled" as M_Scheduled
+  state "In Progress" as M_InProgress
+  state "Completed" as M_Completed
+  
+  [*] --> M_Scheduled : Tạo lịch bảo trì
+  
+  M_Scheduled : Đã lên lịch
+  M_Scheduled : Chờ đến ngày bảo trì
+  M_Scheduled : Có thể reschedule
+  
+  M_Scheduled --> M_InProgress : Bắt đầu bảo trì\n(Staff confirms)
+  M_Scheduled --> Available : Hủy lịch bảo trì\n(nếu không cần thiết)
+  
+  M_InProgress : Đang bảo trì/sửa chữa
+  M_InProgress : Không thể booking
+  M_InProgress : Recording work details
+  M_InProgress : Tracking costs
+  
+  M_InProgress --> M_Completed : Hoàn thành công việc\n(Staff confirms)
+  
+  M_Completed : Kiểm tra chất lượng
+  M_Completed : Cập nhật records
+  M_Completed : Update odometer
+}
+
+Maintenance --> Available : Hoàn tất bảo trì\n+ Xe OK
+Maintenance --> Unavailable : Phát hiện vấn đề nghiêm trọng\n(cần sửa lớn hoặc retire)
+
+state Unavailable {
+  Unavailable : Xe không khả dụng
+  Unavailable : Lý do:
+  Unavailable : - Hư hỏng nghiêm trọng
+  Unavailable : - Đang chờ phụ tùng
+  Unavailable : - Admin vô hiệu hóa
+  Unavailable : - Vi phạm điều kiện an toàn
+}
+
+Unavailable --> Maintenance : Bắt đầu sửa chữa
+Unavailable --> Available : Admin kích hoạt lại\n(đã khắc phục vấn đề)
+Unavailable --> [*] : Retire xe\n(thanh lý/bán)
+
+note right of Available
+  Điều kiện khả dụng:
+  ✓ status = 'available'
+  ✓ battery_level >= 20%
+  ✓ Không có booking trong 30 phút
+  ✓ Không có maintenance scheduled
+  ✓ Đã qua kiểm tra an toàn
+end note
+
+note right of InUse
+  Monitors:
+  - Real-time GPS
+  - Battery consumption
+  - Distance traveled
+  - Speed
+  - Harsh braking/acceleration
+  - Geofence violations
+end note
+
+note right of Maintenance
+  Loại bảo trì:
+  1. Định kỳ (mỗi 5000km hoặc 6 tháng)
+  2. Sửa chữa (sau incident/report)
+  3. Recall (từ hãng)
+  4. Upgrade (software/hardware)
+end note
+
+note bottom of Unavailable
+  Notification:
+  - Thông báo group members
+  - Hủy bookings tương lai
+  - Đề xuất xe thay thế
+  - Update calendar
+end note
+
+@enduml

@@ -1,0 +1,325 @@
+@startuml activity-ai-fairness
+title Activity Diagram - AI đề xuất lịch công bằng
+
+|System (Scheduler)|
+start
+
+note right
+  Chạy định kỳ:
+  - Mỗi tuần
+  - Hoặc khi có request
+  - Hoặc khi phát hiện imbalance
+end note
+
+:Trigger AI analysis;
+
+|AI Service|
+:Nhận request phân tích;
+
+partition "Thu thập dữ liệu" {
+  fork
+    :Lấy thông tin nhóm:
+    - Group ID
+    - Members
+    - Ownership percentages;
+    
+  fork again
+    :Lấy lịch sử booking:
+    - Last 3 months
+    - Frequency
+    - Duration
+    - Time slots;
+    
+  fork again
+    :Lấy lịch sử chi phí:
+    - Individual costs
+    - Shared costs
+    - Payment history;
+    
+  fork again
+    :Lấy vehicle usage:
+    - Distance traveled
+    - Battery consumption
+    - Maintenance records;
+    
+  fork again
+    :Lấy current bookings:
+    - Upcoming bookings
+    - Recurring patterns;
+  end fork
+}
+
+partition "Tính toán Fairness Score" {
+  repeat
+    :Với mỗi member;
+    
+    :Tính actual_usage_percentage:
+    = (member_usage_hours / total_group_usage_hours) × 100;
+    
+    :Lấy ownership_percentage;
+    
+    :Tính usage_deviation:
+    = actual_usage_percentage - ownership_percentage;
+    
+    :Tính fairness_score:
+    = 100 - |usage_deviation|;
+    
+    note right
+      Fairness Score:
+      100 = hoàn toàn công bằng
+      80-99 = khá công bằng
+      60-79 = chưa cân bằng
+      <60 = mất cân bằng nghiêm trọng
+    end note
+    
+    :Phân loại member:
+    - Underuser (dùng ít hơn quyền)
+    - Balanced (cân bằng)
+    - Overuser (dùng nhiều hơn quyền);
+    
+  repeat while (Còn member?)
+  
+  :Tính group_fairness_score:
+  = average(all_member_fairness_scores);
+}
+
+if (Group fairness < 70?) then (Có - Cần can thiệp)
+  
+  partition "Phân tích nguyên nhân" {
+    :Phân tích patterns:
+    - Thời gian thường đặt
+    - Loại trip (ngắn/dài)
+    - Priorities conflicts
+    - Seasonal factors;
+    
+    :Xác định bottlenecks:
+    - Peak time conflicts
+    - Vehicle availability
+    - Booking behavior;
+    
+    :Machine Learning Analysis;
+    
+    note right
+      Sử dụng ML model để:
+      - Dự đoán demand
+      - Tìm optimal slots
+      - Identify patterns
+    end note
+  }
+  
+  partition "Tạo đề xuất" {
+    
+    :Xác định underusers (cần khuyến khích);
+    
+    repeat
+      :Với mỗi underuser;
+      
+      :Phân tích preference:
+      - Preferred time slots (từ history)
+      - Preferred duration
+      - Typical purposes;
+      
+      :Tìm available slots phù hợp:
+      - Match preferences
+      - Low competition
+      - High success rate;
+      
+      :Tính priority boost needed;
+      
+      :Tạo suggestion:
+      - Recommended time slots (top 5)
+      - Reasons
+      - Expected benefits;
+      
+    repeat while (Còn underuser?)
+    
+    :Xác định overusers (cần hạn chế);
+    
+    repeat
+      :Với mỗi overuser;
+      
+      :Phân tích excess usage;
+      
+      :Đề xuất:
+      - Giảm frequency
+      - Shorter durations
+      - Off-peak times
+      - Share with others;
+      
+      if (Vượt quá >> ownership?) then (Có)
+        :Suggest tăng ownership %
+        hoặc
+        đóng góp thêm chi phí;
+      endif
+      
+    repeat while (Còn overuser?)
+    
+    partition "Optimization Algorithm" {
+      :Chạy optimization:
+      - Maximize fairness score
+      - Minimize conflicts
+      - Balance preferences
+      - Consider constraints;
+      
+      :Genetic Algorithm / Simulated Annealing;
+      
+      :Tạo optimal schedule cho tuần/tháng tới;
+      
+      :Validate schedule:
+      - No conflicts
+      - All constraints met
+      - Improved fairness;
+    }
+  }
+  
+  partition "Tạo recommendations" {
+    :Tạo Recommendation records:
+    - recommendation_type
+    - target_user_id
+    - suggested_slots
+    - reasoning
+    - expected_fairness_improvement
+    - priority;
+    
+    :Lưu vào database;
+    
+    :Tính confidence score cho mỗi recommendation;
+  }
+  
+else (Không - Đã công bằng)
+  :Ghi nhận group đang balanced;
+  :Không cần intervention;
+  stop
+endif
+
+partition "Gửi đề xuất" {
+  
+  fork
+    |System|
+    repeat
+      :Gửi notification cho underusers:
+      "Bạn có thể sử dụng xe nhiều hơn!";
+      
+      :Hiển thị suggested slots;
+      
+    repeat while (Còn underuser?)
+    
+  fork again
+    repeat
+      :Gửi gentle reminder cho overusers:
+      "Cân nhắc chia sẻ nhiều hơn";
+      
+      :Hiển thị usage statistics;
+      
+    repeat while (Còn overuser?)
+    
+  fork again
+    :Gửi báo cáo tổng quan cho group admin:
+    - Current fairness score
+    - Recommendations summary
+    - Expected improvements;
+    
+  fork again
+    :Gửi email weekly digest;
+    
+  end fork
+}
+
+|Co-owner|
+:Nhận AI recommendations;
+
+:Xem đề xuất chi tiết:
+- Your current fairness score
+- Suggested time slots
+- Benefits of following suggestion
+- Alternative options;
+
+if (Chấp nhận đề xuất?) then (Có)
+  :Click "Book suggested slot";
+  
+  |System|
+  :Pre-fill booking form với:
+  - Suggested date/time
+  - Suggested duration
+  - Priority boost applied;
+  
+  :Co-owner xác nhận;
+  
+  :Tạo booking;
+  
+  |AI Service|
+  :Ghi nhận acceptance;
+  :Cập nhật recommendation status = "accepted";
+  :Feedback cho ML model (positive);
+  
+else (Không)
+  :Bỏ qua hoặc chọn slot khác;
+  
+  |AI Service|
+  :Ghi nhận rejection;
+  :Cập nhật recommendation status = "rejected";
+  
+  if (Có feedback?) then (Có)
+    :Thu thập lý do từ chối;
+    :Feedback cho ML model (negative);
+    :Improve future recommendations;
+  endif
+endif
+
+partition "Monitoring & Learning" {
+  |AI Service|
+  :Theo dõi kết quả:
+  - Acceptance rate
+  - Fairness improvement
+  - User satisfaction;
+  
+  :Thu thập metrics:
+  - Before/After fairness scores
+  - Booking patterns changes
+  - Conflict reduction;
+  
+  :Update ML model:
+  - Retrain với new data
+  - Adjust weights
+  - Improve accuracy;
+  
+  if (Sau 1 tháng?) then (Có)
+    :Tạo báo cáo hiệu quả AI:
+    - Fairness improvement %
+    - Recommendations accepted %
+    - Conflicts reduced %
+    - User satisfaction scores;
+    
+    :Gửi báo cáo cho Admin;
+  endif
+}
+
+partition "Continuous Improvement" {
+  |AI Service|
+  :Phân tích trends;
+  
+  if (Phát hiện new patterns?) then (Có)
+    :Update algorithms;
+    :Adjust recommendation logic;
+  endif
+  
+  if (Model accuracy < 80%?) then (Có)
+    :Trigger retraining;
+    :Collect more data;
+  endif
+  
+  :Schedule next analysis;
+}
+
+stop
+
+note right
+  KPI của AI Service:
+  - Fairness Score Improvement
+  - Recommendation Acceptance Rate
+  - Booking Conflict Reduction
+  - User Satisfaction
+  - Model Accuracy
+end note
+
+@enduml

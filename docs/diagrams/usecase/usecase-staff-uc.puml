@@ -1,0 +1,48 @@
+@startuml staff_uc
+title Use Case - Staff (Nhân viên vận hành)
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Staff (Nhân viên vận hành)" as Staff
+
+rectangle "Chức năng Staff" {
+  usecase "Xem danh sách xe" as UC_ViewVehicles
+  usecase "Cập nhật trạng thái xe" as UC_UpdateVehicleStatus
+  usecase "Ghi lịch sử trạng thái" as UC_LogStatus
+
+  usecase "Xác nhận nhận xe" as UC_ConfirmPickup
+  usecase "Xác nhận trả xe" as UC_ConfirmReturn
+  usecase "Quét mã QR" as UC_ScanQR
+  usecase "Ghi biên bản bàn giao" as UC_HandoverRecord
+
+  usecase "Tạo yêu cầu bảo dưỡng" as UC_CreateMaintenance
+  usecase "Ghi nhận sửa chữa" as UC_RecordRepair
+  usecase "Tạo hóa đơn dịch vụ nội bộ" as UC_InternalInvoice
+
+  usecase "Xác nhận hợp đồng" as UC_ConfirmContract
+  usecase "Kiểm tra thông tin pháp lý" as UC_LegalCheck
+
+  usecase "Ghi nhận tranh chấp" as UC_RecordDispute
+  usecase "Cập nhật trạng thái tranh chấp" as UC_UpdateDispute
+}
+
+' include / extend rules (standardized per Option B)
+UC_UpdateVehicleStatus ..> UC_LogStatus : <<include>>
+UC_ConfirmPickup ..> UC_ScanQR : <<include>>
+UC_ConfirmReturn ..> UC_HandoverRecord : <<include>>
+UC_RecordRepair <.. UC_InternalInvoice : <<extend>>
+UC_ConfirmContract ..> UC_LegalCheck : <<include>>
+UC_RecordDispute ..> UC_UpdateDispute : <<include>>
+
+' connections (pruned: only top-level usecases)
+Staff -- UC_ViewVehicles
+Staff -- UC_UpdateVehicleStatus
+Staff -- UC_ConfirmPickup
+Staff -- UC_ConfirmReturn
+Staff -- UC_CreateMaintenance
+Staff -- UC_RecordRepair
+Staff -- UC_ConfirmContract
+Staff -- UC_RecordDispute
+
+
+@enduml

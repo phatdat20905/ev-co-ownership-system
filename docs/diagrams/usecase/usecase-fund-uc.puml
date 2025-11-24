@@ -1,0 +1,27 @@
+@startuml fund_uc
+title Use Case - Quỹ nhóm (Group Fund)
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Co-owner" as CoOwner
+actor "GroupAdmin" as GroupAdmin
+actor "Admin" as Admin
+
+
+rectangle "Quỹ & Quản lý tài chính nhóm" {
+  usecase "Xem quỹ chung" as UC_ViewFund
+  usecase "Lịch sử quỹ" as UC_FundHistory
+  usecase "Nạp quỹ" as UC_DepositFund
+  usecase "Rút / Quản lý quỹ nhóm" as UC_SettleGroupFund
+}
+
+' relations
+UC_ViewFund ..> UC_FundHistory : <<include>>
+UC_ViewFund ..> UC_SettleGroupFund : <<include>>
+
+' actor links
+CoOwner -- UC_ViewFund
+GroupAdmin -- UC_SettleGroupFund
+Admin -- UC_SettleGroupFund
+
+@enduml

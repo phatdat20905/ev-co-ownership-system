@@ -1,0 +1,30 @@
+@startuml dispute_uc
+title Use Case - Tranh chấp (Dispute)
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Co-owner" as CoOwner
+actor "Staff" as Staff
+actor "Admin" as Admin
+
+
+rectangle "Quy trình tranh chấp" {
+  usecase "Ghi nhận tranh chấp" as UC_RecordDispute
+  usecase "Cập nhật trạng thái tranh chấp" as UC_UpdateDispute
+  usecase "Phân công xử lý tranh chấp" as UC_AssignDispute
+  usecase "Nâng cấp tranh chấp" as UC_EscalateDispute
+  usecase "Giải quyết tranh chấp" as UC_ResolveDispute
+}
+
+' relations
+UC_RecordDispute <.. UC_EscalateDispute : <<extend>>
+UC_ResolveDispute ..> UC_UpdateDispute : <<include>>
+UC_AssignDispute ..> UC_ResolveDispute : <<include>>
+
+' actor links
+CoOwner -- UC_RecordDispute
+Staff -- UC_AssignDispute
+Staff -- UC_ResolveDispute
+Admin -- UC_ResolveDispute
+
+@enduml

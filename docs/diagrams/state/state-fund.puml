@@ -1,0 +1,76 @@
+@startuml state-fund
+title State Diagram - Quỹ nhóm (Group Fund)
+skinparam linetype ortho
+skinparam nodesep 80
+skinparam ranksep 100
+
+[*] --> Open : Quỹ nhóm được tạo
+
+state Open {
+  Open : Quỹ khởi tạo
+  Open : Thiết lập owner / policies
+}
+
+Open --> Active : Quỹ mở, accept deposits
+Active --> PendingDeposit : Deposit initiated (user)
+PendingDeposit --> Active : Deposit cleared
+PendingDeposit --> Failed : Deposit failed
+
+Active --> PendingSettlement : Trigger settlement (periodic or manual)
+PendingSettlement --> Settled : Settlement completed
+PendingSettlement --> UnderDispute : Dispute during settlement
+
+state Settled {
+  Settled : Funds settled to recipients
+  Settled : Ledger updated
+}
+
+state UnderDispute {
+  UnderDispute : Discrepancy found
+  UnderDispute : Investigation started
+}
+
+UnderDispute --> PendingSettlement : Dispute resolved
+UnderDispute --> Frozen : If unresolved, freeze fund
+
+Frozen --> Active : Admin unfreeze after resolution
+Frozen --> Closed : Permanent freeze -> close
+
+Settled --> Disbursed : Payout executed
+Disbursed --> Closed : All payouts completed
+
+state Disbursed {
+  Disbursed : Money transferred to members
+}
+
+state Failed {
+  Failed : Operation failed (deposit/withdraw)
+}
+
+Active --> WithdrawRequested : Member requests withdrawal
+WithdrawRequested --> WithdrawPending : Awaiting approval/hold
+WithdrawPending --> Withdrawn : Withdraw processed
+WithdrawPending --> Failed : Withdraw failed
+
+note right of PendingSettlement
+  Settlement can be triggered by:
+  - Scheduled cron (monthly)
+  - Admin close group
+  - Threshold reached
+end note
+
+note left of Active
+  Active fund supports:
+  - Deposits (instant / bank transfer)
+  - Holds for disputes
+  - Multi-signature approvals (optional)
+end note
+state Closed {
+  Closed : Fund closed / archive
+}
+
+Closed --> [*]
+
+Withdrawn --> [*]
+
+@enduml

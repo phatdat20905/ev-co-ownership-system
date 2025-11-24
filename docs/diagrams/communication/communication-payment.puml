@@ -1,0 +1,70 @@
+@startuml communication-payment
+!theme plain
+title Communication Diagram - Thanh toán (Payment Process)
+
+participant "Co-owner" as User
+participant "Frontend" as FE
+participant "API Gateway" as GW
+participant "Cost Service" as CostSvc
+participant "Payment Gateway\n(VNPay)" as PaymentGW
+participant "Database" as DB
+participant "RabbitMQ" as MQ
+participant "Notification Service" as Notif
+
+User -> FE : 1: Chọn chi phí cần thanh toán
+FE -> GW : 2: POST /api/payments
+GW -> CostSvc : 3: createPayment(costSplitId)
+
+CostSvc -> DB : 4: SELECT cost_split
+DB --> CostSvc : 4.1: cost data
+
+CostSvc -> DB : 5: SELECT user_wallet
+DB --> CostSvc : 5.1: wallet balance
+
+alt Wallet balance sufficient
+  CostSvc -> DB : 6: BEGIN TRANSACTION
+  CostSvc -> DB : 6.1: UPDATE wallet
+  CostSvc -> DB : 6.2: INSERT transaction
+  CostSvc -> DB : 6.3: UPDATE cost_split status
+  CostSvc -> DB : 6.4: COMMIT
+  DB --> CostSvc : 6.5: success
+else Insufficient - Use online payment
+  CostSvc -> PaymentGW : 7: createPaymentRequest(amount)
+  PaymentGW --> CostSvc : 7.1: payment URL
+  CostSvc --> FE : 7.2: redirect URL
+  User -> PaymentGW : 7.3: thực hiện thanh toán
+  PaymentGW -> CostSvc : 7.4: IPN callback
+  CostSvc -> DB : 7.5: UPDATE payment status
+end
+
+CostSvc -> MQ : 8: PUBLISH payment.completed
+MQ -> Notif : 8.1: consume event
+Notif -> DB : 8.2: INSERT notification
+Notif -> Notif : 8.3: send receipt email
+
+CostSvc --> GW : 9: payment success
+GW --> FE : 10: response
+FE --> User : 11: Hiển thị xác nhận
+
+note right of CostSvc
+  Messages:
+  3: createPayment
+  4: getCostSplit
+  5: checkWalletBalance
+  6: processWalletPayment
+  7: createOnlinePayment
+  8: publishPaymentEvent
+  9: returnSuccess
+end note
+
+note bottom
+  Collaboration: Thanh toán chi phí
+  - Lấy thông tin chi phí
+  - Kiểm tra số dư ví
+  - Xử lý thanh toán
+    (ví hoặc online)
+  - Cập nhật trạng thái
+  - Gửi thông báo & hóa đơn
+end note
+
+@enduml

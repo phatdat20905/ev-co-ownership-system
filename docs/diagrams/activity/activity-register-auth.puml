@@ -1,0 +1,106 @@
+@startuml activity-register-auth
+title Activity Diagram - Đăng ký & Xác thực
+start
+
+:Co-owner truy cập trang đăng ký;
+
+:Nhập thông tin đăng ký:
+- Email
+- Mật khẩu
+- Họ tên
+- Số điện thoại;
+
+:Gửi yêu cầu đăng ký;
+
+if (Thông tin hợp lệ?) then (Không)
+  :Hiển thị lỗi validation;
+  stop
+else (Có)
+  if (Email đã tồn tại?) then (Có)
+    :Thông báo email đã được sử dụng;
+    stop
+  else (Không)
+    :Tạo tài khoản mới;
+    :Mã hóa mật khẩu;
+    :Lưu vào database;
+    
+    fork
+      :Tạo token xác thực email;
+      :Gửi email xác thực;
+    fork again
+      :Tạo access token & refresh token;
+      :Trả về thông tin đăng ký thành công;
+    end fork
+    
+    :Co-owner nhận email;
+    :Click link xác thực;
+    
+    if (Token hợp lệ?) then (Không)
+      :Thông báo link hết hạn;
+      :Gửi lại email xác thực;
+      stop
+    else (Có)
+      :Cập nhật email_verified = true;
+      :Thông báo xác thực thành công;
+    endif
+    
+    :Co-owner đăng nhập;
+    
+    note right
+      Sau khi đăng nhập thành công,
+      hệ thống khuyến khích thực hiện KYC
+    end note
+    
+    if (Có muốn xác thực KYC ngay?) then (Có)
+      :Chuyển đến trang KYC;
+      
+      :Upload giấy tờ:
+      - CMND/CCCD
+      - Bằng lái xe
+      - Ảnh selfie;
+      
+      :Gửi yêu cầu xác thực;
+      
+      partition "Admin xử lý KYC" {
+        :Admin nhận yêu cầu;
+        :Kiểm tra giấy tờ;
+        
+        if (Giấy tờ hợp lệ?) then (Không)
+          if (Thiếu thông tin?) then (Có)
+            :Yêu cầu bổ sung;
+            :Co-owner bổ sung giấy tờ;
+          else (Không)
+            :Từ chối KYC;
+            :Gửi email thông báo;
+            stop
+          endif
+        else (Có)
+          :Phê duyệt KYC;
+          :Cập nhật kyc_status = "verified";
+          :Tăng trust_level;
+          fork
+            :Gửi email thông báo;
+          fork again
+            :Gửi thông báo trong app;
+          end fork
+        endif
+      }
+      
+      :Co-owner nhận thông báo;
+      :Hoàn tất xác thực;
+      
+    else (Không)
+      :Bỏ qua KYC;
+      note right
+        Co-owner có thể thực hiện
+        KYC sau. Tuy nhiên một số
+        tính năng bị giới hạn.
+      end note
+    endif
+    
+  endif
+endif
+
+stop
+
+@enduml

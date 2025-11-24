@@ -1,0 +1,72 @@
+@startuml state-sharechange
+title State Diagram - Thay đổi tỉ lệ sở hữu (Share Change)
+skinparam linetype ortho
+skinparam nodesep 80
+skinparam ranksep 100
+
+[*] --> Proposed : Người dùng đề xuất thay đổi tỉ lệ
+
+state Proposed {
+  Proposed : Ghi nhận đề xuất
+  Proposed : Kiểm tra eligibility
+}
+
+Proposed --> Calculating : Tính toán phân chia mới (preview)
+Proposed --> Rejected : Không đủ quyền hoặc invalid
+
+state Calculating {
+  Calculating : Tạo bản preview tỉ lệ mới
+  Calculating : Hiển thị cho parties
+}
+
+Calculating --> UnderReview : Các party/GroupAdmin review
+Calculating --> Rejected : Calculation error
+
+state UnderReview {
+  UnderReview : Chờ phê duyệt (GroupAdmin / vote)
+  UnderReview : Có thể có vote / consensus
+}
+
+UnderReview --> Approved : Đạt điều kiện phê duyệt
+UnderReview --> Rejected : Bị từ chối
+
+state Approved {
+  Approved : Approved => trigger contract update
+}
+
+Approved --> Applying : Áp dụng thay đổi (update contract)
+Applying --> Applied : Thay đổi được áp dụng (contract updated)
+Applying --> RolledBack : Nếu cập nhật hợp đồng thất bại
+
+state Rejected {
+  Rejected : Đề xuất không được chấp nhận
+}
+
+state Applied {
+  Applied : Tỉ lệ mới có hiệu lực
+  Applied : Ghi nhận version contract
+}
+
+state RolledBack {
+  RolledBack : Rollback & thông báo
+}
+
+Applied --> [*]
+Rejected --> [*]
+RolledBack --> [*]
+
+note right of UnderReview
+  Approval models:
+  - Single GroupAdmin approval
+  - Majority vote among members
+  - Time-limited voting window
+end note
+
+note left of Applying
+  Contract update must:
+  - Create new version
+  - Preserve signatures / audit trail
+  - Trigger notifications
+end note
+
+@enduml

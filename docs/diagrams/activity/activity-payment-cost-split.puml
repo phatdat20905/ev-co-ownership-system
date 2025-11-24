@@ -1,0 +1,262 @@
+@startuml activity-payment-cost-split
+!theme plain
+title Activity Diagram - Thanh toán & Chia chi phí
+skinparam linetype ortho
+skinparam nodesep 80
+skinparam ranksep 100
+|System|
+start
+
+:Phát sinh chi phí;
+
+note right
+  Chi phí có thể từ:
+  - Booking hoàn thành
+  - Bảo trì xe
+  - Bảo hiểm
+  - Sạc xe
+  - Phí phạt
+end note
+
+:Xác định loại chi phí;
+
+partition "Phân loại chi phí" {
+  if (Chi phí cá nhân?) then (Có)
+    :Gán cho Co-owner cụ thể;
+    :type = "individual";
+    note right
+      Ví dụ:
+      - Booking cost
+      - Hư hỏng do cá nhân
+      - Phí phạt cá nhân
+    end note
+  else (Không - Chi phí chung)
+    :Gán cho nhóm;
+    :type = "shared";
+    note right
+      Ví dụ:
+      - Bảo trì định kỳ
+      - Bảo hiểm
+      - Phí quản lý
+    end note
+  endif
+}
+
+:Tạo Cost record;
+
+:Lưu vào database;
+
+partition "Chia chi phí" {
+  
+  if (Chi phí cá nhân?) then (Có)
+    :Tạo 1 CostSplit record:
+    - user_id
+    - amount = 100%
+    - status = "pending";
+    
+  else (Không - Chi phí chung)
+    :Lấy danh sách group members;
+    
+    :Lấy tỷ lệ sở hữu mỗi thành viên;
+    
+    repeat
+      :Tính amount cho member:
+      = total_cost × ownership_percentage;
+      
+      :Tạo CostSplit record:
+      - user_id
+      - amount
+      - percentage
+      - status = "pending";
+      
+    repeat while (Còn member?)
+    
+    :Validate tổng = 100%;
+  endif
+}
+
+fork
+  :Tạo Invoice cho mỗi CostSplit;
+  :Tạo InvoiceItems chi tiết;
+fork again
+  :Gửi thông báo cho Co-owners;
+fork again
+  :Gửi email hóa đơn;
+end fork
+
+|Co-owner|
+:Nhận thông báo chi phí mới;
+
+:Xem chi tiết hóa đơn:
+- Loại chi phí
+- Số tiền
+- Breakdown
+- Due date;
+
+if (Có tranh chấp?) then (Có)
+  :Tạo dispute;
+  :Chờ xử lý;
+  note right
+    Tạm ngưng thanh toán
+    cho đến khi tranh chấp
+    được giải quyết
+  end note
+  stop
+else (Không)
+  :Quyết định phương thức thanh toán;
+endif
+
+if (Thanh toán từ đâu?) then (Ví cá nhân)
+  
+  |System|
+  :Kiểm tra số dư ví;
+  
+  if (Đủ số dư?) then (Không)
+    :Thông báo số dư không đủ;
+    :Yêu cầu nạp tiền;
+    
+    |Co-owner|
+    :Nạp tiền vào ví;
+    
+    |System|
+    :Xử lý nạp tiền qua Payment Provider;
+    :Cập nhật số dư ví;
+  endif
+  
+  |System|
+  :Trừ tiền từ ví;
+  :Tạo WalletTransaction;
+  :Cập nhật số dư;
+  
+else (Quỹ chung)
+  
+  |System|
+  :Kiểm tra số dư quỹ chung;
+  
+  if (Đủ số dư?) then (Không)
+    :Thông báo quỹ không đủ;
+    :Yêu cầu nạp thêm;
+    
+    |Co-owner|
+    if (Có quyền nạp quỹ?) then (Có)
+      :Nạp tiền vào quỹ;
+      
+      |System|
+      :Xử lý nạp tiền;
+      :Tạo GroupFundTransaction;
+      :Cập nhật số dư quỹ;
+    else (Không)
+      :Thông báo Admin/Owner;
+      stop
+    endif
+  endif
+  
+  |System|
+  :Trừ tiền từ quỹ;
+  :Tạo GroupFundTransaction;
+  :Cập nhật số dư quỹ;
+  
+else (Thanh toán trực tuyến)
+  
+  |Co-owner|
+  :Chọn phương thức:
+  - Thẻ tín dụng
+  - Thẻ ghi nợ
+  - Ví điện tử (Momo, ZaloPay)
+  - Chuyển khoản ngân hàng;
+  
+  :Nhập thông tin thanh toán;
+  
+  |System|
+  :Tạo Payment record;
+  :Gửi request đến Payment Provider;
+  
+  |Payment Provider|
+  :Xử lý thanh toán;
+  
+  if (Thanh toán thành công?) then (Không)
+    :Trả về lỗi;
+    
+    |System|
+    :Cập nhật payment_status = "failed";
+    :Ghi log lỗi;
+    :Thông báo Co-owner;
+    stop
+    
+  else (Có)
+    :Xác nhận thanh toán;
+    :Trả về transaction_id;
+  endif
+  
+  |System|
+  :Nhận xác nhận từ Payment Provider;
+  :Cập nhật payment_status = "completed";
+  
+endif
+
+:Cập nhật CostSplit status = "paid";
+
+:Cập nhật Invoice status = "paid";
+
+:Ghi nhận payment_date;
+
+partition "Xử lý sau thanh toán" {
+  fork
+    :Tạo receipt PDF;
+    :Gửi email receipt;
+  fork again
+    :Cập nhật payment history;
+  fork again
+    :Cập nhật accounting records;
+  fork again
+    :Gửi thông báo thanh toán thành công;
+  fork again
+    :Cập nhật user credit score;
+  fork again
+    :Ghi log vào audit trail;
+  end fork
+}
+
+|Co-owner|
+:Nhận xác nhận thanh toán;
+
+:Tải xuống hóa đơn điện tử;
+
+if (Cần hóa đơn VAT?) then (Có)
+  :Yêu cầu xuất hóa đơn VAT;
+  :Nhập thông tin công ty;
+  
+  |System|
+  :Tạo VAT invoice;
+  :Gửi cho Co-owner;
+endif
+
+partition "Báo cáo & Thống kê" {
+  |System|
+  :Cập nhật thống kê chi phí:
+  - Total spent
+  - By category
+  - By time period;
+  
+  :Cập nhật group financial report;
+  
+  :Tính toán metrics:
+  - Average cost per member
+  - Cost distribution fairness
+  - Payment compliance rate;
+  
+  if (Cuối tháng?) then (Có)
+    :Tạo báo cáo tháng;
+    :Gửi cho tất cả members;
+  endif
+  
+  if (Cuối quý?) then (Có)
+    :Tạo báo cáo quý;
+    :Phân tích xu hướng;
+    :Gửi cho Admin & Members;
+  endif
+}
+
+stop
+
+@enduml

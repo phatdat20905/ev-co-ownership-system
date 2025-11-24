@@ -1,0 +1,40 @@
+@startuml communication-cost-settlement
+!theme plain
+title Communication Diagram - Thanh toán & Hoa hồng / Refund (Cost Settlement)
+
+participant "Cost Service" as CostSvc
+participant "API Gateway" as GW
+participant "Payment Provider" as PaymentGW
+participant "Database (Accounting)" as DB
+participant "RabbitMQ" as MQ
+participant "Notification Service" as Notif
+participant "User" as User
+
+User -> GW : 1: Request settlement / invoice
+GW -> CostSvc : 2: createInvoice(request)
+CostSvc -> DB : 3: INSERT invoice
+DB --> CostSvc : 3.1: invoice id
+alt Pay with wallet
+  CostSvc -> DB : 4: UPDATE wallet balance
+  CostSvc -> DB : 4.1: mark invoice paid
+else Online payment
+  CostSvc -> PaymentGW : 5: createCharge(amount)
+  PaymentGW --> CostSvc : 5.1: payment URL / token
+  CostSvc --> GW : 5.2: return redirect
+  PaymentGW -> CostSvc : 5.3: IPN / webhook (payment status)
+  CostSvc -> DB : 5.4: update payment status
+end
+
+' Refund flow
+CostSvc -> PaymentGW : 6: requestRefund(txnId)
+PaymentGW --> CostSvc : 6.1: refund status
+CostSvc -> DB : 6.2: update records
+CostSvc -> MQ : 7: PUBLISH settlement.completed
+MQ -> Notif : 7.1: notify user
+
+note right of CostSvc
+  - Handles invoices, charges, refunds
+  - Emits accounting events for ledger
+end note
+
+@enduml

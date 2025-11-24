@@ -1,0 +1,53 @@
+@startuml communication-auth
+!theme plain
+title Communication Diagram - Xác thực / Đăng nhập (Auth Flow)
+
+participant "Frontend" as FE
+participant "API Gateway" as GW
+participant "Auth Service" as AuthSvc
+participant "Redis (Session)" as Redis
+participant "Database" as DB
+participant "Email/SMS Provider" as SNS
+participant "KYC Provider" as KYC
+participant "User" as User
+
+User -> FE : 1: Nhập credentials / OTP
+FE -> GW : 2: POST /api/auth/login
+GW -> AuthSvc : 3: login(request)
+AuthSvc -> DB : 3.1: SELECT user WHERE email
+DB --> AuthSvc : 3.2: user record
+alt Password correct
+  AuthSvc -> Redis : 4: SET session(token)
+  Redis --> AuthSvc : 4.1: OK
+  AuthSvc --> GW : 5: 200 { access_token }
+  GW --> FE : 6: response
+  FE --> User : 7: Hiển thị đăng nhập thành công
+else Password incorrect / needs OTP
+  AuthSvc -> SNS : 8: sendOTP(phone/email)
+  SNS --> AuthSvc : 8.1: sent
+  AuthSvc --> GW : 9: 401 {OTP required}
+end
+
+' Password reset / refresh token
+FE -> GW : 10: POST /api/auth/refresh
+GW -> AuthSvc : 11: refresh(token)
+AuthSvc -> Redis : 11.1: GET refresh_token
+Redis --> AuthSvc : 11.2: valid
+AuthSvc --> GW : 12: 200 { new_access_token }
+GW --> FE : 13: response
+
+' KYC callback example
+KYC -> AuthSvc : 14: webhook/kyc_result(userId, status)
+AuthSvc -> DB : 14.1: UPDATE user SET kyc_status
+DB --> AuthSvc : 14.2: updated
+AuthSvc -> GW : 15: publish event auth.kyc.updated
+
+note right of AuthSvc
+  Responsibilities:
+  - Verify credentials
+  - Issue tokens
+  - Manage sessions in Redis
+  - Integrate OTP / KYC
+end note
+
+@enduml

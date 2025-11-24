@@ -1,0 +1,350 @@
+@startuml sequence-ai-suggestion
+!theme plain
+title Sequence Diagram - Gợi ý AI cho lịch công bằng
+
+actor "Co-owner" as User
+participant "Frontend" as FE
+participant "API Gateway" as Gateway
+participant "AI Service" as AI
+participant "Booking Service" as BookingSvc
+participant "User Service" as UserSvc
+participant "Cost Service" as CostSvc
+participant "Redis Cache" as Redis
+participant "Database" as DB
+participant "ML Model" as ML
+
+== YÊU CẦU GỢI Ý THỦ CÔNG ==
+
+User -> FE: Vào trang đặt lịch
+activate FE
+
+User -> FE: Click "AI Suggest Best Time"
+
+FE -> Gateway: POST /api/ai/suggest-booking\n{group_id, vehicle_id,\npreferred_duration,\nflexible_dates: true}
+activate Gateway
+
+Gateway -> AI: Request booking suggestion
+activate AI
+
+note right of AI
+  AI Service sẽ phân tích:
+  - Lịch sử booking của user
+  - Lịch sử booking của group
+  - Ownership percentage
+  - Current fairness score
+  - Available time slots
+end note
+
+' Thu thập dữ liệu
+par Parallel data collection
+    AI -> BookingSvc: GET /api/bookings/user/{user_id}/history
+    activate BookingSvc
+    BookingSvc -> DB: SELECT * FROM bookings\nWHERE user_id = ?\nAND created_at > DATE_SUB(NOW(), INTERVAL 3 MONTH)
+    activate DB
+    DB --> BookingSvc: User's booking history
+    deactivate DB
+    BookingSvc --> AI: History data
+    deactivate BookingSvc
+    
+and
+    AI -> UserSvc: GET /api/groups/{group_id}/usage-stats
+    activate UserSvc
+    UserSvc -> DB: SELECT user_id,\nSUM(TIMESTAMPDIFF(HOUR, start_time, end_time)) as total_hours,\nCOUNT(*) as booking_count\nFROM bookings b\nJOIN group_members gm\nGROUP BY user_id
+    activate DB
+    DB --> UserSvc: Group usage stats
+    deactivate DB
+    UserSvc --> AI: Group stats
+    deactivate UserSvc
+    
+and
+    AI -> UserSvc: GET /api/groups/{group_id}/member/{user_id}
+    activate UserSvc
+    UserSvc -> DB: SELECT ownership_percentage,\nfairness_score, role\nFROM group_members
+    activate DB
+    DB --> UserSvc: Member info
+    deactivate DB
+    UserSvc --> AI: Ownership & fairness
+    deactivate UserSvc
+    
+and
+    AI -> BookingSvc: GET /api/vehicles/{vehicle_id}/calendar\n?days=14
+    activate BookingSvc
+    BookingSvc -> Redis: GET calendar cache
+    activate Redis
+    Redis --> BookingSvc: Cached calendar
+    deactivate Redis
+    BookingSvc --> AI: Available slots
+    deactivate BookingSvc
+    
+and
+    AI -> CostSvc: GET /api/costs/user/{user_id}/summary
+    activate CostSvc
+    CostSvc -> DB: SELECT SUM(amount) as total_cost\nFROM cost_splits
+    activate DB
+    DB --> CostSvc: Cost summary
+    deactivate DB
+    CostSvc --> AI: Cost data
+    deactivate CostSvc
+end
+
+' Phân tích dữ liệu
+AI -> AI: Calculate current usage percentage:\nuser_hours / total_group_hours
+
+AI -> AI: Calculate usage deviation:\nusage_percentage - ownership_percentage
+
+AI -> AI: Determine if underuser or overuser
+
+note right of AI
+  Underuser: usage < ownership
+  → Encourage more booking
+  
+  Overuser: usage > ownership
+  → Suggest reducing or off-peak times
+end note
+
+' Machine Learning Analysis
+AI -> ML: Analyze patterns\n{user_history, group_patterns,\ntemporal_features}
+activate ML
+
+ML -> ML: Feature extraction:\n- Preferred time of day\n- Preferred day of week\n- Average duration\n- Booking frequency\n- Success rate
+
+ML -> ML: Run prediction model:\n- Time slot preference probability\n- Conflict likelihood\n- Fairness impact score
+
+ML --> AI: Predictions & scores
+deactivate ML
+
+' Optimization Algorithm
+AI -> AI: Run optimization algorithm
+
+note right of AI
+  Objective function:
+  Maximize:
+  - User satisfaction (0.3)
+  - Fairness improvement (0.4)
+  - Low conflict probability (0.3)
+  
+  Constraints:
+  - Vehicle availability
+  - User preferences
+  - Group fairness threshold
+end note
+
+AI -> AI: Generate top 5 suggestions:\n1. Best overall\n2. Soonest available\n3. Longest duration\n4. Weekend option\n5. Off-peak option
+
+loop For each suggestion
+    AI -> AI: Calculate scores:\n- Confidence: 0-100%\n- Fairness impact: +X%\n- Conflict risk: Low/Medium/High\n- Reasoning: "Based on your patterns..."
+end
+
+' Lưu recommendations
+AI -> DB: INSERT INTO recommendations\n{user_id, vehicle_id,\nsuggestions_json,\ngenerated_at, expires_at}
+activate DB
+DB --> AI: Recommendation saved
+deactivate DB
+
+AI --> Gateway: 200 OK\n{suggestions: [\n  {slot, confidence, reasoning},\n  ...\n]}
+deactivate AI
+
+Gateway --> FE: AI suggestions
+deactivate Gateway
+
+FE --> User: Hiển thị đề xuất:\n━━━━━━━━━━━━━━━━\n✨ Top Suggestions:\n\n1️⃣ Tomorrow 9AM-12PM\n   Confidence: 95%\n   📈 Improves fairness by 5%\n   💡 Low competition time\n\n2️⃣ This Saturday 2PM-6PM\n   Confidence: 88%\n   📈 Improves fairness by 7%\n   ⚠️ Medium demand\n\n[Use This] [See More]
+deactivate FE
+
+User -> FE: Click "Use This" trên suggestion #1
+activate FE
+
+FE -> FE: Pre-fill booking form:\n- Start: Tomorrow 9AM\n- End: Tomorrow 12PM\n- Priority boost applied
+
+FE -> Gateway: POST /api/bookings\n{...suggestion data...,\nai_recommendation_id}
+activate Gateway
+
+Gateway -> BookingSvc: Create booking
+activate BookingSvc
+
+BookingSvc -> DB: INSERT booking
+activate DB
+DB --> BookingSvc: Booking created
+deactivate DB
+
+' Track AI recommendation acceptance
+BookingSvc -> AI: POST /api/ai/feedback\n{recommendation_id,\naccepted: true}
+activate AI
+
+AI -> DB: UPDATE recommendations\nSET status = 'accepted',\nfeedback_at = NOW()
+activate DB
+DB --> AI: Updated
+deactivate DB
+
+AI -> ML: Record positive feedback\nfor model training
+activate ML
+ML --> AI: Recorded
+deactivate ML
+
+AI --> BookingSvc: Feedback recorded
+deactivate AI
+
+BookingSvc --> Gateway: Booking created
+deactivate BookingSvc
+
+Gateway --> FE: Success
+deactivate Gateway
+
+FE --> User: Đặt lịch thành công!\n✅ Following AI suggestion
+deactivate FE
+
+== GỢI Ý TỰ ĐỘNG ĐỊNH KỲ ==
+
+activate AI
+note right of AI
+  Cronjob chạy mỗi tuần
+  vào Chủ nhật 8PM
+end note
+
+AI -> AI: Trigger weekly fairness analysis
+
+AI -> DB: SELECT DISTINCT group_id\nFROM co_ownership_groups\nWHERE status = 'active'
+activate DB
+DB --> AI: List of active groups
+deactivate DB
+
+loop For each group
+
+    AI -> UserSvc: GET /api/groups/{group_id}/fairness
+    activate UserSvc
+    
+    UserSvc -> DB: Calculate fairness scores
+    activate DB
+    DB --> UserSvc: {group_fairness: 65%,\nmembers: [...]}
+    deactivate DB
+    
+    UserSvc --> AI: Fairness data
+    deactivate UserSvc
+    
+    alt Group fairness < 70%
+        AI -> AI: Group needs intervention
+        
+        ' Identify underusers
+        AI -> AI: Filter members where\nusage_percentage < ownership_percentage - 10%
+        
+        loop For each underuser
+            AI -> ML: Generate personalized suggestions
+            activate ML
+            
+            ML -> DB: Get user preferences
+            activate DB
+            DB --> ML: Preference data
+            deactivate DB
+            
+            ML -> ML: Predict optimal slots
+            
+            ML --> AI: Suggestions for user
+            deactivate ML
+            
+            AI -> DB: INSERT INTO recommendations\n{type: 'proactive',\nuser_id, suggestions}
+            activate DB
+            DB --> AI: Saved
+            deactivate DB
+            
+            AI -> Gateway: POST /api/notifications/send\n{user_id, type: 'ai_suggestion'}
+            activate Gateway
+            
+            Gateway -> UserSvc: Send notification
+            activate UserSvc
+            
+            UserSvc -> DB: INSERT notification
+            activate DB
+            DB --> UserSvc: OK
+            deactivate DB
+            
+            UserSvc -> UserSvc: Send email:\n"📊 Your vehicle usage is below\nyour ownership share.\n\n✨ We found perfect time slots for you:\n[View Suggestions]"
+            
+            UserSvc --> Gateway: Notification sent
+            deactivate UserSvc
+            
+            Gateway --> AI: OK
+            deactivate Gateway
+        end
+        
+        ' Suggest to overusers
+        AI -> AI: Identify overusers
+        
+        loop For each overuser
+            AI -> DB: INSERT recommendation\n{type: 'reduce_usage'}
+            activate DB
+            DB --> AI: Saved
+            deactivate DB
+            
+            AI -> Gateway: Send gentle reminder
+            activate Gateway
+            Gateway -> UserSvc: Send notification
+            activate UserSvc
+            UserSvc -> UserSvc: Send email:\n"📈 Your usage is above your share.\nConsider:\n- Shorter trips\n- Off-peak times\n- Sharing opportunities"
+            UserSvc --> Gateway: OK
+            deactivate UserSvc
+            Gateway --> AI: OK
+            deactivate Gateway
+        end
+        
+    else Group fairness >= 70%
+        AI -> AI: Group is balanced\nNo action needed
+    end
+end
+
+AI -> DB: INSERT INTO ai_analysis_logs\n{analyzed_at, groups_count,\nrecommendations_generated}
+activate DB
+DB --> AI: Logged
+deactivate DB
+
+deactivate AI
+
+== THEO DÕI HIỆU QUẢ AI ==
+
+activate AI
+AI -> AI: Monthly performance analysis
+
+AI -> DB: SELECT COUNT(*) as total,\nSUM(CASE WHEN status='accepted' THEN 1 ELSE 0 END) as accepted\nFROM recommendations\nWHERE created_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH)
+activate DB
+DB --> AI: {total: 1250, accepted: 875}
+deactivate DB
+
+AI -> AI: Calculate acceptance rate:\n875 / 1250 = 70%
+
+AI -> DB: SELECT AVG(fairness_score)\nFROM group_members\nGROUP BY DATE_FORMAT(updated_at, '%Y-%m')
+activate DB
+DB --> AI: Fairness trend data
+deactivate DB
+
+AI -> AI: Analyze fairness improvement:\nBefore AI: 68%\nAfter AI: 78%\n→ +10% improvement
+
+AI -> DB: INSERT INTO ai_performance_reports\n{month, acceptance_rate,\nfairness_improvement,\nconflicts_reduced}
+activate DB
+DB --> AI: Report saved
+deactivate DB
+
+alt Acceptance rate < 60%
+    AI -> ML: Trigger model retraining
+    activate ML
+    
+    ML -> DB: Fetch recent data\n(bookings, user behavior, feedback)
+    activate DB
+    DB --> ML: Training data
+    deactivate DB
+    
+    ML -> ML: Retrain model with new data
+    
+    ML -> ML: Evaluate model:\n- Precision\n- Recall\n- F1-score
+    
+    ML -> ML: Deploy new model if better
+    
+    ML --> AI: Retraining completed
+    deactivate ML
+    
+    AI -> DB: Log retraining event
+    activate DB
+    DB --> AI: Logged
+    deactivate DB
+end
+
+deactivate AI
+
+@enduml

@@ -1,0 +1,370 @@
+@startuml sequence-booking-crud
+!theme plain
+title Sequence Diagram - Tạo/Sửa/Xóa Lịch đặt xe
+
+actor "Co-owner" as User
+participant "Frontend" as FE
+participant "API Gateway" as Gateway
+participant "Booking Service" as BookingSvc
+participant "Vehicle Service" as VehicleSvc
+participant "User Service" as UserSvc
+participant "AI Service" as AI
+participant "Notification Service" as NotifSvc
+participant "Redis Cache" as Redis
+participant "Database" as DB
+participant "RabbitMQ" as MQ
+
+== TẠO LỊCH ĐẶT XE ==
+
+User -> FE: Chọn xe và thời gian
+activate FE
+
+FE -> Gateway: GET /api/vehicles/{vehicle_id}/calendar\n?start_date=...&end_date=...
+activate Gateway
+
+Gateway -> BookingSvc: Get calendar
+activate BookingSvc
+
+BookingSvc -> Redis: GET vehicle:{id}:calendar:{date}
+activate Redis
+
+alt Cache hit
+    Redis --> BookingSvc: Cached calendar data
+    
+else Cache miss
+    deactivate Redis
+    
+    BookingSvc -> DB: SELECT * FROM bookings\nWHERE vehicle_id = ?\nAND date BETWEEN ? AND ?
+    activate DB
+    DB --> BookingSvc: Bookings data
+    deactivate DB
+    
+    BookingSvc -> Redis: SETEX vehicle:{id}:calendar\nTTL=300
+    activate Redis
+    Redis --> BookingSvc: OK
+    deactivate Redis
+end
+
+BookingSvc --> Gateway: Calendar data
+deactivate BookingSvc
+Gateway --> FE: 200 OK {available_slots, bookings}
+deactivate Gateway
+
+FE --> User: Hiển thị lịch xe
+deactivate FE
+
+User -> FE: Nhập thông tin booking:\n- Start time\n- End time\n- Purpose
+activate FE
+
+alt User yêu cầu AI đề xuất
+    User -> FE: Click "AI Suggest"
+    
+    FE -> Gateway: POST /api/ai/suggest-booking
+    activate Gateway
+    
+    Gateway -> AI: Suggest optimal slot
+    activate AI
+    
+    AI -> BookingSvc: Get user's booking history
+    activate BookingSvc
+    BookingSvc -> DB: SELECT * FROM bookings\nWHERE user_id = ?
+    activate DB
+    DB --> BookingSvc: History
+    deactivate DB
+    BookingSvc --> AI: Booking history
+    deactivate BookingSvc
+    
+    AI -> UserSvc: Get ownership percentage
+    activate UserSvc
+    UserSvc -> DB: SELECT ownership_percentage
+    activate DB
+    DB --> UserSvc: Ownership data
+    deactivate DB
+    UserSvc --> AI: Ownership %
+    deactivate UserSvc
+    
+    AI -> AI: ML algorithm:\n- Analyze patterns\n- Calculate fairness\n- Find optimal slots
+    
+    AI --> Gateway: Suggested slots with scores
+    deactivate AI
+    
+    Gateway --> FE: AI suggestions
+    deactivate Gateway
+    
+    FE --> User: Hiển thị đề xuất
+    
+    User -> FE: Chọn slot (đề xuất hoặc tự chọn)
+end
+
+FE -> Gateway: POST /api/bookings\n{vehicle_id, start_time,\nend_time, purpose}
+activate Gateway
+
+Gateway -> Gateway: Verify JWT & permissions
+
+Gateway -> BookingSvc: Create booking
+activate BookingSvc
+
+BookingSvc -> BookingSvc: Validate input
+
+' Kiểm tra xe khả dụng
+BookingSvc -> VehicleSvc: GET /api/vehicles/{id}
+activate VehicleSvc
+VehicleSvc -> DB: SELECT * FROM vehicles\nWHERE id = ?
+activate DB
+DB --> VehicleSvc: Vehicle data
+deactivate DB
+
+alt Vehicle không tồn tại hoặc không active
+    VehicleSvc --> BookingSvc: 404 Vehicle not found
+    BookingSvc --> Gateway: Error
+    Gateway --> FE: Error response
+    FE --> User: Thông báo lỗi
+    
+else Vehicle available
+    VehicleSvc --> BookingSvc: Vehicle data
+    deactivate VehicleSvc
+    
+    ' Kiểm tra quyền booking
+    BookingSvc -> UserSvc: GET /api/groups/{group_id}/member/{user_id}
+    activate UserSvc
+    UserSvc -> DB: SELECT * FROM group_members
+    activate DB
+    DB --> UserSvc: Member data
+    deactivate DB
+    
+    alt User không phải member
+        UserSvc --> BookingSvc: 403 Not authorized
+        BookingSvc --> Gateway: Error
+        Gateway --> FE: Error
+        FE --> User: Không có quyền
+        
+    else User là member
+        UserSvc --> BookingSvc: Member data\n{ownership_percentage, role}
+        deactivate UserSvc
+        
+        ' Kiểm tra xung đột
+        BookingSvc -> DB: SELECT * FROM bookings\nWHERE vehicle_id = ?\nAND status NOT IN ('cancelled')\nAND time_overlap(?, ?)
+        activate DB
+        DB --> BookingSvc: Conflicting bookings
+        deactivate DB
+        
+        alt Có xung đột
+            BookingSvc -> BookingSvc: Calculate priority scores
+            note right
+              Priority = 
+              (ownership_% × 0.4) +
+              (fairness_score × 0.3) +
+              (usage_compliance × 0.3)
+            end note
+            
+            alt Priority thấp hơn
+                BookingSvc -> DB: INSERT INTO booking_conflicts
+                activate DB
+                DB --> BookingSvc: Conflict logged
+                deactivate DB
+                
+                BookingSvc --> Gateway: 409 Conflict
+                Gateway --> FE: Conflict error
+                FE --> User: Thông báo xung đột\n+ Đề xuất thời gian khác
+                
+            else Priority cao hơn
+                BookingSvc -> DB: BEGIN TRANSACTION
+                activate DB
+                
+                BookingSvc -> DB: INSERT INTO bookings\n{...data...}
+                DB --> BookingSvc: Booking created
+                
+                BookingSvc -> DB: INSERT INTO booking_conflicts\n{conflict_type: 'resolved'}
+                DB --> BookingSvc: OK
+                
+                BookingSvc -> DB: COMMIT
+                deactivate DB
+                
+                ' Publish event
+                BookingSvc -> MQ: Publish booking.created\n{booking_id, user_id, conflicted_users}
+                activate MQ
+                MQ --> BookingSvc: Published
+                deactivate MQ
+            end
+            
+        else Không xung đột
+            BookingSvc -> DB: INSERT INTO bookings
+            activate DB
+            DB --> BookingSvc: Booking created
+            deactivate DB
+            
+            BookingSvc -> MQ: Publish booking.created
+            activate MQ
+            MQ --> BookingSvc: Published
+            deactivate MQ
+        end
+        
+        ' Invalidate cache
+        BookingSvc -> Redis: DEL vehicle:{id}:calendar:*
+        activate Redis
+        Redis --> BookingSvc: OK
+        deactivate Redis
+        
+        BookingSvc --> Gateway: 201 Created {booking}
+        deactivate BookingSvc
+        
+        Gateway --> FE: Success
+        deactivate Gateway
+        
+        FE --> User: Xác nhận đặt lịch thành công
+        deactivate FE
+        
+        ' Background notification
+        MQ -> NotifSvc: Consume booking.created event
+        activate NotifSvc
+        
+        NotifSvc -> NotifSvc: Tạo notifications
+        
+        par Send to all group members
+            NotifSvc -> DB: INSERT notifications
+            activate DB
+            DB --> NotifSvc: OK
+            deactivate DB
+        and
+            NotifSvc -> NotifSvc: Send email
+        and
+            NotifSvc -> NotifSvc: Send push notification
+        end
+        
+        deactivate NotifSvc
+    end
+end
+
+== SỬA LỊCH ĐẶT ==
+
+User -> FE: Click "Sửa lịch"
+activate FE
+
+FE -> Gateway: PUT /api/bookings/{booking_id}\n{new_start_time, new_end_time}
+activate Gateway
+
+Gateway -> BookingSvc: Update booking
+activate BookingSvc
+
+' Kiểm tra quyền sửa
+BookingSvc -> DB: SELECT * FROM bookings\nWHERE id = ?
+activate DB
+DB --> BookingSvc: Booking data
+deactivate DB
+
+alt User không phải owner của booking
+    BookingSvc --> Gateway: 403 Forbidden
+    Gateway --> FE: Error
+    FE --> User: Không có quyền sửa
+    
+else User là owner
+    alt Booking đã bắt đầu hoặc hoàn thành
+        BookingSvc --> Gateway: 400 Cannot modify
+        Gateway --> FE: Error
+        FE --> User: Không thể sửa lịch đã diễn ra
+        
+    else Có thể sửa
+        BookingSvc -> DB: Check conflicts với new time
+        activate DB
+        DB --> BookingSvc: Conflict check result
+        deactivate DB
+        
+        alt Có xung đột với thời gian mới
+            BookingSvc --> Gateway: 409 Conflict
+            Gateway --> FE: Error
+            FE --> User: Thời gian mới bị xung đột
+            
+        else Không xung đột
+            BookingSvc -> DB: UPDATE bookings\nSET start_time = ?,\nend_time = ?,\nupdated_at = NOW()
+            activate DB
+            DB --> BookingSvc: Updated
+            deactivate DB
+            
+            BookingSvc -> Redis: DEL cache
+            activate Redis
+            Redis --> BookingSvc: OK
+            deactivate Redis
+            
+            BookingSvc -> MQ: Publish booking.updated
+            activate MQ
+            MQ --> BookingSvc: OK
+            deactivate MQ
+            
+            BookingSvc --> Gateway: 200 OK {updated_booking}
+            deactivate BookingSvc
+            
+            Gateway --> FE: Success
+            deactivate Gateway
+            
+            FE --> User: Cập nhật thành công
+            deactivate FE
+        end
+    end
+end
+
+== XÓA LỊCH ĐẶT ==
+
+User -> FE: Click "Hủy lịch"
+activate FE
+
+FE -> FE: Hiển thị confirmation dialog
+
+User -> FE: Xác nhận hủy
+
+FE -> Gateway: DELETE /api/bookings/{booking_id}
+activate Gateway
+
+Gateway -> BookingSvc: Cancel booking
+activate BookingSvc
+
+BookingSvc -> DB: SELECT * FROM bookings\nWHERE id = ?
+activate DB
+DB --> BookingSvc: Booking data
+deactivate DB
+
+alt User không phải owner
+    BookingSvc --> Gateway: 403 Forbidden
+    Gateway --> FE: Error
+    FE --> User: Không có quyền hủy
+    
+else User là owner
+    BookingSvc -> BookingSvc: Check cancellation policy
+    note right
+      - Hủy > 24h trước: Không phí
+      - Hủy < 24h: Phí 20%
+      - Hủy < 2h: Phí 50%
+    end note
+    
+    BookingSvc -> DB: UPDATE bookings\nSET status = 'cancelled',\ncancelled_at = NOW(),\ncancellation_reason = ?
+    activate DB
+    DB --> BookingSvc: Updated
+    deactivate DB
+    
+    alt Có phí hủy
+        BookingSvc -> DB: INSERT INTO costs\n{type: 'cancellation_fee'}
+        activate DB
+        DB --> BookingSvc: Cost created
+        deactivate DB
+    end
+    
+    BookingSvc -> Redis: DEL cache
+    activate Redis
+    Redis --> BookingSvc: OK
+    deactivate Redis
+    
+    BookingSvc -> MQ: Publish booking.cancelled\n{booking_id, cancellation_fee}
+    activate MQ
+    MQ --> BookingSvc: OK
+    deactivate MQ
+    
+    BookingSvc --> Gateway: 200 OK {message, fee}
+    deactivate BookingSvc
+    
+    Gateway --> FE: Success
+    deactivate Gateway
+    
+    FE --> User: Hủy lịch thành công\n(Phí hủy: {fee} nếu có)
+    deactivate FE
+end
+
+@enduml

@@ -1,0 +1,92 @@
+@startuml communication-voting
+!theme plain
+title Communication Diagram - Bỏ phiếu (Voting Process)
+
+participant "Co-owner\n(Initiator)" as Initiator
+participant "Frontend" as FE
+participant "API Gateway" as GW
+participant "User Service" as UserSvc
+participant "Database" as DB
+participant "RabbitMQ" as MQ
+participant "Notification Service" as Notif
+participant "Co-owner\n(Voter)" as Voter
+
+Initiator -> FE : 1: Tạo bỏ phiếu
+FE -> GW : 2: POST /api/votes
+GW -> UserSvc : 3: createVote(voteData)
+
+UserSvc -> DB : 4: INSERT group_vote
+DB --> UserSvc : 4.1: vote created
+
+UserSvc -> DB : 5: INSERT vote_options
+DB --> UserSvc : 5.1: options created
+
+UserSvc -> DB : 6: SELECT eligible_voters
+DB --> UserSvc : 6.1: voters list
+
+UserSvc -> MQ : 7: PUBLISH vote.created
+MQ -> Notif : 7.1: consume event
+Notif -> DB : 7.2: INSERT notifications
+Notif -> Notif : 7.3: send emails to voters
+
+Voter -> FE : 8: Nhận thông báo & xem vote
+FE -> GW : 9: GET /api/votes/{id}
+GW -> UserSvc : 10: getVoteDetails(voteId)
+UserSvc -> DB : 10.1: SELECT vote & options
+DB --> UserSvc : 10.2: vote data
+UserSvc --> FE : 10.3: vote details
+
+Voter -> FE : 11: Chọn option & gửi vote
+FE -> GW : 12: POST /api/votes/{id}/cast
+GW -> UserSvc : 13: castVote(voteId, optionId)
+
+UserSvc -> DB : 14: INSERT user_vote
+DB --> UserSvc : 14.1: vote recorded
+
+UserSvc -> DB : 15: UPDATE option vote_count
+DB --> UserSvc : 15.1: count updated
+
+UserSvc -> MQ : 16: PUBLISH vote.cast
+MQ -> Notif : 16.1: notify initiator
+
+UserSvc -> UserSvc : 17: checkIfComplete()
+
+alt All members voted or deadline reached
+  UserSvc -> UserSvc : 18: calculateResult()
+  UserSvc -> DB : 19: UPDATE vote status & result
+  DB --> UserSvc : 19.1: updated
+  UserSvc -> MQ : 20: PUBLISH vote.completed
+  MQ -> Notif : 20.1: notify all members
+end
+
+UserSvc --> GW : 21: vote cast success
+GW --> FE : 22: response
+FE --> Voter : 23: Xác nhận đã bỏ phiếu
+
+note right of UserSvc
+  Messages:
+  3: createVote
+  4: saveVote
+  5: saveOptions
+  6: getEligibleVoters
+  7: publishVoteCreated
+  10: getVoteDetails
+  13: castVote
+  14: recordVote
+  15: updateCount
+  16: publishVoteCast
+  17: checkCompletion
+  18: calculateResult
+  20: publishCompleted
+end note
+
+note bottom
+  Collaboration: Bỏ phiếu trong nhóm
+  - Tạo vote với options
+  - Thông báo cho members
+  - Ghi nhận phiếu bầu
+  - Tính kết quả tự động
+  - Thông báo kết quả
+end note
+
+@enduml

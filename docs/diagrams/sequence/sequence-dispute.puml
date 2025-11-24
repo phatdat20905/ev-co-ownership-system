@@ -1,0 +1,491 @@
+@startuml sequence-dispute
+!theme plain
+title Sequence Diagram - Quản lý tranh chấp
+
+actor "Co-owner" as User
+actor "Staff" as Staff  
+actor "Admin" as Admin
+participant "Frontend" as FE
+participant "API Gateway" as Gateway
+participant "Admin Service" as AdminSvc
+participant "User Service" as UserSvc
+participant "Cost Service" as CostSvc
+participant "Notification Service" as NotifSvc
+participant "Database" as DB
+participant "Storage" as Storage
+participant "RabbitMQ" as MQ
+
+== TẠO TRANH CHẤP ==
+
+User -> FE: Phát hiện vấn đề:\n- Chi phí không hợp lý\n- Xe bị hư hỏng\n- Xung đột booking
+activate FE
+
+FE --> User: Hiển thị form tạo tranh chấp
+
+User -> FE: Nhập thông tin:\n- Loại tranh chấp\n- Mô tả chi tiết\n- Bằng chứng (ảnh/video)\n- Liên quan đến (booking/cost/member)
+
+FE -> Gateway: POST /api/disputes\n{type, description,\nrelated_entity, attachments}
+activate Gateway
+
+Gateway -> AdminSvc: Create dispute
+activate AdminSvc
+
+AdminSvc -> AdminSvc: Validate input
+
+' Upload attachments
+loop For each attachment
+    AdminSvc -> Storage: Upload file
+    activate Storage
+    Storage --> AdminSvc: File URL
+    deactivate Storage
+end
+
+AdminSvc -> DB: BEGIN TRANSACTION
+activate DB
+
+AdminSvc -> DB: INSERT INTO disputes\n{created_by, type,\ndescription, status: 'open',\npriority: 'medium'}
+DB --> AdminSvc: Dispute created {dispute_id}
+
+loop For each attachment
+    AdminSvc -> DB: INSERT INTO dispute_attachments\n{dispute_id, file_url, file_type}
+    DB --> AdminSvc: OK
+end
+
+' Link to related entities
+alt Liên quan đến cost
+    AdminSvc -> DB: UPDATE disputes\nSET related_cost_id = ?
+else Liên quan đến booking
+    AdminSvc -> DB: UPDATE disputes\nSET related_booking_id = ?
+else Liên quan đến member
+    AdminSvc -> DB: UPDATE disputes\nSET related_user_id = ?
+end
+
+AdminSvc -> DB: COMMIT
+deactivate DB
+
+' Determine assignee based on priority
+AdminSvc -> AdminSvc: Calculate initial priority:\n- Cost dispute: medium\n- Damage dispute: high\n- Booking conflict: low
+
+alt Priority = high
+    AdminSvc -> DB: Assign to Admin on-duty
+    activate DB
+    DB --> AdminSvc: Assigned
+    deactivate DB
+else Priority = medium/low
+    AdminSvc -> DB: Assign to Staff on-duty
+    activate DB
+    DB --> AdminSvc: Assigned
+    deactivate DB
+end
+
+AdminSvc -> MQ: Publish dispute.created\n{dispute_id, assignee}
+activate MQ
+MQ --> AdminSvc: Published
+deactivate MQ
+
+AdminSvc --> Gateway: 201 Created {dispute}
+deactivate AdminSvc
+
+Gateway --> FE: Success
+deactivate Gateway
+
+FE --> User: Tranh chấp đã tạo\n[Mã: #{dispute_id}]
+deactivate FE
+
+' Background notification
+MQ -> NotifSvc: Consume dispute.created
+activate NotifSvc
+
+par
+    NotifSvc -> DB: Notify assignee (Staff/Admin)
+    activate DB
+    DB --> NotifSvc: OK
+    deactivate DB
+and
+    NotifSvc -> NotifSvc: Send email to assignee
+and
+    NotifSvc -> NotifSvc: Send email confirmation to creator
+end
+
+deactivate NotifSvc
+
+== STAFF XỬ LÝ TRANH CHẤP ==
+
+Staff -> FE: Nhận thông báo tranh chấp mới
+activate FE
+
+FE -> Gateway: GET /api/disputes/{dispute_id}
+activate Gateway
+
+Gateway -> AdminSvc: Get dispute details
+activate AdminSvc
+
+AdminSvc -> DB: SELECT d.*, dm.*\nFROM disputes d\nLEFT JOIN dispute_messages dm\nWHERE d.id = ?
+activate DB
+DB --> AdminSvc: Dispute data với messages
+deactivate DB
+
+' Get related data
+alt Related to cost
+    AdminSvc -> CostSvc: GET /api/costs/{cost_id}
+    activate CostSvc
+    CostSvc --> AdminSvc: Cost details
+    deactivate CostSvc
+    
+else Related to booking
+    AdminSvc -> UserSvc: GET /api/bookings/{booking_id}
+    activate UserSvc
+    UserSvc --> AdminSvc: Booking details
+    deactivate UserSvc
+end
+
+AdminSvc --> Gateway: Full dispute context
+deactivate AdminSvc
+
+Gateway --> FE: Dispute details
+deactivate Gateway
+
+FE --> Staff: Hiển thị:\n- Thông tin tranh chấp\n- Bằng chứng\n- Lịch sử messages\n- Related entities
+deactivate FE
+
+Staff -> FE: Phân tích vấn đề
+activate FE
+
+Staff -> FE: Gửi tin nhắn cho User:\n"Chúng tôi đang xem xét.\nVui lòng cung cấp thêm..."
+activate FE
+
+FE -> Gateway: POST /api/disputes/{dispute_id}/messages\n{message, sender: 'staff'}
+activate Gateway
+
+Gateway -> AdminSvc: Add message
+activate AdminSvc
+
+AdminSvc -> DB: INSERT INTO dispute_messages\n{dispute_id, sender_id,\nmessage, created_at}
+activate DB
+DB --> AdminSvc: Message saved
+deactivate DB
+
+AdminSvc -> MQ: Publish dispute.message_added
+activate MQ
+MQ --> AdminSvc: OK
+deactivate MQ
+
+AdminSvc --> Gateway: 201 Created
+deactivate AdminSvc
+
+Gateway --> FE: Success
+deactivate Gateway
+
+FE --> Staff: Tin nhắn đã gửi
+deactivate FE
+
+' User nhận thông báo
+MQ -> NotifSvc: Consume event
+activate NotifSvc
+NotifSvc -> DB: Notify user
+activate DB
+DB --> NotifSvc: OK
+deactivate DB
+NotifSvc -> NotifSvc: Send email
+deactivate NotifSvc
+
+User -> FE: Nhận thông báo
+activate FE
+
+FE -> Gateway: GET /api/disputes/{dispute_id}/messages
+activate Gateway
+Gateway -> AdminSvc: Get messages
+activate AdminSvc
+AdminSvc -> DB: SELECT messages
+activate DB
+DB --> AdminSvc: Messages
+deactivate DB
+AdminSvc --> Gateway: Messages
+deactivate AdminSvc
+Gateway --> FE: Messages
+deactivate Gateway
+
+FE --> User: Hiển thị tin nhắn từ Staff
+deactivate FE
+
+User -> FE: Trả lời + Upload thêm bằng chứng
+activate FE
+
+FE -> Gateway: POST /api/disputes/{dispute_id}/messages\n{message, attachments}
+activate Gateway
+Gateway -> AdminSvc: Add user message
+activate AdminSvc
+AdminSvc -> Storage: Upload attachments
+activate Storage
+Storage --> AdminSvc: URLs
+deactivate Storage
+AdminSvc -> DB: INSERT message & attachments
+activate DB
+DB --> AdminSvc: Saved
+deactivate DB
+AdminSvc -> MQ: Publish event
+activate MQ
+MQ --> AdminSvc: OK
+deactivate MQ
+AdminSvc --> Gateway: OK
+deactivate AdminSvc
+Gateway --> FE: Success
+deactivate Gateway
+FE --> User: Đã gửi phản hồi
+deactivate FE
+
+== STAFF GIẢI QUYẾT HOẶC CHUYỂN TIẾP ==
+
+Staff -> FE: Xem xét tất cả thông tin
+activate FE
+
+alt Staff có thể giải quyết
+
+    Staff -> FE: Chọn hành động:\n[Phê duyệt | Từ chối | Điều chỉnh]
+    
+    alt Điều chỉnh chi phí
+        Staff -> FE: Nhập số tiền điều chỉnh
+        
+        FE -> Gateway: POST /api/disputes/{dispute_id}/resolve\n{action: 'adjust_cost',\nnew_amount, resolution_note}
+        activate Gateway
+        
+        Gateway -> AdminSvc: Resolve dispute
+        activate AdminSvc
+        
+        AdminSvc -> DB: BEGIN TRANSACTION
+        activate DB
+        
+        AdminSvc -> DB: UPDATE disputes\nSET status = 'resolved',\nresolved_by = ?,\nresolved_at = NOW(),\nresolution = ?
+        
+        ' Apply resolution
+        AdminSvc -> CostSvc: PUT /api/costs/{cost_id}\n{amount: new_amount}
+        activate CostSvc
+        CostSvc -> DB: UPDATE costs\nSET amount = ?
+        CostSvc -> DB: Recalculate cost_splits
+        CostSvc --> AdminSvc: Updated
+        deactivate CostSvc
+        
+        AdminSvc -> DB: COMMIT
+        deactivate DB
+        
+        AdminSvc -> MQ: Publish dispute.resolved
+        activate MQ
+        MQ --> AdminSvc: OK
+        deactivate MQ
+        
+        AdminSvc --> Gateway: 200 OK
+        deactivate AdminSvc
+        
+        Gateway --> FE: Success
+        deactivate Gateway
+        
+        FE --> Staff: Tranh chấp đã giải quyết
+        deactivate FE
+        
+    else Phê duyệt/Từ chối
+        Staff -> FE: Nhập lý do
+        
+        FE -> Gateway: POST /api/disputes/{dispute_id}/resolve\n{action, resolution_note}
+        activate Gateway
+        
+        Gateway -> AdminSvc: Resolve
+        activate AdminSvc
+        
+        AdminSvc -> DB: UPDATE disputes\nSET status = 'resolved'
+        activate DB
+        DB --> AdminSvc: OK
+        deactivate DB
+        
+        AdminSvc -> MQ: Publish event
+        activate MQ
+        MQ --> AdminSvc: OK
+        deactivate MQ
+        
+        AdminSvc --> Gateway: OK
+        deactivate AdminSvc
+        Gateway --> FE: Success
+        deactivate Gateway
+        FE --> Staff: Đã xử lý
+        deactivate FE
+    end
+
+else Vấn đề phức tạp - Chuyển Admin
+
+    Staff -> FE: Click "Chuyển lên Admin"
+    
+    FE -> Gateway: POST /api/disputes/{dispute_id}/escalate\n{escalation_reason}
+    activate Gateway
+    
+    Gateway -> AdminSvc: Escalate dispute
+    activate AdminSvc
+    
+    AdminSvc -> DB: UPDATE disputes\nSET status = 'escalated',\npriority = 'high',\nassigned_to = (admin_on_duty),\nescalated_at = NOW()
+    activate DB
+    DB --> AdminSvc: Updated
+    deactivate DB
+    
+    AdminSvc -> MQ: Publish dispute.escalated
+    activate MQ
+    MQ --> AdminSvc: OK
+    deactivate MQ
+    
+    AdminSvc --> Gateway: 200 OK
+    deactivate AdminSvc
+    
+    Gateway --> FE: Success
+    deactivate Gateway
+    
+    FE --> Staff: Đã chuyển lên Admin
+    deactivate FE
+    
+    ' Notify Admin
+    MQ -> NotifSvc: Consume escalated event
+    activate NotifSvc
+    NotifSvc -> DB: Notify admin
+    activate DB
+    DB --> NotifSvc: OK
+    deactivate DB
+    NotifSvc -> NotifSvc: Send urgent email
+    deactivate NotifSvc
+    
+    == ADMIN XỬ LÝ TRANH CHẤP CAO CẤP ==
+    
+    Admin -> FE: Nhận thông báo urgent
+    activate FE
+    
+    FE -> Gateway: GET /api/disputes/{dispute_id}
+    activate Gateway
+    Gateway -> AdminSvc: Get full context
+    activate AdminSvc
+    AdminSvc -> DB: Get all related data
+    activate DB
+    DB --> AdminSvc: Full context
+    deactivate DB
+    AdminSvc --> Gateway: Dispute context
+    deactivate AdminSvc
+    Gateway --> FE: Context
+    deactivate Gateway
+    
+    FE --> Admin: Hiển thị đầy đủ thông tin\n+ Staff notes\n+ Escalation reason
+    deactivate FE
+    
+    Admin -> FE: Đưa ra phán quyết cuối cùng
+    activate FE
+    
+    alt Hoàn tiền
+        Admin -> FE: Chọn "Hoàn tiền"\n+ Nhập số tiền
+        
+        FE -> Gateway: POST /api/disputes/{dispute_id}/resolve\n{action: 'refund',\namount, resolution}
+        activate Gateway
+        
+        Gateway -> AdminSvc: Process admin resolution
+        activate AdminSvc
+        
+        AdminSvc -> DB: BEGIN TRANSACTION
+        activate DB
+        
+        AdminSvc -> DB: UPDATE disputes\nSET status = 'resolved',\nresolved_by = admin_id
+        
+        ' Process refund
+        AdminSvc -> CostSvc: POST /api/refunds\n{user_id, amount, reason}
+        activate CostSvc
+        CostSvc -> DB: Create refund transaction
+        CostSvc -> DB: Update wallet balance
+        CostSvc --> AdminSvc: Refund completed
+        deactivate CostSvc
+        
+        AdminSvc -> DB: COMMIT
+        deactivate DB
+        
+        AdminSvc -> MQ: Publish dispute.resolved
+        activate MQ
+        MQ --> AdminSvc: OK
+        deactivate MQ
+        
+        AdminSvc --> Gateway: OK
+        deactivate AdminSvc
+        Gateway --> FE: Success
+        deactivate Gateway
+        FE --> Admin: Đã hoàn tiền
+        deactivate FE
+        
+    else Áp dụng hình phạt
+        Admin -> FE: Chọn "Phạt member"\n+ Chọn member\n+ Nhập lý do & mức phạt
+        
+        FE -> Gateway: POST /api/disputes/{dispute_id}/resolve\n{action: 'penalize',\ntarget_user_id, penalty}
+        activate Gateway
+        
+        Gateway -> AdminSvc: Apply penalty
+        activate AdminSvc
+        
+        AdminSvc -> DB: BEGIN TRANSACTION
+        activate DB
+        
+        AdminSvc -> DB: UPDATE disputes SET status = 'resolved'
+        
+        ' Apply penalty
+        AdminSvc -> UserSvc: POST /api/users/{user_id}/penalties\n{type, amount, reason}
+        activate UserSvc
+        UserSvc -> DB: INSERT penalty
+        UserSvc -> DB: Update user trust_score
+        UserSvc --> AdminSvc: Penalty applied
+        deactivate UserSvc
+        
+        AdminSvc -> DB: COMMIT
+        deactivate DB
+        
+        AdminSvc -> MQ: Publish event
+        activate MQ
+        MQ --> AdminSvc: OK
+        deactivate MQ
+        
+        AdminSvc --> Gateway: OK
+        deactivate AdminSvc
+        Gateway --> FE: Success
+        deactivate Gateway
+        FE --> Admin: Đã áp dụng hình phạt
+        deactivate FE
+    end
+end
+
+== THÔNG BÁO KẾT QUẢ ==
+
+MQ -> NotifSvc: Consume dispute.resolved
+activate NotifSvc
+
+par Notify all parties
+    NotifSvc -> DB: Notify creator
+    activate DB
+    DB --> NotifSvc: OK
+    deactivate DB
+and
+    NotifSvc -> NotifSvc: Send email with resolution
+and
+    NotifSvc -> DB: Notify other involved parties
+    activate DB
+    DB --> NotifSvc: OK
+    deactivate DB
+end
+
+deactivate NotifSvc
+
+User -> FE: Nhận thông báo kết quả
+activate FE
+
+FE -> Gateway: GET /api/disputes/{dispute_id}
+activate Gateway
+Gateway -> AdminSvc: Get resolved dispute
+activate AdminSvc
+AdminSvc -> DB: Get full resolution
+activate DB
+DB --> AdminSvc: Dispute with resolution
+deactivate DB
+AdminSvc --> Gateway: Dispute
+deactivate AdminSvc
+Gateway --> FE: Dispute data
+deactivate Gateway
+
+FE --> User: Hiển thị kết quả:\n- Resolution\n- Action taken\n- Next steps
+deactivate FE
+
+@enduml

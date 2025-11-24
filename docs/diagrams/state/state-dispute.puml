@@ -1,0 +1,230 @@
+@startuml state-dispute
+title State Diagram - Trạng thái tranh chấp (Dispute)
+skinparam linetype ortho
+skinparam nodesep 80
+skinparam ranksep 100
+
+[*] --> Open : User tạo tranh chấp
+
+state Open {
+  Open : Tranh chấp mới tạo
+  Open : Đã ghi nhận vấn đề
+  Open : Đã upload bằng chứng
+  Open : Chờ Staff nhận
+  Open : Priority: được tính tự động
+}
+
+Open --> Assigned : Hệ thống assign cho Staff\n(hoặc Admin nếu priority cao)
+
+state Assigned {
+  Assigned : Đã assign cho người xử lý
+  Assigned : Staff/Admin đã nhận thông báo
+  Assigned : SLA timer starts
+  Assigned : User được thông báo
+}
+
+Assigned --> InProgress : Staff/Admin\nbắt đầu xem xét
+
+state InProgress {
+  state "Investigating" as IP_Investigating
+  state "Requesting Info" as IP_RequestInfo
+  state "Evidence Review" as IP_Review
+  
+  [*] --> IP_Investigating : Bắt đầu điều tra
+  
+  IP_Investigating : Xem xét thông tin
+  IP_Investigating : Phân tích bằng chứng
+  IP_Investigating : Check related data:
+  IP_Investigating : - Booking records
+  IP_Investigating : - Cost records
+  IP_Investigating : - User history
+  IP_Investigating : - Vehicle logs
+  
+  IP_Investigating --> IP_RequestInfo : Cần thêm thông tin
+  IP_Investigating --> IP_Review : Đủ thông tin
+  
+  IP_RequestInfo : Yêu cầu user bổ sung
+  IP_RequestInfo : Gửi message/email
+  IP_RequestInfo : Waiting for response
+  IP_RequestInfo : Timeout: 3 ngày
+  
+  IP_RequestInfo --> IP_Investigating : User cung cấp thêm
+  IP_RequestInfo --> IP_Review : Timeout hoặc user không phản hồi
+  
+  IP_Review : Review toàn bộ evidence
+  IP_Review : Đánh giá tính hợp lệ
+  IP_Review : Xác định nguyên nhân
+  IP_Review : Đề xuất giải pháp
+}
+
+InProgress --> Escalated : Vấn đề phức tạp\nStaff chuyển lên Admin
+InProgress --> Resolved : Staff giải quyết thành công
+InProgress --> Rejected : Tranh chấp không hợp lệ
+
+state Escalated {
+  Escalated : Chuyển lên Admin
+  Escalated : Priority tăng lên HIGH
+  Escalated : Lý do escalate ghi nhận
+  Escalated : Admin review ASAP
+}
+
+Escalated --> InProgress : Admin tiếp nhận\nvà xử lý
+Escalated --> Resolved : Admin giải quyết trực tiếp
+
+state Resolved {
+  state "Approved" as R_Approved
+  state "Adjusted" as R_Adjusted
+  state "Compensated" as R_Compensated
+  
+  [*] --> R_Approved : Chấp nhận yêu cầu\ncủa user
+  [*] --> R_Adjusted : Điều chỉnh một phần
+  [*] --> R_Compensated : Bồi thường
+  
+  R_Approved : Hoàn toàn đồng ý với user
+  R_Approved : Apply resolution:
+  R_Approved : - Hủy chi phí
+  R_Approved : - Hoàn tiền
+  R_Approved : - Sửa record
+  
+  R_Adjusted : Giải quyết một phần
+  R_Adjusted : Điều chỉnh số liệu
+  R_Adjusted : Compromise solution
+  R_Adjusted : Both parties có benefit
+  
+  R_Compensated : Bồi thường cho user
+  R_Compensated : Refund amount
+  R_Compensated : Credit to wallet
+  R_Compensated : Discount coupon
+}
+
+Resolved --> Closed : User chấp nhận giải pháp\n(không appeal)
+Resolved --> Reopened : User không đồng ý\n(appeal trong 7 ngày)
+
+state Rejected {
+  Rejected : Tranh chấp bị từ chối
+  Rejected : Lý do từ chối rõ ràng:
+  Rejected : - Không đủ bằng chứng
+  Rejected : - Claim không hợp lệ
+  Rejected : - Vượt quá thời hạn
+  Rejected : - Trùng lặp
+}
+
+Rejected --> Reopened : User cung cấp\nbằng chứng mới
+Rejected --> Closed : User chấp nhận\n(không appeal)
+
+state Reopened {
+  Reopened : Mở lại tranh chấp
+  Reopened : Do appeal hoặc evidence mới
+  Reopened : Re-assign lại
+  Reopened : Higher priority
+}
+
+Reopened --> Escalated : Auto-escalate lên Admin
+Escalated --> InProgress : Admin xử lý lại
+
+state Closed {
+  Closed : Tranh chấp đã đóng
+  Closed : Giải pháp đã thực thi
+  Closed : Tất cả parties satisfied
+  Closed : hoặc hết thời hạn appeal
+  Closed : Record được archive
+}
+
+Closed --> [*] : Archive sau 30 ngày
+
+note right of Open
+  Auto-assign based on:
+  - Priority level
+  - Dispute type
+  - Staff availability
+  - Staff expertise
+  - Current workload
+  
+  Priority calculation:
+  HIGH: 
+  - Cost > 5M VND
+  - Vehicle damage
+  - Safety issues
+  MEDIUM:
+  - Cost 1-5M VND
+  - Service issues
+  LOW:
+  - Cost < 1M
+  - Minor complaints
+end note
+
+note right of InProgress
+  SLA (Service Level Agreement):
+  
+  HIGH priority:
+  - Response: 2 hours
+  - Resolution: 24 hours
+  
+  MEDIUM priority:
+  - Response: 8 hours  
+  - Resolution: 3 days
+  
+  LOW priority:
+  - Response: 24 hours
+  - Resolution: 7 days
+  
+  Violation → Auto-escalate
+end note
+
+note right of Escalated
+  Escalation triggers:
+  1. SLA violation
+  2. Staff không giải quyết được
+  3. High-value dispute
+  4. Legal implications
+  5. Multiple parties involved
+  6. Safety concerns
+  
+  Admin actions:
+  - Full investigation
+  - Access all records
+  - Contact all parties
+  - Make final decision
+  - Apply penalties if needed
+end note
+
+note bottom of Resolved
+  Resolution actions:
+  
+  Approved:
+  - Refund full amount
+  - Cancel charges
+  - Waive fees
+  - Apologize
+  
+  Adjusted:
+  - Partial refund
+  - Reduce charges
+  - Credit discount
+  - Service upgrade
+  
+  Compensated:
+  - Money compensation
+  - Extra credits
+  - Priority booking
+  - Goodwill gesture
+  
+  All actions logged & audited
+end note
+
+note bottom of Closed
+  Closure process:
+  1. Resolution executed
+  2. User confirmation
+  3. Payment processed (if any)
+  4. Feedback collected
+  5. Update user trust_score
+  6. Update dispute stats
+  7. Archive records
+  8. Send closure notification
+  
+  Appeal period: 7 days
+  After 7 days: Final
+end note
+
+@enduml

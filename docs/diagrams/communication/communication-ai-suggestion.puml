@@ -1,0 +1,113 @@
+@startuml communication-ai-suggestion
+!theme plain
+title Communication Diagram - AI gợi ý lịch (AI Suggestion Process)
+
+participant "System\n(Scheduler)" as Scheduler
+participant "AI Service" as AI
+participant "Booking Service" as BookingSvc
+participant "User Service" as UserSvc
+participant "Cost Service" as CostSvc
+participant "ML Engine" as ML
+participant "Database" as DB
+participant "RabbitMQ" as MQ
+participant "Notification Service" as Notif
+participant "Co-owner" as User
+participant "Frontend" as FE
+
+Scheduler -> AI : 1: triggerWeeklyAnalysis()
+
+AI -> UserSvc : 2: getActiveGroups()
+UserSvc -> DB : 2.1: SELECT active groups
+DB --> UserSvc : 2.2: groups list
+UserSvc --> AI : 2.3: groups data
+
+loop For each group
+  AI -> UserSvc : 3: getFairnessScores(groupId)
+  UserSvc -> DB : 3.1: CALCULATE fairness
+  DB --> UserSvc : 3.2: scores
+  UserSvc --> AI : 3.3: group fairness: 65%
+  
+  alt Fairness < 70%
+    AI -> BookingSvc : 4: getUserBookingHistory(userId)
+    BookingSvc -> DB : 4.1: SELECT bookings
+    DB --> BookingSvc : 4.2: history
+    BookingSvc --> AI : 4.3: usage data
+    
+    AI -> CostSvc : 5: getUserCosts(userId)
+    CostSvc -> DB : 5.1: SELECT costs
+    DB --> CostSvc : 5.2: cost data
+    CostSvc --> AI : 5.3: spending data
+    
+    AI -> ML : 6: analyzePatternsAndPredict(data)
+    ML -> ML : 6.1: feature extraction
+    ML -> ML : 6.2: run ML model
+    ML --> AI : 6.3: predictions & suggestions
+    
+    AI -> AI : 7: optimizeSchedule()
+    AI -> AI : 8: generateRecommendations()
+    
+    AI -> DB : 9: INSERT recommendations
+    DB --> AI : 9.1: recommendations saved
+    
+    AI -> MQ : 10: PUBLISH ai.recommendations.ready
+    MQ -> Notif : 10.1: consume event
+    Notif -> DB : 10.2: INSERT notifications
+    Notif -> Notif : 10.3: send emails
+  end
+end
+
+User -> FE : 11: Xem thông báo gợi ý
+FE -> AI : 12: GET /api/recommendations
+AI -> DB : 12.1: SELECT recommendations
+DB --> AI : 12.2: suggestions
+AI --> FE : 12.3: AI suggestions
+
+FE --> User : 13: Hiển thị gợi ý lịch
+
+User -> FE : 14: acceptRecommendation(suggestionId)
+FE -> AI : 15: acceptSuggestion(id)
+AI -> DB : 16: UPDATE recommendation status
+DB --> AI : 16.1: updated
+
+AI -> BookingSvc : 17: createBooking(suggestedData)
+BookingSvc -> DB : 17.1: INSERT booking
+DB --> BookingSvc : 17.2: booking created
+BookingSvc --> AI : 17.3: booking confirmed
+
+AI -> ML : 18: recordFeedback(positive)
+ML -> ML : 18.1: update model training data
+
+AI --> FE : 19: booking created
+FE --> User : 20: Xác nhận đặt lịch
+
+note right of AI
+  Messages:
+  1: triggerWeeklyAnalysis
+  2: getActiveGroups
+  3: getFairnessScores
+  4: getUserBookingHistory
+  5: getUserCosts
+  6: analyzePatternsAndPredict
+  7: optimizeSchedule
+  8: generateRecommendations
+  9: saveRecommendations
+  10: publishRecommendations
+  12: getRecommendations
+  15: acceptSuggestion
+  17: createBooking
+  18: recordFeedback
+end note
+
+note bottom
+  Collaboration: AI gợi ý lịch công bằng
+  - Phân tích nhóm hàng tuần
+  - Tính fairness scores
+  - Thu thập dữ liệu usage
+  - ML prediction & optimization
+  - Tạo recommendations
+  - Gửi thông báo cho users
+  - Track acceptance & feedback
+  - Improve ML model
+end note
+
+@enduml

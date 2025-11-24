@@ -1,0 +1,32 @@
+@startuml communication-kyc
+!theme plain
+title Communication Diagram - KYC / Onboarding Flow
+
+participant "Frontend" as FE
+participant "API Gateway" as GW
+participant "User Service" as UserSvc
+participant "KYC Provider" as KYC
+participant "Storage (S3)" as S3
+participant "Database" as DB
+participant "Notification Service" as Notif
+participant "User" as User
+
+User -> FE : 1: Upload KYC documents
+FE -> GW : 2: POST /api/kyc
+GW -> UserSvc : 3: uploadDocuments(files)
+UserSvc -> S3 : 3.1: upload files
+S3 --> UserSvc : 3.2: file URLs
+UserSvc -> KYC : 4: submitForVerification(fileUrls, userData)
+KYC --> UserSvc : 4.1: verification result (webhook)
+UserSvc -> DB : 5: update kyc_status
+DB --> UserSvc : 5.1: saved
+UserSvc -> Notif : 6: publish kyc.updated
+Notif -> DB : 6.1: insert notification
+Notif -> Notif : 6.2: send email/SMS
+
+note right of UserSvc
+  - Manages document uploads and provider callbacks
+  - Stores KYC status and metadata
+end note
+
+@enduml

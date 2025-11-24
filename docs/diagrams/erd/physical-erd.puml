@@ -1,0 +1,455 @@
+@startuml physical-erd
+!theme plain
+skinparam linetype ortho
+title Physical ERD - PostgreSQL Schema
+
+' Users Table
+entity "users" as USERS {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL DEFAULT gen_random_uuid()
+  ==
+  **Columns**
+  --
+  email : VARCHAR(255) <<UNIQUE>> NOT NULL
+  password_hash : VARCHAR(255) NOT NULL
+  role : ENUM('OWNER','STAFF','ADMIN') NOT NULL
+  is_verified : BOOLEAN DEFAULT FALSE
+  is_active : BOOLEAN DEFAULT TRUE
+  created_at : TIMESTAMP DEFAULT NOW()
+  updated_at : TIMESTAMP DEFAULT NOW()
+  ==
+  **Indexes**
+  --
+  idx_users_email (email)
+  idx_users_role (role)
+}
+
+entity "user_profiles" as PROFILES {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  ==
+  **Foreign Keys**
+  --
+  user_id : UUID <<FK>> <<UNIQUE>> NOT NULL
+  ==
+  **Columns**
+  --
+  first_name : VARCHAR(100)
+  last_name : VARCHAR(100)
+  phone : VARCHAR(20)
+  address : TEXT
+  avatar_url : VARCHAR(500)
+  created_at : TIMESTAMP
+  ==
+  **Indexes**
+  --
+  idx_profiles_user (user_id)
+}
+
+entity "co_ownership_groups" as GROUPS {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  ==
+  **Foreign Keys**
+  --
+  created_by : UUID <<FK>> NOT NULL
+  vehicle_id : UUID <<FK>> <<UNIQUE>>
+  ==
+  **Columns**
+  --
+  group_name : VARCHAR(200) NOT NULL
+  description : TEXT
+  group_fund_balance : DECIMAL(15,2) DEFAULT 0
+  is_active : BOOLEAN DEFAULT TRUE
+  created_at : TIMESTAMP
+  ==
+  **Indexes**
+  --
+  idx_groups_created_by (created_by)
+  idx_groups_vehicle (vehicle_id)
+}
+
+entity "group_members" as MEMBERS {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  ==
+  **Foreign Keys**
+  --
+  group_id : UUID <<FK>> NOT NULL
+  user_id : UUID <<FK>> NOT NULL
+  ==
+  **Columns**
+  --
+  ownership_percentage : DECIMAL(5,2) NOT NULL
+  role : ENUM('OWNER','MEMBER') DEFAULT 'MEMBER'
+  joined_at : TIMESTAMP
+  ==
+  **Constraints**
+  --
+  UNIQUE(group_id, user_id)
+  CHECK(ownership_percentage BETWEEN 0.01 AND 100)
+  ==
+  **Indexes**
+  --
+  idx_members_group (group_id)
+  idx_members_user (user_id)
+}
+
+entity "vehicles" as VEHICLES {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  ==
+  **Foreign Keys**
+  --
+  group_id : UUID <<FK>> NOT NULL
+  ==
+  **Columns**
+  --
+  vehicle_name : VARCHAR(200) NOT NULL
+  license_plate : VARCHAR(20) <<UNIQUE>> NOT NULL
+  brand : VARCHAR(100)
+  model : VARCHAR(100)
+  year : INTEGER
+  status : ENUM('AVAILABLE','IN_USE','MAINTENANCE','RETIRED')
+  mileage : INTEGER DEFAULT 0
+  created_at : TIMESTAMP
+  ==
+  **Indexes**
+  --
+  idx_vehicles_group (group_id)
+  idx_vehicles_status (status)
+  idx_vehicles_plate (license_plate)
+}
+
+entity "bookings" as BOOKINGS {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  ==
+  **Foreign Keys**
+  --
+  vehicle_id : UUID <<FK>> NOT NULL
+  user_id : UUID <<FK>> NOT NULL
+  group_id : UUID <<FK>> NOT NULL
+  ==
+  **Columns**
+  --
+  start_time : TIMESTAMP NOT NULL
+  end_time : TIMESTAMP NOT NULL
+  status : ENUM('PENDING','CONFIRMED','IN_PROGRESS','COMPLETED','CANCELLED')
+  priority_score : INTEGER DEFAULT 0
+  purpose : TEXT
+  created_at : TIMESTAMP
+  ==
+  **Constraints**
+  --
+  CHECK(end_time > start_time)
+  ==
+  **Indexes**
+  --
+  idx_bookings_vehicle_time (vehicle_id, start_time, end_time)
+  idx_bookings_user (user_id)
+  idx_bookings_status (status)
+}
+
+entity "costs" as COSTS {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  ==
+  **Foreign Keys**
+  --
+  group_id : UUID <<FK>> NOT NULL
+  vehicle_id : UUID <<FK>>
+  booking_id : UUID <<FK>>
+  ==
+  **Columns**
+  --
+  amount : DECIMAL(15,2) NOT NULL
+  cost_type : ENUM('FUEL','MAINTENANCE','INSURANCE','PARKING','OTHER')
+  description : TEXT
+  incurred_at : TIMESTAMP
+  created_at : TIMESTAMP
+  ==
+  **Indexes**
+  --
+  idx_costs_group (group_id)
+  idx_costs_vehicle (vehicle_id)
+  idx_costs_type (cost_type)
+}
+
+entity "cost_splits" as SPLITS {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  ==
+  **Foreign Keys**
+  --
+  cost_id : UUID <<FK>> NOT NULL
+  user_id : UUID <<FK>> NOT NULL
+  ==
+  **Columns**
+  --
+  amount : DECIMAL(15,2) NOT NULL
+  percentage : DECIMAL(5,2)
+  status : ENUM('PENDING','PAID','OVERDUE')
+  paid_at : TIMESTAMP
+  ==
+  **Indexes**
+  --
+  idx_splits_cost (cost_id)
+  idx_splits_user_status (user_id, status)
+}
+
+entity "payments" as PAYMENTS {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  ==
+  **Foreign Keys**
+  --
+  invoice_id : UUID <<FK>>
+  user_id : UUID <<FK>> NOT NULL
+  ==
+  **Columns**
+  --
+  amount : DECIMAL(15,2) NOT NULL
+  payment_method : ENUM('VNPAY','MOMO','ZALOPAY','CASH')
+  transaction_id : VARCHAR(255) <<UNIQUE>>
+  status : ENUM('PENDING','COMPLETED','FAILED','REFUNDED')
+  paid_at : TIMESTAMP
+  ==
+  **Indexes**
+  --
+  idx_payments_user (user_id)
+  idx_payments_transaction (transaction_id)
+}
+
+' Relationships
+USERS ||--|| PROFILES : "ON DELETE CASCADE"
+USERS ||--o{ MEMBERS : "ON DELETE CASCADE"
+USERS ||--o{ BOOKINGS : "ON DELETE RESTRICT"
+USERS ||--o{ SPLITS : "ON DELETE RESTRICT"
+USERS ||--o{ PAYMENTS : "ON DELETE RESTRICT"
+
+GROUPS ||--o{ MEMBERS : "ON DELETE CASCADE"
+GROUPS ||--|| VEHICLES : "ON DELETE RESTRICT"
+GROUPS ||--o{ BOOKINGS : "ON DELETE CASCADE"
+GROUPS ||--o{ COSTS : "ON DELETE CASCADE"
+
+VEHICLES ||--o{ BOOKINGS : "ON DELETE RESTRICT"
+VEHICLES ||--o{ COSTS : "ON DELETE SET NULL"
+
+BOOKINGS ||--o| COSTS : "ON DELETE SET NULL"
+
+COSTS ||--o{ SPLITS : "ON DELETE CASCADE"
+
+'Invoices & billing'
+entity "invoices" as INVOICES {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  ==
+  user_id : UUID <<FK>>
+  group_id : UUID <<FK>>
+  invoice_number : VARCHAR(100) <<UNIQUE>>
+  total_amount : DECIMAL(15,2)
+  status : ENUM('DRAFT','ISSUED','PAID','CANCELLED')
+  issued_at : TIMESTAMP
+  ==
+  idx_invoices_user (user_id)
+}
+
+entity "invoice_items" as INVOICE_ITEMS {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  ==
+  invoice_id : UUID <<FK>> NOT NULL
+  description : TEXT
+  quantity : DECIMAL(10,2)
+  unit_price : DECIMAL(15,2)
+  amount : DECIMAL(15,2)
+  ==
+  idx_invoice_items_invoice (invoice_id)
+}
+
+'Wallets & transactions'
+entity "user_wallets" as USER_WALLETS {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  ==
+  user_id : UUID <<FK>> NOT NULL
+  balance : DECIMAL(15,2) DEFAULT 0
+  currency : VARCHAR(10)
+  ==
+  idx_wallets_user (user_id)
+}
+
+entity "group_wallets" as GROUP_WALLETS {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  ==
+  group_id : UUID <<FK>> NOT NULL
+  balance : DECIMAL(15,2) DEFAULT 0
+  currency : VARCHAR(10)
+  ==
+  idx_group_wallets_group (group_id)
+}
+
+entity "wallet_transactions" as WALLET_TXNS {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  ==
+  wallet_id : UUID <<FK>> NOT NULL
+  user_id : UUID <<FK>>
+  transaction_type : ENUM('DEPOSIT','WITHDRAW','TRANSFER','REFUND')
+  amount : DECIMAL(15,2)
+  balance_before : DECIMAL(15,2)
+  balance_after : DECIMAL(15,2)
+  created_at : TIMESTAMP
+  ==
+  idx_wallet_txn_wallet (wallet_id)
+}
+
+'Notifications & templates'
+entity "notifications" as NOTIFICATIONS {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  ==
+  user_id : UUID <<FK>> NOT NULL
+  title : VARCHAR(255)
+  message : TEXT
+  data : JSON
+  is_read : BOOLEAN DEFAULT FALSE
+  created_at : TIMESTAMP
+  ==
+  idx_notifications_user (user_id)
+}
+
+entity "notification_templates" as NOTIF_TEMPLATES {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  ==
+  name : VARCHAR(200)
+  type : VARCHAR(100)
+  subject : VARCHAR(255)
+  body_html : TEXT
+}
+
+'Device tokens / sessions / verification'
+entity "device_tokens" as DEVICE_TOKENS {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  ==
+  user_id : UUID <<FK>> NOT NULL
+  device_type : VARCHAR(50)
+  token : VARCHAR(500)
+  is_active : BOOLEAN DEFAULT TRUE
+  created_at : TIMESTAMP
+}
+
+entity "refresh_tokens" as REFRESH_TOKENS {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  user_id : UUID <<FK>> NOT NULL
+  token : VARCHAR(500)
+  expires_at : TIMESTAMP
+  is_revoked : BOOLEAN DEFAULT FALSE
+}
+
+entity "email_verifications" as EMAIL_VERIFICATIONS {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  user_id : UUID <<FK>> NOT NULL
+  token : VARCHAR(255)
+  expires_at : TIMESTAMP
+  verified_at : TIMESTAMP
+}
+
+entity "password_resets" as PASSWORD_RESETS {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  user_id : UUID <<FK>> NOT NULL
+  token : VARCHAR(255)
+  expires_at : TIMESTAMP
+  used_at : TIMESTAMP
+}
+
+'KYC and contract artifacts'
+entity "kyc_verifications" as KYC_VERIFICATIONS {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  user_id : UUID <<FK>> NOT NULL
+  document_type : VARCHAR(50)
+  document_number : VARCHAR(100)
+  status : ENUM('PENDING','APPROVED','REJECTED')
+  verified_at : TIMESTAMP
+}
+
+entity "contract_documents" as CONTRACT_DOCS {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  contract_id : UUID <<FK>> NOT NULL
+  file_url : VARCHAR(1000)
+  type : VARCHAR(50)
+  uploaded_at : TIMESTAMP
+}
+
+entity "signature_logs" as SIGN_LOGS {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  contract_id : UUID <<FK>> NOT NULL
+  user_id : UUID <<FK>> NOT NULL
+  signed_at : TIMESTAMP
+  ip_address : VARCHAR(45)
+}
+
+entity "dispute_messages" as DISPUTE_MSGS {
+  **PRIMARY KEY**
+  --
+  id : UUID <<PK>> NOT NULL
+  dispute_id : UUID <<FK>> NOT NULL
+  sender_id : UUID <<FK>> NOT NULL
+  message : TEXT
+  created_at : TIMESTAMP
+}
+
+note top of USERS
+**Bảng users**
+Lưu thông tin đăng nhập và vai trò
+Cascade: profiles
+Restrict: bookings, splits, payments
+end note
+
+note bottom of MEMBERS
+**Bảng group_members**
+ownership_percentage: 0.01-100.00
+Tổng % trong group = 100%
+Unique constraint: (group_id, user_id)
+end note
+
+note right of BOOKINGS
+**Bảng bookings**
+Constraint: end_time > start_time
+No overlap bookings cho cùng vehicle
+end note
+
+@enduml

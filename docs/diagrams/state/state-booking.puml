@@ -1,0 +1,92 @@
+@startuml state-booking
+title State Diagram - Trạng thái lịch đặt xe (Booking)
+skinparam linetype ortho
+skinparam nodesep 80
+skinparam ranksep 100
+
+[*] --> Pending : Tạo booking mới
+
+state Pending {
+  Pending : Booking vừa được tạo
+  Pending : Chờ xác nhận hoặc check-in
+  Pending : Priority score đã tính
+}
+
+Pending --> Confirmed : Hệ thống tự động xác nhận\n(không xung đột)
+Pending --> Conflict : Phát hiện xung đột\nvới booking khác
+
+state Conflict {
+  Conflict : Có xung đột về thời gian
+  Conflict : Đang so sánh priority scores
+  Conflict : Chờ giải quyết
+}
+
+Conflict --> Confirmed : Priority cao hơn\n→ Giải quyết xung đột
+Conflict --> Cancelled : Priority thấp hơn\nhoặc user hủy
+
+Confirmed --> InProgress : Check-in thành công\n(quét QR + xác nhận Staff)
+Confirmed --> Cancelled : User hủy trước khi check-in
+
+state InProgress {
+  InProgress : Xe đang được sử dụng
+  InProgress : Tracking GPS active
+  InProgress : Recording metrics
+  InProgress : Monitor battery & distance
+}
+
+InProgress --> Completed : Check-out thành công\n(quét QR + xác nhận Staff)
+
+state Completed {
+  Completed : Booking đã hoàn thành
+  Completed : Chi phí đã được tính
+  Completed : Metrics đã lưu
+  Completed : Usage stats updated
+}
+
+Completed --> [*]
+
+state Cancelled {
+  Cancelled : Booking đã bị hủy
+  Cancelled : Lý do hủy đã ghi nhận
+  Cancelled : Phí hủy (nếu có) đã tính
+}
+
+Cancelled --> [*]
+
+note right of Pending
+  Timeout: Nếu không check-in
+  trong vòng 30 phút sau start_time
+  → Auto cancel
+end note
+
+note right of Confirmed
+  Gửi QR code cho user
+  Gửi thông báo nhắc nhở
+  trước 1 giờ
+end note
+
+note right of InProgress
+  Real-time tracking:
+  - GPS location
+  - Battery level
+  - Distance traveled
+  - Time elapsed
+end note
+
+note right of Completed
+  Tự động tạo:
+  - Cost record
+  - Invoice
+  - Usage report
+  - Fairness score update
+end note
+
+note bottom of Cancelled
+  Phí hủy:
+  - > 24h trước: Miễn phí
+  - < 24h: 20% estimated cost
+  - < 2h: 50% estimated cost
+  - Sau start_time: 100%
+end note
+
+@enduml

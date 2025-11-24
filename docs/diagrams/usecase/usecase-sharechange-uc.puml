@@ -1,0 +1,28 @@
+@startuml sharechange_uc
+title Use Case - Thay đổi tỉ lệ sở hữu (Share Change)
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Co-owner" as CoOwner
+actor "GroupAdmin" as GroupAdmin
+actor "Admin" as Admin
+
+
+rectangle "Quyền sở hữu" {
+  usecase "Đề xuất thay đổi tỉ lệ sở hữu" as UC_ProposeShareChange
+  usecase "Tính toán tỉ lệ mới (preview)" as UC_CalculateNewShares
+  usecase "Phê duyệt thay đổi tỉ lệ" as UC_ApproveShareChange
+  usecase "Cập nhật hợp đồng đồng sở hữu" as UC_UpdateContract
+}
+
+' relations
+UC_ProposeShareChange ..> UC_CalculateNewShares : <<include>>
+UC_ProposeShareChange ..> UC_ApproveShareChange : <<include>>
+UC_ApproveShareChange ..> UC_UpdateContract : <<include>>
+
+' actor links
+CoOwner -- UC_ProposeShareChange
+GroupAdmin -- UC_ApproveShareChange
+Admin -- UC_ApproveShareChange
+
+@enduml

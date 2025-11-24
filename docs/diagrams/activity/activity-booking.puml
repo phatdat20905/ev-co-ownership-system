@@ -1,0 +1,139 @@
+@startuml activity-booking
+!theme plain
+title Activity Diagram - Đặt lịch xe
+skinparam linetype ortho
+skinparam nodesep 80
+skinparam ranksep 100
+
+start
+
+:Co-owner đăng nhập hệ thống;
+
+:Truy cập trang đặt lịch;
+
+:Chọn nhóm đồng sở hữu;
+
+:Xem danh sách xe của nhóm;
+
+:Chọn xe muốn đặt;
+
+:Xem lịch xe khả dụng;
+
+note right
+  Hiển thị:
+  - Các slot đã đặt
+  - Các slot khả dụng
+  - Priority của user
+end note
+
+:Chọn thời gian:
+- Ngày bắt đầu
+- Giờ bắt đầu
+- Ngày kết thúc
+- Giờ kết thúc;
+
+:Nhập mục đích sử dụng;
+
+if (Muốn AI đề xuất?) then (Có)
+  partition "AI Suggestion" {
+    :Gửi yêu cầu đến AI Service;
+    :AI phân tích:
+    - Lịch sử sử dụng
+    - Tỷ lệ sở hữu
+    - Fairness score
+    - Thời gian phổ biến;
+    :AI đề xuất slot phù hợp;
+    :Hiển thị đề xuất;
+    
+    if (Chấp nhận đề xuất?) then (Có)
+      :Áp dụng thời gian đề xuất;
+    else (Không)
+      :Giữ thời gian đã chọn;
+    endif
+  }
+endif
+
+:Gửi yêu cầu đặt lịch;
+
+partition "Validate & Priority Check" {
+  if (Thời gian hợp lệ?) then (Không)
+    :Thông báo lỗi thời gian;
+    stop
+  endif
+  
+  if (Xe khả dụng?) then (Không)
+    :Thông báo xe không khả dụng;
+    stop
+  endif
+  
+  :Tính priority score:
+  = (ownership_percentage × 0.4) +
+    (fairness_score × 0.3) +
+    (usage_compliance × 0.3);
+  
+  if (Có xung đột lịch?) then (Có)
+    :Lấy danh sách booking xung đột;
+    
+    fork
+      :So sánh priority score;
+    fork again
+      :Kiểm tra thời gian tạo booking;
+    end fork
+    
+    if (Priority cao hơn?) then (Có)
+      :Ghi log xung đột;
+      :Gửi thông báo cho user bị ảnh hưởng;
+      :Cho phép đặt lịch;
+    else (Không)
+      if (Thời gian tạo sớm hơn?) then (Không)
+        :Từ chối đặt lịch;
+        :Thông báo xung đột;
+        :Đề xuất thời gian khác;
+        stop
+      else (Có)
+        :Cho phép đặt lịch;
+      endif
+    endif
+  else (Không)
+    :Cho phép đặt lịch;
+  endif
+}
+
+partition "Tạo Booking" {
+  :Tạo record booking mới;
+  :Cập nhật calendar cache;
+  :Tính estimated cost;
+  
+  fork
+    :Gửi thông báo cho co-owner;
+  fork again
+    :Gửi thông báo cho group members;
+  fork again
+    :Ghi log hoạt động;
+  fork again
+    :Cập nhật usage statistics;
+  end fork
+}
+
+:Hiển thị xác nhận đặt lịch;
+
+:Gửi email xác nhận;
+
+note right
+  Email chứa:
+  - Chi tiết booking
+  - Thông tin xe
+  - QR code check-in
+  - Hướng dẫn sử dụng
+end note
+
+if (Muốn thêm vào lịch?) then (Có)
+  :Xuất file .ics;
+  :Thêm vào Google Calendar/Outlook;
+endif
+
+:Hoàn tất;
+
+stop
+
+@enduml

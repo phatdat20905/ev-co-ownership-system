@@ -1,0 +1,80 @@
+@startuml communication-booking
+!theme plain
+title Communication Diagram - Đặt lịch xe (Booking Process)
+
+participant "Co-owner" as User
+participant "Frontend" as FE
+participant "API Gateway" as GW
+participant "Booking Service" as BookingSvc
+participant "Vehicle Service" as VehicleSvc
+participant "User Service" as UserSvc
+participant "AI Service" as AI
+participant "Redis" as Redis
+participant "Database" as DB
+participant "RabbitMQ" as MQ
+participant "Notification Service" as Notif
+
+User -> FE : 1: Chọn xe và thời gian
+FE -> GW : 2: POST /api/bookings
+GW -> BookingSvc : 3: createBooking(data)
+
+BookingSvc -> VehicleSvc : 4: checkAvailability(vehicleId)
+VehicleSvc -> DB : 4.1: SELECT vehicle
+DB --> VehicleSvc : 4.2: vehicle data
+VehicleSvc --> BookingSvc : 4.3: availability status
+
+BookingSvc -> UserSvc : 5: verifyMembership(userId, groupId)
+UserSvc -> DB : 5.1: SELECT group_member
+DB --> UserSvc : 5.2: member data
+UserSvc --> BookingSvc : 5.3: ownership % & role
+
+BookingSvc -> AI : 6: calculatePriority(userId, history)
+AI -> DB : 6.1: GET usage history
+DB --> AI : 6.2: history data
+AI --> BookingSvc : 6.3: priority score
+
+BookingSvc -> DB : 7: CHECK conflicts
+DB --> BookingSvc : 7.1: conflicting bookings
+
+BookingSvc -> BookingSvc : 8: resolveConflicts()
+
+BookingSvc -> DB : 9: INSERT booking
+DB --> BookingSvc : 9.1: booking created
+
+BookingSvc -> Redis : 10: INVALIDATE calendar cache
+Redis --> BookingSvc : 10.1: cache cleared
+
+BookingSvc -> MQ : 11: PUBLISH booking.created event
+MQ -> Notif : 11.1: consume event
+Notif -> DB : 11.2: INSERT notifications
+Notif -> Notif : 11.3: send emails
+
+BookingSvc --> GW : 12: booking confirmed
+GW --> FE : 13: success response
+FE --> User : 14: Hiển thị xác nhận
+
+note right of BookingSvc
+  Messages:
+  3: createBooking
+  4: checkAvailability
+  5: verifyMembership
+  6: calculatePriority
+  7: checkConflicts
+  8: resolveConflicts
+  9: saveBooking
+  10: invalidateCache
+  11: publishEvent
+  12: return booking
+end note
+
+note bottom
+  Collaboration: Tạo lịch đặt xe
+  - Kiểm tra xe khả dụng
+  - Xác thực membership
+  - Tính priority score
+  - Giải quyết xung đột
+  - Lưu booking
+  - Gửi thông báo
+end note
+
+@enduml

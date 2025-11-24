@@ -1,0 +1,39 @@
+@startuml ops_uc
+title Use Case - Vận hành & Admin (Staff/Admin)
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Staff" as Staff
+actor "Admin" as Admin
+
+
+rectangle "Vận hành & Quản trị" {
+  usecase "Quản lý nhóm" as UC_ManageGroup
+  usecase "Quản lý hợp đồng e-contract" as UC_ManageContract
+  usecase "Xác nhận nhận/ trả xe" as UC_ConfirmPickupReturn
+  usecase "Tạo yêu cầu bảo dưỡng" as UC_CreateMaintenance
+  usecase "Ghi nhận sửa chữa" as UC_RecordRepair
+  usecase "Tạo hóa đơn nội bộ" as UC_InternalInvoice
+  usecase "Phê duyệt hợp đồng" as UC_ApproveContract
+  usecase "Giám sát & Báo cáo" as UC_ViewReports
+  usecase "Xác thực chữ ký số" as UC_VerifyDigitalSign
+  usecase "Xuất báo cáo tài chính" as UC_ExportFinancialReport
+}
+
+' relations
+UC_ManageContract ..> UC_VerifyDigitalSign : <<include>>
+UC_RecordRepair <.. UC_InternalInvoice : <<extend>>
+UC_ViewReports ..> UC_ExportFinancialReport : <<include>>
+
+' actor links
+Staff -- UC_ManageGroup
+Staff -- UC_ConfirmPickupReturn
+Staff -- UC_CreateMaintenance
+Staff -- UC_RecordRepair
+Staff -- UC_InternalInvoice
+Admin -- UC_ManageContract
+Admin -- UC_ApproveContract
+Admin -- UC_ViewReports
+Admin -- UC_VerifyDigitalSign
+
+@enduml
