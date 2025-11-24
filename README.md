@@ -469,7 +469,9 @@ RABBITMQ_URL=amqp://localhost:5672
 
 **frontend/.env:**
 ```env
-VITE_API_URL=http://localhost:3000/api
+# IMPORTANT: include the API prefix used by the API Gateway
+# The gateway exposes APIs under /api/v1 in development
+VITE_API_URL=http://localhost:3000/api/v1
 ```
 
 ### Database Migrations
@@ -678,3 +680,6 @@ Special thanks to all contributors!
 ---
 
 **Made with ❤️ for sustainable EV co-ownership**
+
+
+docker compose -f docker-compose.dev.yml --profile "*" up -d --build
