@@ -61,3 +61,5 @@ docker-compose.override.yml
 # OS
 .DS_Store
 Thumbs.db
+
+ev-co-ownership-system-firebase-adminsdk-fbsvc-1451386614.json
