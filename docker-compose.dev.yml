@@ -186,10 +186,12 @@ services:
     networks:
       - ev_network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      # redis is started with a password; authenticate in healthcheck
+      test: ["CMD-SHELL", "redis-cli -a redis123 ping || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   # RabbitMQ
   rabbitmq:
@@ -206,10 +208,12 @@ services:
     networks:
       - ev_network
     healthcheck:
-      test: ["CMD", "rabbitmqctl", "status"]
+      # use a shell check and give rabbitmq some extra startup time
+      test: ["CMD-SHELL", "rabbitmqctl status || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
+      start_period: 30s
 
   # Apache NiFi - Data Flow Orchestration & ETL
   nifi:
@@ -338,9 +342,12 @@ services:
       - ./backend/auth-service/.env
     environment:
       NODE_ENV: development
-      DB_HOST: postgres-auth       
+      DB_HOST: postgres-auth 
+      DB_PORT: 5432      
       REDIS_HOST: redis
       RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
+      # Public-facing base URL used when the service builds absolute URLs (dev: gateway)
+      AUTH_SERVICE_PUBLIC_URL: http://localhost:3000
     depends_on:
       postgres-auth:
         condition: service_healthy
@@ -350,12 +357,16 @@ services:
         condition: service_healthy
     ports:
       - "3001:3001"
+    expose:
+      - "3001"
     networks:
       - ev_network
     volumes:
       - ./backend/auth-service/src:/app/src
       - ./backend/auth-service/logs:/app/logs
       - ./backend/shared:/app/node_modules/@ev-coownership/shared
+      # Mount local uploads so static files are available to the container
+      - ./backend/auth-service/uploads:/app/uploads
     command: npm run dev
 
   # User Service - Development
@@ -370,8 +381,14 @@ services:
     environment:
       NODE_ENV: development
       DB_HOST: postgres-user
+      DB_PORT: 5432
       REDIS_HOST: redis
       RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
+      # Public-facing base URL used when the service builds absolute URLs (dev: gateway)
+      USER_SERVICE_PUBLIC_URL: http://localhost:3000
+      # Internal API token for service-to-service communication
+      INTERNAL_API_TOKEN: internal_dev_token_change_me
+      INTERNAL_SERVICE_TOKEN: internal_dev_token_change_me
     depends_on:
       postgres-user:
         condition: service_healthy
@@ -381,12 +398,16 @@ services:
         condition: service_healthy
     ports:
       - "3002:3002"
+    expose:
+      - "3002"
     networks:
       - ev_network
     volumes:
       - ./backend/user-service/src:/app/src
       - ./backend/user-service/logs:/app/logs
       - ./backend/shared:/app/node_modules/@ev-coownership/shared
+      # Mount local uploads so static files are available to the container
+      - ./backend/user-service/uploads:/app/uploads
     command: npm run dev
 
   # Booking Service - Development
@@ -400,6 +421,8 @@ services:
       - ./backend/booking-service/.env
     ports:
       - "3003:3003"
+    expose:
+      - "3003"
     environment:
       NODE_ENV: development
       PORT: 3003
@@ -410,6 +433,14 @@ services:
       DB_PASSWORD: postgres123
       REDIS_URL: redis://:redis123@redis:6379
       RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
+      # Service discovery for internal calls inside docker-compose network
+      USER_SERVICE_URL: http://user-service-dev:3002
+      VEHICLE_SERVICE_URL: http://vehicle-service-dev:3005
+      AUTH_SERVICE_URL: http://auth-service-dev:3001
+      NOTIFICATION_SERVICE_URL: http://notification-service-dev:3008
+      # Ensure internal token matches other services in dev compose
+      INTERNAL_API_TOKEN: internal_dev_token_change_me
+      INTERNAL_SERVICE_TOKEN: internal_dev_token_change_me
     depends_on:
       postgres-booking:
         condition: service_healthy
@@ -436,6 +467,8 @@ services:
       - ./backend/cost-service/.env
     ports:
       - "3004:3004"
+    expose:
+      - "3004"
     environment:
       NODE_ENV: development
       PORT: 3004
@@ -467,6 +500,8 @@ services:
       - ./backend/vehicle-service/.env
     ports:
       - "3005:3005"
+    expose:
+      - "3005"
     environment:
       NODE_ENV: development
       PORT: 3005
@@ -503,6 +538,8 @@ services:
       - ./backend/contract-service/.env
     ports:
       - "3006:3006"
+    expose:
+      - "3006"
     environment:
       NODE_ENV: development
       PORT: 3006
@@ -539,6 +576,8 @@ services:
       - ./backend/admin-service/.env
     ports:
       - "3007:3007"
+    expose:
+      - "3007"
     environment:
       NODE_ENV: development
       PORT: 3007
@@ -578,6 +617,8 @@ services:
       - ./backend/notification-service/.env
     ports:
       - "3008:3008"
+    expose:
+      - "3008"
     environment:
       NODE_ENV: development
       PORT: 3008
@@ -618,12 +659,24 @@ services:
       - ./backend/ai-service/.env
     ports:
       - "3009:3009"
+    expose:
+      - "3009"
     environment:
       NODE_ENV: development
       PORT: 3009
       MONGODB_URL: mongodb://admin:admin123@mongodb:27017/ev_ai_service?authSource=admin
       REDIS_URL: redis://:redis123@redis:6379
       RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
+      # Proxy/pass-through helpers: allow host's proxy env vars to be passed into the container
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-}
+      # Service discovery: point ai-service to other dev service hostnames on the compose network
+      BOOKING_SERVICE_URL: http://booking-service-dev:3003
+      USER_SERVICE_URL: http://user-service-dev:3002
+      # Internal API token for service-to-service communication
+      INTERNAL_API_TOKEN: internal_dev_token_change_me
+      INTERNAL_SERVICE_TOKEN: internal_dev_token_change_me
     depends_on:
       mongodb:
         condition: service_healthy
@@ -633,6 +686,10 @@ services:
         condition: service_healthy
     networks:
       - ev_network
+    # Provide explicit DNS servers as a fallback if host DNS is problematic
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     volumes:
       - ./backend/ai-service/src:/app/src
       - ./backend/ai-service/logs:/app/logs
@@ -652,6 +709,7 @@ services:
     environment:
       VITE_API_BASE_URL: http://localhost:3000/api/v1
       VITE_NODE_ENV: development
+      VITE_APP_NAME: EV Co-ownership System
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/public:/app/public
