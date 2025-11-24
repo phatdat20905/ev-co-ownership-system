@@ -109,7 +109,8 @@ export class RedisClient {
       // Mặc định hết hạn sau 1h nếu không có EX
       if (!redisOptions.EX) redisOptions.EX = 3600;
 
-      await this.client.set(key, value, redisOptions);
+      // return the raw result (e.g., 'OK') so callers can use it for locks
+      return await this.client.set(key, value, redisOptions);
     } catch (error) {
       logger.error(`Redis SET error for ${this.serviceName}: ${error.message}`);
     }
@@ -163,9 +164,15 @@ export class RedisClient {
   }
 
   async disconnect() {
-    if (this.client) {
-      await this.client.quit();
-      logger.info(`Redis Client Disconnected for ${this.serviceName}`);
+    try {
+      if (this.client && this.client.isOpen) {
+        await this.client.quit();
+        logger.info(`Redis Client Disconnected for ${this.serviceName}`);
+      } else {
+        logger.info(`Redis Client already closed for ${this.serviceName}`);
+      }
+    } catch (error) {
+      logger.error(`Error while disconnecting Redis for ${this.serviceName}: ${error.message}`);
     }
   }
 }

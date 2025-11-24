@@ -57,7 +57,7 @@ export class DocumentController {
 
       const documents = await db.ContractDocument.findAll({
         where: { contract_id: contractId },
-        order: [['uploaded_at', 'DESC']]
+        order: [['created_at', 'DESC']]
       });
 
       return successResponse(res, 'Documents retrieved successfully', documents);
@@ -100,6 +100,48 @@ export class DocumentController {
       return successResponse(res, 'Document download ready', downloadInfo);
     } catch (error) {
       logger.error('Failed to download document', { 
+        error: error.message, 
+        documentId: req.params.documentId 
+      });
+      next(error);
+    }
+  }
+
+  async viewDocument(req, res, next) {
+    try {
+      const { contractId, documentId } = req.params;
+
+      const document = await db.ContractDocument.findOne({
+        where: {
+          id: documentId,
+          contract_id: contractId
+        }
+      });
+
+      if (!document) {
+        throw new AppError('Document not found', 404, 'DOCUMENT_NOT_FOUND');
+      }
+
+      // Set appropriate headers for viewing in browser
+      res.setHeader('Content-Type', document.mime_type || 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline'); // Display in browser, not download
+      
+      // In production, redirect to signed URL or stream from storage
+      // For now, return document info with view URL
+      const viewInfo = {
+        document,
+        viewUrl: document.file_url,
+        mimeType: document.mime_type
+      };
+
+      logger.info('Document view requested', { 
+        contractId,
+        documentId 
+      });
+
+      return successResponse(res, 'Document view ready', viewInfo);
+    } catch (error) {
+      logger.error('Failed to view document', { 
         error: error.message, 
         documentId: req.params.documentId 
       });

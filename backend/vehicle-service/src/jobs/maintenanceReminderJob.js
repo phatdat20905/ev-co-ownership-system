@@ -10,6 +10,7 @@ export class MaintenanceReminderJob {
   constructor() {
     this.jobName = 'maintenance-reminder';
     this.isRunning = false;
+    this.intervalId = null;
   }
 
   async start() {
@@ -22,7 +23,7 @@ export class MaintenanceReminderJob {
     logger.info('Starting maintenance reminder job');
 
     // Run every day at 8 AM
-    setInterval(() => {
+    this.intervalId = setInterval(() => {
       this.run();
     }, 24 * 60 * 60 * 1000); // 24 hours
 
@@ -134,6 +135,19 @@ export class MaintenanceReminderJob {
       await redisClient.del(lockKey);
     } catch (error) {
       logger.error('Failed to release job lock', { error: error.message });
+    }
+  }
+
+  async stop() {
+    try {
+      if (this.intervalId) {
+        clearInterval(this.intervalId);
+        this.intervalId = null;
+      }
+      this.isRunning = false;
+      logger.info('Stopped maintenance reminder job');
+    } catch (error) {
+      logger.error('Failed to stop maintenance reminder job', { error: error.message });
     }
   }
 }

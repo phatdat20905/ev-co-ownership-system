@@ -31,8 +31,10 @@ export class ConflictService {
       for (const conflictData of detectedConflicts) {
         const conflict = await this.createConflictRecord(booking, conflictData);
         
-        // 🔌 NEW: Real-time conflict notification
-        socketService.publishBookingConflict(conflict);
+        // 🔌 NEW: Real-time conflict notification (only if conflict was created)
+        if (conflict) {
+          socketService.publishBookingConflict(conflict);
+        }
       }
 
       if (detectedConflicts.length > 0) {
@@ -51,7 +53,8 @@ export class ConflictService {
         error: error.message,
         bookingId: booking.id
       });
-      throw error;
+      // Don't throw - log error but allow booking to proceed
+      return [];
     }
   }
 
@@ -226,6 +229,15 @@ export class ConflictService {
 
   async createConflictRecord(booking, conflictData) {
     try {
+      // Ensure booking exists before creating conflict record
+      const bookingExists = await db.Booking.findByPk(booking.id);
+      if (!bookingExists) {
+        logger.warn('Cannot create conflict record: booking not found', {
+          bookingId: booking.id
+        });
+        return null;
+      }
+
       const conflict = await db.BookingConflict.create({
         bookingId_1: booking.id,
         bookingId_2: conflictData.conflictingBookingId || null,
@@ -242,7 +254,8 @@ export class ConflictService {
         bookingId: booking.id,
         conflictData
       });
-      throw error;
+      // Don't throw - allow booking to succeed even if conflict record fails
+      return null;
     }
   }
 

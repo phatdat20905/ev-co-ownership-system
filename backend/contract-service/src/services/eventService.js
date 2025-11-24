@@ -116,6 +116,16 @@ class EventService {
     });
   }
 
+  async publishContractDownloaded(downloadData) {
+    if (!downloadData?.contractId || !downloadData?.userId) return;
+    await this.publishEvent(eventTypes.CONTRACT_DOWNLOADED || 'contract.downloaded', {
+      contractId: downloadData.contractId,
+      userId: downloadData.userId,
+      documentId: downloadData.documentId,
+      downloadedAt: new Date().toISOString()
+    });
+  }
+
   async publishSignatureReminderSent(reminderData) {
     if (!reminderData?.contractId || !reminderData?.userId) return;
     await this.publishEvent(eventTypes.SIGNATURE_REMINDER_SENT, {

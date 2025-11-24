@@ -181,7 +181,7 @@ export class AnalyticsController {
       const path = `/api/v1/bookings/admin/analytics/vehicle-utilization${qs ? `?${qs}` : ''}`;
 
       // Helper to attempt fetch with a timeout
-      const doFetch = async (baseUrl, timeoutMs = 5000) => {
+      const doFetch = async (baseUrl, timeoutMs = 10000) => {
         const url = `${baseUrl.replace(/\/$/, '')}${path}`;
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -220,15 +220,21 @@ export class AnalyticsController {
           return json.data || json;
         } catch (err) {
           clearTimeout(timer);
-          // rethrow so caller can decide to fallback
-          throw err;
+          // Handle AbortError (timeout) explicitly so we return a clear upstream timeout
+          const name = err && (err.name || err.type || '');
+          if (name === 'AbortError' || /aborted|timeout/i.test(String(err.message || ''))) {
+            throw new AppError('Upstream booking-service request timed out', 504, 'UPSTREAM_TIMEOUT', { url, timeoutMs });
+          }
+
+          // Wrap other low-level/network errors into an AppError for consistent handling
+          throw new AppError('Failed to fetch upstream booking-service', 502, 'UPSTREAM_ERROR', { message: String(err.message || err), url });
         }
       };
 
       // First attempt: configured BOOKING_SERVICE_URL
       let data;
       try {
-        data = await doFetch(bookingBase, 5000);
+        data = await doFetch(bookingBase, 10000);
       } catch (firstErr) {
         logger.warn('First attempt to fetch vehicle analytics failed, trying localhost fallback', {
           error: firstErr.message,
@@ -237,14 +243,16 @@ export class AnalyticsController {
         // Try fallback to localhost:3003 if host name resolution failed or container network isn't available
         const fallback = bookingBase.includes('localhost') ? bookingBase : 'http://localhost:3003';
         try {
-          data = await doFetch(fallback, 5000);
+          data = await doFetch(fallback, 15000);
         } catch (secondErr) {
           logger.error('Failed to get vehicle analytics after fallback', {
             error: secondErr.message,
             bookingBase,
             fallback
           });
-          throw secondErr;
+          // Ensure we throw an AppError so the central error handler can return a meaningful status
+          if (secondErr instanceof AppError) throw secondErr;
+          throw new AppError('Failed to fetch vehicle analytics from upstream', 502, 'UPSTREAM_ERROR', { bookingBase, fallback, message: secondErr.message });
         }
       }
 

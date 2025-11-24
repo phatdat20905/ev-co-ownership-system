@@ -30,19 +30,20 @@ export class GeminiCoreService {
         const fullPrompt = this.buildFullPrompt(promptTemplate, context);
         
         // Wrap generateContent with a timeout
-        const response = await Promise.race([
-          this.ai.generateContent({
-            model: this.config.modelName,
-            contents: fullPrompt,
-            generationConfig: this.config.getGenerationConfig()
-          }),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('Gemini request timeout')), timeoutMs))
-        ]);
+        // Use config.requestGenerateContent which implements SDK + REST fallback, timeout and retries
+        const result = await this.config.requestGenerateContent({
+          model: this.config.modelName,
+          contents: fullPrompt,
+          generationConfig: this.config.getGenerationConfig()
+        });
+
+        // Normalize to expected response shape (SDK returns object with .text)
+        const response = result;
 
         const responseTime = Date.now() - startTime;
         
         const parsedResponse = ResponseParser.parseGeminiResponse(
-          response.text, 
+          response && response.text ? response.text : '', 
           featureType
         );
 
@@ -75,16 +76,23 @@ export class GeminiCoreService {
       } catch (error) {
         logger.error(`Gemini API attempt ${attempt + 1} failed`, {
           featureType,
-          error: error.message,
+          error: error && error.message,
+          name: error && error.name,
+          stack: error && error.stack,
           attempt: attempt + 1
         });
 
+        // If this looks like a network-level fetch error, open the circuit immediately
+        const msg = (error && error.message || '').toLowerCase();
+        const networkError = error && (error.name === 'TypeError' || msg.includes('fetch failed') || msg.includes('ecxn') || msg.includes('econnrefused') || msg.includes('enotfound'));
+
         // Increment failure counter and possibly open circuit
         this.failureCount += 1;
-        if (this.failureCount >= this.failureThreshold) {
+        if (networkError || this.failureCount >= this.failureThreshold) {
           this.circuitOpenUntil = Date.now() + this.circuitCooldownMs;
-          logger.warn('Gemini circuit opened due to repeated failures', {
+          logger.warn('Gemini circuit opened due to failures', {
             failureCount: this.failureCount,
+            networkError: !!networkError,
             openUntil: new Date(this.circuitOpenUntil).toISOString()
           });
         }

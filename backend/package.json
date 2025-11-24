@@ -1,0 +1,14 @@
+{
+  "name": "backend-tests",
+  "version": "1.0.0",
+  "description": "Test scripts for EV Co-Ownership backend services",
+  "type": "module",
+  "scripts": {
+    "test:fcm-simple": "node test-fcm-simple.js",
+    "test:fcm-booking": "node test-booking-notification.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.2",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

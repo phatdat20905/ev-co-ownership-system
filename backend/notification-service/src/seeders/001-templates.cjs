@@ -6,6 +6,19 @@ const { v4: uuidv4 } = require('uuid');
 module.exports = {
   async up(queryInterface, Sequelize) {
   const templates = [
+      // Booking templates (multi-channel)
+      {
+        id: uuidv4(),
+        name: 'booking_created',
+        type: 'booking',
+        subject: 'Đặt lịch xe thành công',
+        body: `Xin chào {{user_name}}! Bạn đã đặt xe {{vehicle_name}} thành công. Thời gian: {{start_time}} đến {{end_time}}. Mã đặt lịch: {{booking_id}}`,
+        variables: ['user_name', 'booking_id', 'vehicle_name', 'start_time', 'end_time'],
+        channels: ['push', 'in_app', 'email'],
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date()
+      },
       // Email templates
       {
         id: uuidv4(),
@@ -35,7 +48,71 @@ EV Co-ownership System
       },
       {
         id: uuidv4(),
+        name: 'booking_cancelled',
+        type: 'booking',
+        subject: 'Đặt lịch đã bị hủy',
+        body: `Xin chào {{user_name}}! Đặt lịch xe {{vehicle_name}} của bạn đã bị hủy. Lý do: {{cancellation_reason}}`,
+        variables: ['user_name', 'vehicle_name', 'cancellation_reason'],
+        channels: ['push', 'in_app', 'email'],
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date()
+      },
+      {
+        id: uuidv4(),
         name: 'booking_reminder',
+        type: 'booking',
+        subject: 'Nhắc nhở: Chuyến đi sắp bắt đầu',
+        body: `Xin chào {{user_name}}! Xe {{vehicle_name}} sẽ sẵn sàng lúc {{start_time}}. Hãy chuẩn bị nhé!`,
+        variables: ['user_name', 'vehicle_name', 'start_time'],
+        channels: ['push', 'in_app'],
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date()
+      },
+      {
+        id: uuidv4(),
+        name: 'booking_confirmed',
+        type: 'booking',
+        subject: 'Xác nhận đặt xe thành công',
+        body: `Xin chào {{user_name}}! Đặt xe {{vehicle_name}} đã được xác nhận. Biển số: {{license_plate}}. Thời gian: {{start_time}} - {{end_time}}`,
+        variables: ['user_name', 'vehicle_name', 'license_plate', 'start_time', 'end_time'],
+        channels: ['push', 'in_app', 'email'],
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date()
+      },
+      
+      // Legacy Email templates (for backward compatibility)
+      {
+        id: uuidv4(),
+  name: 'booking_confirmed_email',
+  type: 'email',
+  subject: 'Xác nhận đặt xe thành công',
+  body: `
+Xin chào {{user_name}},
+
+Đặt xe của bạn đã được xác nhận:
+
+🚗 Xe: {{vehicle_name}}
+📅 Thời gian: {{start_time}} - {{end_time}}
+📍 Địa điểm nhận: {{pickup_location}}
+🎯 Mục đích: {{purpose}}
+
+Vui lòng check-in đúng giờ.
+
+Trân trọng,
+EV Co-ownership System
+`,
+        variables: ['user_name', 'vehicle_name', 'start_time', 'end_time', 'pickup_location', 'purpose'],
+        channels: ['email'],
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date()
+      },
+      {
+        id: uuidv4(),
+        name: 'booking_reminder_email',
         type: 'email',
         subject: 'Nhắc nhở: Chuyến đi sắp bắt đầu',
          body: `
@@ -163,7 +240,7 @@ EV Co-ownership System
   },
 
   async down(queryInterface, Sequelize) {
-    const names = ['booking_confirmed','booking_reminder','payment_due','booking_confirmed_sms','low_battery_warning','maintenance_reminder','new_vote'];
+    const names = ['booking_created','booking_cancelled','booking_reminder','booking_confirmed','booking_confirmed_email','booking_reminder_email','payment_due','booking_confirmed_sms','low_battery_warning','maintenance_reminder','new_vote'];
     await queryInterface.bulkDelete('notification_templates', { name: names }, {});
   }
 };

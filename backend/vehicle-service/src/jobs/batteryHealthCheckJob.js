@@ -10,6 +10,7 @@ export class BatteryHealthCheckJob {
   constructor() {
     this.jobName = 'battery-health-check';
     this.isRunning = false;
+    this.intervalId = null;
   }
 
   async start() {
@@ -22,7 +23,7 @@ export class BatteryHealthCheckJob {
     logger.info('Starting battery health check job');
 
     // Run every 7 days
-    setInterval(() => {
+    this.intervalId = setInterval(() => {
       this.run();
     }, 7 * 24 * 60 * 60 * 1000); // 7 days
 
@@ -109,6 +110,19 @@ export class BatteryHealthCheckJob {
       await redisClient.del(lockKey);
     } catch (error) {
       logger.error('Failed to release job lock', { error: error.message });
+    }
+  }
+
+  async stop() {
+    try {
+      if (this.intervalId) {
+        clearInterval(this.intervalId);
+        this.intervalId = null;
+      }
+      this.isRunning = false;
+      logger.info('Stopped battery health check job');
+    } catch (error) {
+      logger.error('Failed to stop battery health check job', { error: error.message });
     }
   }
 }

@@ -131,6 +131,27 @@ class EventService {
     });
   }
 
+  async publishGroupMemberRoleUpdated(roleData) {
+    if (!roleData?.groupId || !roleData?.userId) return;
+    await this.publishEvent(eventTypes.MEMBER_UPDATED, {
+      groupId: roleData.groupId,
+      userId: roleData.userId,
+      newRole: roleData.newRole,
+      updatedBy: roleData.updatedBy,
+      updatedAt: new Date().toISOString()
+    });
+  }
+
+  async publishGroupRulesUpdated(rulesData) {
+    if (!rulesData?.groupId) return;
+    await this.publishEvent(eventTypes.GROUP_UPDATED, {
+      groupId: rulesData.groupId,
+      updatedBy: rulesData.updatedBy,
+      updates: { rules: true },
+      updatedAt: new Date().toISOString()
+    });
+  }
+
   // Vote Events
   async publishVoteCreated(voteData) {
     if (!voteData?.voteId) return;

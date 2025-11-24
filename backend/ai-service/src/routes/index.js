@@ -4,6 +4,7 @@ import costRoutes from './costRoutes.js';
 import disputeRoutes from './disputeRoutes.js';
 import analyticsRoutes from './analyticsRoutes.js';
 import feedbackRoutes from './feedbackRoutes.js';
+import fairnessRoutes from './fairnessRoutes.js';
 
 const router = express.Router();
 
@@ -24,5 +25,6 @@ router.use('/ai/cost', costRoutes);
 router.use('/ai/dispute', disputeRoutes);
 router.use('/ai/analytics', analyticsRoutes);
 router.use('/ai/feedback', feedbackRoutes);
+router.use('/ai/fairness', fairnessRoutes);
 
 export default router;

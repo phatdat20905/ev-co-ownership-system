@@ -24,6 +24,30 @@ export class SplitRepository {
     }
   }
 
+  async findById(splitId) {
+    try {
+      const split = await db.CostSplit.findByPk(splitId, {
+        include: [
+          {
+            model: db.Cost,
+            as: 'cost',
+            include: [{ model: db.CostCategory, as: 'category' }]
+          }
+        ]
+      });
+      
+      if (!split) {
+        throw new AppError('Cost split not found', 404, 'SPLIT_NOT_FOUND');
+      }
+      
+      return split;
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      logger.error('SplitRepository.findById - Error:', error);
+      throw new AppError('Failed to fetch cost split', 500, 'SPLIT_FETCH_ERROR');
+    }
+  }
+
   async findByCostId(costId) {
     try {
       return await db.CostSplit.findAll({
@@ -228,19 +252,43 @@ export class SplitRepository {
         distinct: true
       });
 
-      const payments = rows.map(split => ({
-        id: split.id,
-        description: split.cost?.costName || 'Chi phí',
-        amount: parseFloat(split.splitAmount),
-        paidAmount: parseFloat(split.paidAmount),
-        date: new Date(split.cost?.costDate || split.createdAt).toLocaleDateString('vi-VN'),
-        status: split.paymentStatus === 'paid' ? 'completed' : split.paymentStatus,
-        type: split.cost?.category?.categoryName || 'other',
-        method: 'VNPay',
-        invoice: `INV-${split.costId?.slice(0, 8)}`,
-        dueDate: split.dueDate ? new Date(split.dueDate).toLocaleDateString('vi-VN') : null,
-        paidAt: split.paidAt ? new Date(split.paidAt).toLocaleDateString('vi-VN') : null
-      }));
+      // Fetch latest payment for each split in bulk to avoid N+1 queries
+      const splitIds = rows.map(r => r.id);
+      let paymentsForSplits = [];
+      if (splitIds.length > 0) {
+        const paymentRows = await db.Payment.findAll({
+          where: { costSplitId: splitIds },
+          order: [['createdAt', 'DESC']]
+        });
+        // Map latest payment per split
+        const paymentMap = new Map();
+        for (const p of paymentRows) {
+          if (!paymentMap.has(p.costSplitId)) {
+            paymentMap.set(p.costSplitId, p);
+          }
+        }
+        paymentsForSplits = paymentMap; // Map of costSplitId -> payment row
+      }
+
+      const payments = rows.map(split => {
+        const latestPayment = paymentsForSplits.get(split.id);
+        return {
+          id: latestPayment ? latestPayment.id : split.id, // prefer latest payment id, else split id
+          paymentId: latestPayment ? latestPayment.id : null,
+          splitId: split.id,
+          costSplitId: split.id, // Add costSplitId for frontend payment creation
+          description: split.cost?.costName || 'Chi phí',
+          amount: parseFloat(split.splitAmount),
+          paidAmount: parseFloat(split.paidAmount),
+          date: new Date(split.cost?.costDate || split.createdAt).toLocaleDateString('vi-VN'),
+          status: split.paymentStatus === 'paid' ? 'completed' : split.paymentStatus,
+          type: split.cost?.category?.categoryName || 'other',
+          method: latestPayment ? (latestPayment.paymentMethod || 'VNPay') : 'VNPay',
+          invoice: `INV-${split.costId?.slice(0, 8)}`,
+          dueDate: split.dueDate ? new Date(split.dueDate).toLocaleDateString('vi-VN') : null,
+          paidAt: split.paidAt ? new Date(split.paidAt).toLocaleDateString('vi-VN') : null
+        };
+      });
 
       return {
         rows: payments,

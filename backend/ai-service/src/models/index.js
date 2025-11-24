@@ -1,12 +1,15 @@
 import { Recommendation } from './Recommendation.js';
 import { UsageLog } from './UsageLog.js';
+import { FairnessRecord } from './FairnessRecord.js';
 
 export {
   Recommendation,
-  UsageLog
+  UsageLog,
+  FairnessRecord
 };
 
 export default {
   Recommendation,
-  UsageLog
+  UsageLog,
+  FairnessRecord
 };

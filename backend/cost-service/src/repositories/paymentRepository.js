@@ -29,7 +29,25 @@ export class PaymentRepository {
         ]
       });
 
+      // If not found by primary key, try to find by transactionId as a fallback
       if (!payment) {
+        const byTxn = await db.Payment.findOne({
+          where: { transactionId: id },
+          include: [
+            {
+              model: db.CostSplit,
+              as: 'costSplit',
+              include: [{
+                model: db.Cost,
+                as: 'cost',
+                include: [{ model: db.CostCategory, as: 'category' }]
+              }]
+            }
+          ]
+        });
+
+        if (byTxn) return byTxn;
+
         throw new AppError('Payment not found', 404, 'PAYMENT_NOT_FOUND');
       }
 

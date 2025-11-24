@@ -265,6 +265,7 @@ export class ValidationService {
 
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
+      const now = new Date();
 
       // Check daily booking limit
       const todaysBookings = await db.Booking.count({
@@ -286,10 +287,15 @@ export class ValidationService {
       }
 
       // Check active bookings limit
+      // Count only bookings that are still active/future to avoid counting stale past bookings
+      // Consider pending, confirmed and in_progress statuses but require endTime > now
       const activeBookings = await db.Booking.count({
         where: {
           userId,
-          status: ['pending', 'confirmed']
+          status: ['pending', 'confirmed', 'in_progress'],
+          endTime: {
+            [db.Sequelize.Op.gt]: now
+          }
         }
       });
 

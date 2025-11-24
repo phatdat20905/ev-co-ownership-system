@@ -52,9 +52,20 @@ async function startServer() {
 const shutdown = async (signal) => {
   logger.info(`${signal} received. Cleaning up Vehicle Service...`);
   try {
+    // Stop background jobs first to avoid them using clients during shutdown
+    try {
+      await maintenanceReminderJob.stop();
+      await insuranceExpiryJob.stop();
+      await batteryHealthCheckJob.stop();
+      await vehicleMetricsJob.stop();
+    } catch (jobErr) {
+      logger.warn('Error while stopping jobs', { error: jobErr?.message });
+    }
+
+    // Close DB and external clients
     await db.sequelize.close();
-    await redisClient.disconnect();
     await rabbitMQClient.disconnect();
+    await redisClient.disconnect();
     logger.info('✅ Vehicle Service cleanup complete. Exiting.');
     process.exit(0);
   } catch (err) {

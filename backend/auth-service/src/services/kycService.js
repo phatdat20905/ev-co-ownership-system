@@ -16,10 +16,44 @@ export class KYCService {
         transaction
       });
 
+      // If there's an existing KYC submission, handle idempotency:
+      // - If previous submission was rejected -> allow resubmission by updating the record and setting it to 'pending'
+      // - If previous submission is pending/approved -> return the existing record (do not throw)
       if (existingKYC) {
-        throw new AppError('KYC verification already submitted', 409, 'KYC_ALREADY_SUBMITTED');
+        if (existingKYC.verificationStatus === 'rejected') {
+          // Update existing record to represent a new submission
+          await existingKYC.update({
+            ...kycData,
+            verificationStatus: 'pending',
+            verifiedBy: null,
+            verifiedAt: null,
+            rejectionReason: null
+          }, { transaction });
+
+          await transaction.commit();
+
+          // Publish KYC submitted event (non-blocking)
+          eventService.publishKYCSubmitted(existingKYC)
+            .catch(error => logger.error('Failed to publish KYC submitted event', {
+              error: error.message,
+              kycId: existingKYC.id
+            }));
+
+          logger.info('KYC resubmitted (previously rejected)', {
+            userId,
+            kycId: existingKYC.id
+          });
+
+          return { existing: false, kyc: existingKYC };
+        }
+
+        // For pending/approved submissions, return existing record so caller can be idempotent
+        await transaction.rollback();
+        logger.debug('KYC already exists, returning existing record', { userId, kycId: existingKYC.id, status: existingKYC.verificationStatus });
+        return { existing: true, kyc: existingKYC };
       }
 
+      // No existing KYC -> create a fresh submission
       const kyc = await db.KYCVerification.create({
         userId,
         ...kycData
@@ -29,22 +63,22 @@ export class KYCService {
 
       // Publish KYC submitted event (non-blocking)
       eventService.publishKYCSubmitted(kyc)
-        .catch(error => logger.error('Failed to publish KYC submitted event', { 
+        .catch(error => logger.error('Failed to publish KYC submitted event', {
           error: error.message,
-          kycId: kyc.id 
+          kycId: kyc.id
         }));
 
-      logger.info('KYC submitted successfully', { 
-        userId, 
-        kycId: kyc.id 
+      logger.info('KYC submitted successfully', {
+        userId,
+        kycId: kyc.id
       });
 
-      return kyc;
+      return { existing: false, kyc };
     } catch (error) {
       await transaction.rollback();
-      logger.error('KYC submission failed', { 
-        error: error.message, 
-        userId 
+      logger.error('KYC submission failed', {
+        error: error.message,
+        userId
       });
       throw error;
     }

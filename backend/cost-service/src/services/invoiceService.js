@@ -6,7 +6,14 @@ import {
 } from '../repositories/index.js';
 import { AppError, logger } from '@ev-coownership/shared';
 import pdfInvoiceGenerator from '../utils/pdfInvoiceGenerator.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import eventService from './eventService.js';
+
+// __dirname shim for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export class InvoiceService {
   async generateInvoice(invoiceData, userId) {
@@ -56,11 +63,14 @@ export class InvoiceService {
 
       await invoiceItemRepository.createItems(invoice.id, invoiceItems);
 
-      // Generate PDF
-      const pdfUrl = await pdfInvoiceGenerator.generate(invoice, filteredCosts);
+      // Generate PDF (returns { pdfUrl, filePath, fileName })
+      const pdfResult = await pdfInvoiceGenerator.generate(invoice, filteredCosts);
 
-      // Update invoice with PDF URL
-      await invoiceRepository.update(invoice.id, { pdfUrl });
+      // Update invoice with PDF URL (keep filePath local)
+      const pdfUrl = pdfResult?.pdfUrl ?? null;
+      if (pdfUrl) {
+        await invoiceRepository.update(invoice.id, { pdfUrl });
+      }
 
       // Mark costs as invoiced
       await Promise.all(
@@ -138,19 +148,65 @@ export class InvoiceService {
     try {
       const invoice = await invoiceRepository.findById(id);
 
+      // If PDF not generated yet, attempt to generate on-demand and persist
+      let filePath = null;
+      let fileName = null;
       if (!invoice.pdfUrl) {
-        throw new AppError('PDF not generated for this invoice', 404, 'PDF_NOT_GENERATED');
+        try {
+          const costs = (invoice.items || []).map(i => i.cost).filter(Boolean);
+          const pdfResult = await pdfInvoiceGenerator.generate(invoice, costs);
+          const pdfUrl = pdfResult?.pdfUrl ?? null;
+          filePath = pdfResult?.filePath ?? null;
+          fileName = pdfResult?.fileName ?? null;
+
+          // Persist pdfUrl on the invoice instance
+          if (pdfUrl) {
+            if (invoice.update && typeof invoice.update === 'function') {
+              await invoice.update({ pdfUrl });
+            } else if (typeof invoiceRepository.update === 'function') {
+              await invoiceRepository.update(invoice.id, { pdfUrl });
+            }
+            invoice.pdfUrl = pdfUrl;
+          }
+        } catch (genErr) {
+          logger.error('InvoiceService.downloadInvoice - PDF generation failed:', genErr);
+          throw new AppError('PDF not generated for this invoice', 404, 'PDF_NOT_GENERATED');
+        }
       }
 
-      // Publish event
-      await eventService.publishInvoiceDownloaded({
-        invoiceId: invoice.id,
-        groupId: invoice.groupId,
-        downloadedBy: userId
-      });
+      // If we didn't get filePath earlier, try to resolve it from invoice.pdfUrl
+      if (!filePath && invoice.pdfUrl) {
+        // invoice.pdfUrl might be like '/costs/data/invoices/invoice_x.pdf' or '/data/invoices/invoice_x.pdf'
+        const url = invoice.pdfUrl;
+        // Strip possible '/costs' prefix
+        let rel = url.replace(/^\/costs/, '');
+        // Ensure leading slash removed
+        rel = rel.replace(/^\//, '');
+        const parts = rel.split('/');
+        const file = parts.pop();
+        const folder = parts.join('/');
+        const absFolder = path.join(__dirname, '..', folder);
+        filePath = path.join(absFolder, file);
+        fileName = file;
+      }
 
-      logger.info('Invoice download requested', { invoiceId: id, userId });
-      return invoice.pdfUrl;
+      // Read file buffer and return
+      if (filePath && fs.existsSync(filePath)) {
+        const buffer = await fs.promises.readFile(filePath);
+
+        // Publish event
+        await eventService.publishInvoiceDownloaded({
+          invoiceId: invoice.id,
+          groupId: invoice.groupId,
+          downloadedBy: userId
+        });
+
+        logger.info('Invoice download requested', { invoiceId: id, userId, filePath });
+        return { buffer, fileName: fileName || (`invoice_${invoice.invoiceNumber}.pdf`) };
+      }
+
+      // If we reach here, we couldn't locate the file
+      throw new AppError('PDF not generated for this invoice', 404, 'PDF_NOT_GENERATED');
     } catch (error) {
       logger.error('InvoiceService.downloadInvoice - Error:', error);
       throw error;

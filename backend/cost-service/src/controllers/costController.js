@@ -1,6 +1,7 @@
 // src/controllers/costController.js
 import costService from '../services/costService.js';
-import { successResponse, logger, AppError } from '@ev-coownership/shared';
+import { successResponse, logger, AppError, notificationHelper, NOTIFICATION_TYPES } from '@ev-coownership/shared';
+import db from '../models/index.js';
 
 export class CostController {
   async createCost(req, res, next) {
@@ -15,6 +16,40 @@ export class CostController {
         groupId: cost.groupId,
         userId 
       });
+
+      // Send notification to all group members
+      try {
+        // Get group members
+        const group = await db.Group.findByPk(cost.groupId, {
+          include: [{
+            model: db.GroupMember,
+            attributes: ['userId']
+          }]
+        });
+
+        if (group && group.GroupMembers) {
+          const userIds = group.GroupMembers.map(m => m.userId);
+          
+          await notificationHelper.sendCostNotification(
+            NOTIFICATION_TYPES.COST_ADDED,
+            {
+              id: cost.id,
+              amount: cost.amount,
+              category: cost.category,
+              description: cost.description,
+              groupName: group.name
+            },
+            userIds
+          );
+          logger.info('Cost notification sent to group members', { 
+            costId: cost.id, 
+            groupId: cost.groupId,
+            memberCount: userIds.length 
+          });
+        }
+      } catch (notifError) {
+        logger.error('Failed to send cost notification', { error: notifError.message });
+      }
 
       return successResponse(res, 'Cost created successfully', cost, 201);
     } catch (error) {

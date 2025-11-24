@@ -10,6 +10,7 @@ export class InsuranceExpiryJob {
   constructor() {
     this.jobName = 'insurance-expiry';
     this.isRunning = false;
+    this.intervalId = null;
   }
 
   async start() {
@@ -22,7 +23,7 @@ export class InsuranceExpiryJob {
     logger.info('Starting insurance expiry job');
 
     // Run every day at 9 AM
-    setInterval(() => {
+    this.intervalId = setInterval(() => {
       this.run();
     }, 24 * 60 * 60 * 1000); // 24 hours
 
@@ -71,6 +72,19 @@ export class InsuranceExpiryJob {
       await redisClient.del(lockKey);
     } catch (error) {
       logger.error('Failed to release job lock', { error: error.message });
+    }
+  }
+
+  async stop() {
+    try {
+      if (this.intervalId) {
+        clearInterval(this.intervalId);
+        this.intervalId = null;
+      }
+      this.isRunning = false;
+      logger.info('Stopped insurance expiry job');
+    } catch (error) {
+      logger.error('Failed to stop insurance expiry job', { error: error.message });
     }
   }
 }

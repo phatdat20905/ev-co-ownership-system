@@ -76,7 +76,7 @@ export class PDFService {
           contract_id: contractId,
           document_type: 'contract_pdf'
         },
-        order: [['uploaded_at', 'DESC']]
+        order: [['created_at', 'DESC']]
       });
 
       if (!document) {

@@ -66,13 +66,16 @@ export class PriorityService {
 
   async calculateOwnershipScore(userId, groupId) {
     try {
-      // Call User Service to get ownership percentage
+      // Call User Service to get group members and extract ownership percentage for the user
       const response = await userServiceClient.get(
-        `${process.env.USER_SERVICE_URL}/groups/${groupId}/members/${userId}/ownership`
+        `/api/v1/user/groups/${groupId}/members`,
+        { headers: { Authorization: `Bearer ${process.env.INTERNAL_SERVICE_TOKEN || ''}` } }
       );
 
-      const ownershipPercentage = response.data.ownershipPercentage || 0;
-      
+      const members = response?.data || [];
+      const member = members.find(m => String(m.userId) === String(userId) || String(m.userProfile?.id) === String(userId));
+      const ownershipPercentage = member?.ownershipPercentage || 0;
+
       // Higher ownership = higher score (linear scaling)
       return Math.min(ownershipPercentage * 100, 100);
     } catch (error) {

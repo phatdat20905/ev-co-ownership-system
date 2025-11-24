@@ -1,5 +1,5 @@
 import bookingService from '../services/bookingService.js';
-import { successResponse, logger, AppError } from '@ev-coownership/shared';
+import { successResponse, logger, AppError, notificationHelper, NOTIFICATION_TYPES } from '@ev-coownership/shared';
 
 export class BookingController {
   async createBooking(req, res, next) {
@@ -10,6 +10,25 @@ export class BookingController {
       logger.info('Creating new booking', { userId, bookingData });
 
       const booking = await bookingService.createBooking(bookingData, userId);
+
+      // Send notification to user
+      try {
+        await notificationHelper.sendBookingNotification(
+          NOTIFICATION_TYPES.BOOKING_CREATED,
+          {
+            id: booking.id,
+            vehicleName: booking.Vehicle?.name || 'Xe',
+            startTime: booking.startTime,
+            endTime: booking.endTime,
+            location: booking.pickupLocation || 'Vị trí đặt xe'
+          },
+          userId
+        );
+        logger.info('Booking notification sent', { bookingId: booking.id });
+      } catch (notifError) {
+        logger.error('Failed to send booking notification', { error: notifError.message });
+        // Don't fail the request if notification fails
+      }
 
       return successResponse(res, 'Booking created successfully', booking, 201);
     } catch (error) {
@@ -110,6 +129,24 @@ export class BookingController {
       logger.info('Cancelling booking', { bookingId, userId, reason });
 
       const booking = await bookingService.cancelBooking(bookingId, userId, reason);
+
+      // Send cancellation notification
+      try {
+        await notificationHelper.sendBookingNotification(
+          NOTIFICATION_TYPES.BOOKING_CANCELLED,
+          {
+            id: booking.id,
+            vehicleName: booking.Vehicle?.name || 'Xe',
+            startTime: booking.startTime,
+            endTime: booking.endTime,
+            reason: reason || 'Người dùng hủy'
+          },
+          userId
+        );
+        logger.info('Booking cancellation notification sent', { bookingId: booking.id });
+      } catch (notifError) {
+        logger.error('Failed to send cancellation notification', { error: notifError.message });
+      }
 
       return successResponse(res, 'Booking cancelled successfully', booking);
     } catch (error) {

@@ -4,15 +4,18 @@ import {
   logger 
 } from '@ev-coownership/shared';
 import { internalFetch } from '../utils/internalAuth.js';
+import db from '../models/index.js';
 
 export const groupAccess = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    let groupId = req.params.groupId;
+    // Prefer explicit groupId in params, then body (if present), then query
+    let groupId = req.params.groupId || (req.body && req.body.groupId) || req.query.groupId;
 
-    // If groupId is not in params, try to get it from body or query
-    if (!groupId) {
-      groupId = req.body.groupId || req.query.groupId;
+    // If no groupId but we have a vehicleId param, derive groupId from vehicle record
+    if (!groupId && req.params?.vehicleId) {
+      const vehicle = await db.Vehicle.findByPk(req.params.vehicleId, { attributes: ['groupId'] });
+      if (vehicle) groupId = vehicle.groupId;
     }
 
     // Allow system admin/staff to bypass group membership checks
@@ -40,7 +43,7 @@ export const groupAccess = async (req, res, next) => {
     logger.error('Group access check failed', { 
       error: error.message, 
       userId: req.user?.id,
-      groupId: req.params.groupId 
+      groupId: req.params?.groupId || (req.body && req.body.groupId) 
     });
     next(error);
   }

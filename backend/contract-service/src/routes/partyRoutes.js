@@ -12,24 +12,26 @@ const router = express.Router();
 router.use(authenticate);
 
 // Party management operations
-router.post('/:contractId/parties', 
+// These routes are already prefixed with /contracts/parties from index.js
+// So /:contractId here becomes /contracts/parties/:contractId
+router.post('/:contractId', 
   contractAccess,
   validate(partyValidators.addParty), 
   partyController.addParty
 );
 
-router.get('/:contractId/parties', 
+router.get('/:contractId', 
   contractAccess,
   partyController.getParties
 );
 
-router.put('/:contractId/parties/:partyId', 
+router.put('/:contractId/:partyId', 
   contractAccess,
   validate(partyValidators.updateParty), 
   partyController.updateParty
 );
 
-router.delete('/:contractId/parties/:partyId', 
+router.delete('/:contractId/:partyId', 
   contractAccess,
   partyController.removeParty
 );

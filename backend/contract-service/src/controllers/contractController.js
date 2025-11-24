@@ -172,14 +172,8 @@ export class ContractController {
       const { contractId } = req.params;
       const userId = req.user.id;
 
-      // Soft delete implementation would go here
-      // For now, we'll just return success
-      await contractService.clearContractCache(contractId);
-
-      logger.info('Contract deleted', { 
-        contractId,
-        userId 
-      });
+      // Perform deletion
+      await contractService.deleteContract(contractId, userId);
 
       return successResponse(res, 'Contract deleted successfully');
     } catch (error) {

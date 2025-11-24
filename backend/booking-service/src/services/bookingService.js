@@ -50,10 +50,32 @@ export class BookingService {
         bookingData
       );
 
-      // 6. Create booking
+      // 6. Estimate cost (if not provided) and Create booking
+      // Pricing can be configured via env vars: BOOKING_COST_PER_HOUR (VND), BOOKING_COST_PER_KM (VND)
+      const perHour = parseFloat(process.env.BOOKING_COST_PER_HOUR) || 20000; // VND/hour default
+      const perKm = parseFloat(process.env.BOOKING_COST_PER_KM) || 2500; // VND/km default
+
+      let estimatedCost = 0;
+      try {
+        const start = new Date(bookingData.startTime);
+        const end = new Date(bookingData.endTime);
+        const durationHours = Math.max((end - start) / (1000 * 60 * 60), 0);
+
+        if (bookingData.estimatedDistance && !isNaN(parseFloat(bookingData.estimatedDistance))) {
+          estimatedCost = Math.round(parseFloat(bookingData.estimatedDistance) * perKm);
+        } else {
+          // Fallback to hourly rate if distance not provided
+          estimatedCost = Math.round(durationHours * perHour);
+        }
+      } catch (e) {
+        logger.warn('Failed to estimate booking cost, defaulting to 0', { error: e.message });
+        estimatedCost = 0;
+      }
+
       const booking = await db.Booking.create({
         ...bookingData,
         userId,
+        cost: estimatedCost,
         priorityScore,
         status: priorityScore >= 80 ? 'confirmed' : 'pending'
       }, { transaction });
@@ -70,29 +92,38 @@ export class BookingService {
         socketService.publishBookingCreated(booking);
       }
 
-      // 8. Check for conflicts
-      await conflictService.detectAndHandleConflicts(booking);
-
       await transaction.commit();
 
-      // 9. Clear relevant caches
-      await calendarService.clearCalendarCache(bookingData.vehicleId, bookingData.groupId);
+      // Post-commit operations (don't rollback if these fail)
+      try {
+        // 8. Check for conflicts (moved outside transaction to prevent FK errors)
+        await conflictService.detectAndHandleConflicts(booking);
 
-      // 10. Publish events
-      await eventService.publishBookingCreated(booking);
-      
-      // 🔌 NEW: Real-time notification for all cases
-      if (booking.status !== 'confirmed') {
-        socketService.publishBookingCreated(booking);
+        // 9. Clear relevant caches
+        await calendarService.clearCalendarCache(bookingData.vehicleId, bookingData.groupId);
+
+        // 10. Publish events
+        await eventService.publishBookingCreated(booking);
+        
+        // 🔌 NEW: Real-time notification for all cases
+        if (booking.status !== 'confirmed') {
+          socketService.publishBookingCreated(booking);
+        }
+
+        // 🔌 NEW: Trigger calendar update
+        await calendarService.triggerCalendarUpdate(
+          bookingData.vehicleId,
+          bookingData.groupId,
+          'booking_created',
+          { bookingId: booking.id }
+        );
+      } catch (postCommitError) {
+        // Log but don't fail the request - booking was created successfully
+        logger.error('Post-commit operations failed', { 
+          error: postCommitError.message,
+          bookingId: booking.id
+        });
       }
-
-      // 🔌 NEW: Trigger calendar update
-      await calendarService.triggerCalendarUpdate(
-        bookingData.vehicleId,
-        bookingData.groupId,
-        'booking_created',
-        { bookingId: booking.id }
-      );
 
       logger.info('Booking created successfully', { 
         bookingId: booking.id, 
@@ -102,7 +133,10 @@ export class BookingService {
 
       return await this.getBookingById(booking.id, userId);
     } catch (error) {
-      await transaction.rollback();
+      // Only rollback if transaction is still pending
+      if (transaction && !transaction.finished) {
+        await transaction.rollback();
+      }
       logger.error('Failed to create booking', { 
         error: error.message, 
         userId,
@@ -241,25 +275,33 @@ export class BookingService {
 
       await transaction.commit();
 
-      // Clear caches
-      await calendarService.clearCalendarCache(booking.vehicleId, booking.groupId);
+      // Post-commit operations (don't rollback if these fail)
+      try {
+        // Clear caches
+        await calendarService.clearCalendarCache(booking.vehicleId, booking.groupId);
 
-      // Publish events
-      await eventService.publishBookingUpdated(updatedBooking);
-      
-      // 🔌 NEW: Real-time notification
-      socketService.publishBookingUpdated(updatedBooking, oldBookingData);
+        // Publish events
+        await eventService.publishBookingUpdated(updatedBooking);
+        
+        // 🔌 NEW: Real-time notification
+        socketService.publishBookingUpdated(updatedBooking, oldBookingData);
 
-      // 🔌 NEW: Trigger calendar update
-      await calendarService.triggerCalendarUpdate(
-        booking.vehicleId,
-        booking.groupId,
-        'booking_updated',
-        { 
-          bookingId: booking.id,
-          changes: socketService.getChangedFields(oldBookingData, updatedBooking.toJSON())
-        }
-      );
+        // 🔌 NEW: Trigger calendar update
+        await calendarService.triggerCalendarUpdate(
+          booking.vehicleId,
+          booking.groupId,
+          'booking_updated',
+          { 
+            bookingId: booking.id,
+            changes: socketService.getChangedFields(oldBookingData, updatedBooking.toJSON())
+          }
+        );
+      } catch (postCommitError) {
+        logger.error('Post-commit operations failed for booking update', { 
+          error: postCommitError.message,
+          bookingId
+        });
+      }
 
       logger.info('Booking updated successfully', { 
         bookingId, 
@@ -268,7 +310,10 @@ export class BookingService {
 
       return await this.getBookingById(bookingId, userId);
     } catch (error) {
-      await transaction.rollback();
+      // Only rollback if transaction is still pending
+      if (transaction && !transaction.finished) {
+        await transaction.rollback();
+      }
       logger.error('Failed to update booking', { 
         error: error.message, 
         bookingId,
@@ -320,22 +365,30 @@ export class BookingService {
 
       await transaction.commit();
 
-      // Clear caches
-      await calendarService.clearCalendarCache(booking.vehicleId, booking.groupId);
+      // Post-commit operations (don't rollback if these fail)
+      try {
+        // Clear caches
+        await calendarService.clearCalendarCache(booking.vehicleId, booking.groupId);
 
-      // Publish events
-      await eventService.publishBookingCancelled(booking);
-      
-      // 🔌 NEW: Real-time notification
-      socketService.publishBookingCancelled(booking);
+        // Publish events
+        await eventService.publishBookingCancelled(booking);
+        
+        // 🔌 NEW: Real-time notification
+        socketService.publishBookingCancelled(booking);
 
-      // 🔌 NEW: Trigger calendar update
-      await calendarService.triggerCalendarUpdate(
-        booking.vehicleId,
-        booking.groupId,
-        'booking_cancelled',
-        { bookingId: booking.id, reason }
-      );
+        // 🔌 NEW: Trigger calendar update
+        await calendarService.triggerCalendarUpdate(
+          booking.vehicleId,
+          booking.groupId,
+          'booking_cancelled',
+          { bookingId: booking.id, reason }
+        );
+      } catch (postCommitError) {
+        logger.error('Post-commit operations failed for booking cancellation', { 
+          error: postCommitError.message,
+          bookingId
+        });
+      }
 
       logger.info('Booking cancelled successfully', { 
         bookingId, 
@@ -345,7 +398,10 @@ export class BookingService {
 
       return await this.getBookingById(bookingId, userId);
     } catch (error) {
-      await transaction.rollback();
+      // Only rollback if transaction is still pending
+      if (transaction && !transaction.finished) {
+        await transaction.rollback();
+      }
       logger.error('Failed to cancel booking', { 
         error: error.message, 
         bookingId,
@@ -362,7 +418,7 @@ export class BookingService {
       const { count, rows: bookings } = await db.Booking.findAndCountAll({
         where: {
           userId,
-          status: ['completed', 'cancelled'],
+          // Include all bookings, not just completed/cancelled
           createdAt: {
             [Op.between]: [dateRange.start, dateRange.end]
           }
@@ -371,13 +427,20 @@ export class BookingService {
           {
             model: db.Vehicle,
             as: 'vehicle',
-            attributes: ['id', 'vehicleName', 'licensePlate'],
+            attributes: ['id', 'vehicleName', 'licensePlate', 'brand', 'model'],
             required: false  // LEFT JOIN instead of INNER JOIN
           }
         ],
         order: [['createdAt', 'DESC']],
         limit: parseInt(limit),
         offset: (page - 1) * limit
+      });
+
+      logger.info('Booking history fetched', { 
+        userId, 
+        period, 
+        count, 
+        bookingsReturned: bookings.length 
       });
 
       return {
@@ -930,10 +993,18 @@ export class BookingService {
 
       await transaction.commit();
 
-      // Clear caches
-      await calendarService.clearCalendarCache(booking.vehicleId, booking.groupId);
+      // Post-commit operations (don't rollback if these fail)
+      try {
+        // Clear caches
+        await calendarService.clearCalendarCache(booking.vehicleId, booking.groupId);
 
-      await eventService.publishBookingUpdated(updatedBooking);
+        await eventService.publishBookingUpdated(updatedBooking);
+      } catch (postCommitError) {
+        logger.error('Post-commit operations failed for booking extension', { 
+          error: postCommitError.message,
+          bookingId
+        });
+      }
 
       logger.info('Booking extended successfully', {
         bookingId,
@@ -945,7 +1016,10 @@ export class BookingService {
 
       return await this.getBookingById(bookingId, userId);
     } catch (error) {
-      await transaction.rollback();
+      // Only rollback if transaction is still pending
+      if (transaction && !transaction.finished) {
+        await transaction.rollback();
+      }
       logger.error('Failed to extend booking', {
         error: error.message,
         bookingId,
@@ -959,20 +1033,21 @@ export class BookingService {
 
   async verifyUserPermissions(userId, groupId) {
     try {
-      // Call User Service to verify group membership and permissions
+      // Call User Service to fetch group members and verify membership
+      // Use internal service token for authenticated internal calls
+      // Use the internal route which accepts INTERNAL_SERVICE_TOKEN for membership check
       const response = await userServiceClient.get(
-        `${process.env.USER_SERVICE_URL}/groups/${groupId}/members/${userId}/verify`
+        `/api/v1/internal/groups/${groupId}/members/${userId}`,
+        { headers: { Authorization: `Bearer ${process.env.INTERNAL_SERVICE_TOKEN || ''}` } }
       );
 
-      if (!response.data.isMember) {
+      // HttpClient returns the parsed body; internal route returns { success: true, data: { isMember: true } }
+      const isMember = response?.data?.isMember;
+      if (!isMember) {
         throw new AppError('User is not a member of this group', 403, 'PERMISSION_DENIED');
       }
 
-      if (!response.data.canBook) {
-        throw new AppError('User does not have permission to book vehicles in this group', 403, 'BOOKING_PERMISSION_DENIED');
-      }
-
-      return response.data;
+      return { isMember: true };
     } catch (error) {
       logger.error('Failed to verify user permissions', { 
         error: error.message, 
@@ -983,7 +1058,7 @@ export class BookingService {
       if (error instanceof AppError) {
         throw error;
       }
-      
+
       throw new AppError('Failed to verify user permissions', 500, 'PERMISSION_VERIFICATION_FAILED');
     }
   }

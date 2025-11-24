@@ -20,6 +20,7 @@
     "@ev-coownership/shared": "file:../shared",
     "@google/genai": "^1.28.0",
     "amqplib": "^0.10.9",
+    "axios": "^1.13.2",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "helmet": "^8.1.0",

@@ -12,6 +12,8 @@ const router = express.Router();
 router.use(authenticate);
 
 // Amendment operations
+// These routes are already prefixed with /contracts/amendments from index.js
+// So /:contractId/amendments here becomes /contracts/amendments/:contractId/amendments
 router.post('/:contractId/amendments', 
   contractAccess,
   validate(amendmentValidators.createAmendment), 

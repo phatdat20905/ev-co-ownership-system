@@ -8,9 +8,20 @@ const router = express.Router();
 // Apply authentication to all routes
 router.use(authenticate);
 
-// Send notifications
+// ========== FCM Token Management ==========
+router.post('/register-token', notificationController.registerToken);
+router.delete('/token/:token', notificationController.removeToken);
+router.get('/tokens/:userId', notificationController.getUserTokens);
+
+// ========== Push Notifications ==========
+router.post('/send', notificationController.sendPushNotification);
+router.post('/topic/send', notificationController.sendTopicNotification);
+router.post('/topic/subscribe', notificationController.subscribeToTopic);
+router.post('/topic/unsubscribe', notificationController.unsubscribeFromTopic);
+
+// ========== General Notifications ==========
 router.post('/', notificationController.sendNotification);
-router.post('/send', notificationController.sendBulkNotification); // Bulk send for groups
+router.post('/bulk', notificationController.sendBulkNotification); // Bulk send for groups
 router.post('/template', notificationController.sendTemplateNotification);
 
 // Get user notifications

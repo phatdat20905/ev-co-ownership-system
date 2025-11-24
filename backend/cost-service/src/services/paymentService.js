@@ -20,13 +20,8 @@ export class PaymentService {
       const { costSplitId, amount, paymentMethod, providerName } = paymentData;
 
       // Validate cost split exists and belongs to user
-      const costSplits = await splitRepository.findByCostId(costSplitId);
-      const split = costSplits.find(s => s.id === costSplitId);
+      const split = await splitRepository.findById(costSplitId);
       
-      if (!split) {
-        throw new AppError('Cost split not found', 404, 'COST_SPLIT_NOT_FOUND');
-      }
-
       if (split.userId !== userId) {
         throw new AppError('Not authorized to pay this cost split', 403, 'PAYMENT_UNAUTHORIZED');
       }
@@ -256,6 +251,21 @@ export class PaymentService {
     }
   }
 
+  // Return a single payment by id, ensure the requesting user is authorized to view it
+  async getPayment(id, userId) {
+    try {
+      const payment = await paymentRepository.findById(id);
+      // Authorization: allow owner of payment or admins (admin check omitted here — add if needed)
+      if (payment.userId !== userId) {
+        throw new AppError('Not authorized to view this payment', 403, 'PAYMENT_VIEW_UNAUTHORIZED');
+      }
+      return payment;
+    } catch (error) {
+      logger.error('PaymentService.getPayment - Error:', error);
+      throw error;
+    }
+  }
+
   async getPaymentSummary(groupId, period) {
     try {
       return await paymentRepository.getPaymentSummary(groupId, period);
@@ -297,9 +307,7 @@ export class PaymentService {
       const { costSplitId, amount, scheduleAt, paymentMethod, providerName } = scheduleData;
 
       // Basic validations: cost split ownership & amount checks
-      const costSplits = await splitRepository.findByCostId(costSplitId);
-      const split = costSplits.find(s => s.id === costSplitId);
-      if (!split) throw new AppError('Cost split not found', 404, 'COST_SPLIT_NOT_FOUND');
+      const split = await splitRepository.findById(costSplitId);
       if (split.userId !== userId) throw new AppError('Not authorized to schedule this payment', 403, 'SCHEDULE_UNAUTHORIZED');
 
       const remainingAmount = parseFloat(split.splitAmount) - parseFloat(split.paidAmount || 0);

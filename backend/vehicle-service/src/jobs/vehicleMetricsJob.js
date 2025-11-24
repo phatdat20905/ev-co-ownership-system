@@ -9,6 +9,7 @@ export class VehicleMetricsJob {
   constructor() {
     this.jobName = 'vehicle-metrics';
     this.isRunning = false;
+    this.intervalId = null;
   }
 
   async start() {
@@ -21,7 +22,7 @@ export class VehicleMetricsJob {
     logger.info('Starting vehicle metrics job');
 
     // Run every hour
-    setInterval(() => {
+    this.intervalId = setInterval(() => {
       this.run();
     }, 60 * 60 * 1000); // 1 hour
 
@@ -167,6 +168,19 @@ export class VehicleMetricsJob {
       await redisClient.del(lockKey);
     } catch (error) {
       logger.error('Failed to release job lock', { error: error.message });
+    }
+  }
+
+  async stop() {
+    try {
+      if (this.intervalId) {
+        clearInterval(this.intervalId);
+        this.intervalId = null;
+      }
+      this.isRunning = false;
+      logger.info('Stopped vehicle metrics job');
+    } catch (error) {
+      logger.error('Failed to stop vehicle metrics job', { error: error.message });
     }
   }
 }

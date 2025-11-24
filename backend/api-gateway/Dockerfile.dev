@@ -1,0 +1,28 @@
+# backend/api-gateway/Dockerfile.dev
+# Development Dockerfile for the API Gateway (Node + Express)
+# - installs dependencies with npm ci
+# - exposes the dev server port 3000
+# - runs the dev server (npm run dev)
+
+FROM node:18-alpine
+
+WORKDIR /app
+
+ENV PATH /app/node_modules/.bin:$PATH
+ENV NODE_ENV development
+
+# Copy package files first to leverage docker layer caching
+COPY package.json package-lock.json* ./
+
+# Install dependencies
+RUN npm ci --silent
+
+# Copy source
+COPY . .
+
+# Expose gateway port
+EXPOSE 3000
+
+# Dev command (compose currently sets command: npm run dev)
+CMD ["npm", "run", "dev"]
+

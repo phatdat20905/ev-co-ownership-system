@@ -150,7 +150,7 @@ export class ContractService {
           {
             model: db.ContractDocument,
             as: 'documents',
-            attributes: ['id', 'document_name', 'document_type', 'file_url', 'uploaded_at']
+            attributes: ['id', 'document_name', 'document_type', 'file_url', 'created_at']
           }
         ]
       });
@@ -433,6 +433,52 @@ export class ContractService {
       for (const key of keys) {
         await redisClient.del(key);
       }
+    }
+  }
+
+  async deleteContract(contractId, userId) {
+    const transaction = await db.sequelize.transaction();
+
+    try {
+      const contract = await db.Contract.findByPk(contractId);
+
+      if (!contract) {
+        throw new AppError('Contract not found', 404, 'CONTRACT_NOT_FOUND');
+      }
+
+      // Validate permission
+      if (!await this.validateContractAccess(contract, userId)) {
+        throw new AppError('Access denied to delete contract', 403, 'CONTRACT_DELETE_DENIED');
+      }
+
+      // Delete related records first
+      await db.ContractParty.destroy({ where: { contract_id: contractId }, transaction });
+      await db.ContractDocument.destroy({ where: { contract_id: contractId }, transaction });
+      await db.SignatureLog.destroy({ where: { contract_id: contractId }, transaction });
+      await db.ContractAmendment.destroy({ where: { original_contract_id: contractId }, transaction });
+
+      // Finally delete the contract row
+      await db.Contract.destroy({ where: { id: contractId }, transaction });
+
+      await transaction.commit();
+
+      // Clear cache
+      await this.clearContractCache(contractId);
+
+      // Publish deletion event if needed
+      try {
+        await eventService.publishEvent('CONTRACT_DELETED', { contractId, deletedBy: userId, deletedAt: new Date().toISOString() });
+      } catch (e) {
+        logger.warn('Failed to publish contract deleted event', { error: e.message, contractId });
+      }
+
+      logger.info('Contract deleted successfully', { contractId, deletedBy: userId });
+
+      return true;
+    } catch (error) {
+      await transaction.rollback();
+      logger.error('Failed to delete contract', { error: error.message, contractId, userId });
+      throw error;
     }
   }
 }

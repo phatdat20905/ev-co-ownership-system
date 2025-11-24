@@ -30,9 +30,15 @@ export class KYCController {
 
       const result = await kycService.submitKYC(userId, kycData);
 
-      logger.info('KYC submitted successfully', { userId });
+      // kycService returns { existing: boolean, kyc }
+      if (result && result.existing) {
+        logger.info('KYC submission attempted but already exists', { userId, kycId: result.kyc?.id, status: result.kyc?.verificationStatus });
+        return successResponse(res, 'KYC already submitted', result.kyc, 200);
+      }
 
-      return successResponse(res, 'KYC submitted successfully', result, 201);
+      logger.info('KYC submitted successfully', { userId, kycId: result.kyc?.id });
+
+      return successResponse(res, 'KYC submitted successfully', result.kyc, 201);
     } catch (error) {
       logger.error('KYC submission failed', { 
         error: error.message, 

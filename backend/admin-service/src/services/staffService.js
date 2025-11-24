@@ -2,20 +2,30 @@
 import staffRepository from '../repositories/staffRepository.js';
 import { logger, AppError } from '@ev-coownership/shared';
 import eventService from './eventService.js';
+import { v4 as uuidv4 } from 'uuid';
 
 export class StaffService {
   async createStaff(staffData) {
     try {
+      // If client didn't supply a userId, generate one so userId is never null.
+      // Note: this creates a staff.userId value but does NOT create a corresponding
+      // user in the user-service. If you need an actual user account, call user-service
+      // to create or link a user and populate userId accordingly.
+      const generatedUserId = !staffData.userId;
+      if (generatedUserId) {
+        staffData.userId = uuidv4();
+      }
       // Check if employee ID already exists
       const existingStaff = await staffRepository.findByEmployeeId(staffData.employeeId);
       if (existingStaff) {
         throw new AppError('Employee ID already exists', 400, 'DUPLICATE_EMPLOYEE_ID');
       }
-
-      // Check if user already has staff profile
-      const existingUserStaff = await staffRepository.findByUserId(staffData.userId);
-      if (existingUserStaff) {
-        throw new AppError('User already has a staff profile', 400, 'DUPLICATE_STAFF_PROFILE');
+      // If the client provided a userId (not one we generated), ensure the user doesn't already have a staff profile
+      if (!generatedUserId) {
+        const existingUserStaff = await staffRepository.findByUserId(staffData.userId);
+        if (existingUserStaff) {
+          throw new AppError('User already has a staff profile', 400, 'DUPLICATE_STAFF_PROFILE');
+        }
       }
 
       const staff = await staffRepository.create(staffData);
