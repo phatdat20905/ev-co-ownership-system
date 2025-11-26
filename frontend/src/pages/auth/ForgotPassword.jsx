@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import Footer from "../../components/layout/Footer";
 import Header from "../../components/layout/Header";
 import { authAPI } from "../../api";
+import { showToast } from "../../utils/toast";
 
 export default function ForgotPassword() {
   const [loading, setLoading] = useState(false);
@@ -29,7 +30,9 @@ export default function ForgotPassword() {
         await authAPI.forgotPassword(email);
       } else {
         // For phone, we'll show error since backend doesn't support it yet
-        setError("Chức năng reset qua số điện thoại đang được phát triển. Vui lòng sử dụng email.");
+        const errorMsg = "Chức năng reset qua số điện thoại đang được phát triển. Vui lòng sử dụng email.";
+        setError(errorMsg);
+        showToast.warning(errorMsg);
         setLoading(false);
         return;
       }
@@ -37,9 +40,12 @@ export default function ForgotPassword() {
       // Show success message
       setSentTo(identifier);
       setSuccess(true);
+      showToast.success(`Link đặt lại mật khẩu đã được gửi đến ${identifier}`);
       setLoading(false);
     } catch (err) {
-      setError(err.response?.data?.message || "Gửi email thất bại. Vui lòng thử lại!");
+      const errorMsg = err.response?.data?.message || "Gửi email thất bại. Vui lòng thử lại!";
+      setError(errorMsg);
+      showToast.error(errorMsg);
       setLoading(false);
     }
   };

@@ -9,7 +9,7 @@ export const notificationAPI = {
 
   // Gửi bulk notification (group announcements)
   sendBulkNotification: async (data) => {
-    const response = await axios.post('/notifications/send', data);
+    const response = await axios.post('/notifications/bulk', data); // Changed from '/send' to '/bulk'
     return response.data;
   },
 

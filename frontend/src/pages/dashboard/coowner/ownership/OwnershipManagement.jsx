@@ -109,7 +109,33 @@ export default function OwnershipManagement() {
   const handleSave = async (partyId) => {
     if (!selectedContract) return;
 
+    // Validate ownership percentage
+    if (editPercentage <= 0 || editPercentage > 100) {
+      showToast.error('Tỷ lệ sở hữu phải từ 1-100%');
+      return;
+    }
+
     try {
+      // Check authentication token exists
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        showToast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+        setTimeout(() => window.location.href = '/login', 1500);
+        return;
+      }
+
+      // Calculate total ownership of other parties
+      const otherPartiesOwnership = parties
+        .filter(p => p.id !== partyId)
+        .reduce((sum, p) => sum + parseFloat(p.ownership_percentage || 0), 0);
+      
+      // Check if new total would exceed 100%
+      const newTotal = otherPartiesOwnership + parseFloat(editPercentage);
+      if (newTotal > 100) {
+        showToast.error(`Tổng tỷ lệ sở hữu sẽ vượt quá 100% (hiện tại: ${otherPartiesOwnership.toFixed(1)}% + ${editPercentage}% = ${newTotal.toFixed(1)}%)`);
+        return;
+      }
+
       const response = await contractAPI.updatePartyStatus(
         selectedContract, 
         partyId, 
@@ -122,12 +148,25 @@ export default function OwnershipManagement() {
         setEditingId(null);
         setEditPercentage('');
         showToast.success('Đã cập nhật tỷ lệ sở hữu thành công');
+        
+        // Show warning if total is not 100%
+        if (Math.abs(newTotal - 100) > 0.01) {
+          showToast.warning(`Lưu ý: Tổng tỷ lệ sở hữu hiện tại là ${newTotal.toFixed(1)}%, không phải 100%`);
+        }
       } else {
         showToast.error(response.message || 'Không thể cập nhật tỷ lệ sở hữu');
       }
     } catch (err) {
       console.error('Failed to update party:', err);
-      showToast.error('Có lỗi xảy ra khi cập nhật');
+      const errorMsg = err.response?.data?.error?.message || err.response?.data?.message || 'Có lỗi xảy ra khi cập nhật';
+      
+      // Handle specific authentication errors
+      if (err.response?.status === 401 || errorMsg.includes('token') || errorMsg.includes('expired')) {
+        showToast.error('Phiên đăng nhập đã hết hạn. Đang tải lại trang...');
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        showToast.error(errorMsg);
+      }
     }
   };
 

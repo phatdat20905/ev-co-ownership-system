@@ -63,6 +63,12 @@ export const authAPI = {
     return response.data;
   },
 
+  // Cập nhật profile (email, phone)
+  updateProfile: async (data) => {
+    const response = await axios.put('/auth/profile', data);
+    return response.data;
+  },
+
   // KYC - Submit documents (CCCD + GPLX together)
   submitKYC: async (formData) => {
     const response = await axios.post('/auth/kyc/submit', formData, {

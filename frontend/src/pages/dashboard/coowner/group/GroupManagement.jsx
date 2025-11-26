@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Users, UserPlus, Settings, Mail, Phone, Calendar, Car, MoreVertical, Edit, Trash2, Shield, Crown, Check, X, Send, UserCheck, UserX } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
+import axios from "../../../../api/axios";
 import Header from "../../../../components/layout/Header";
 import Footer from "../../../../components/layout/Footer";
 import { useGroupStore } from "../../../../store";
@@ -121,29 +122,22 @@ export default function GroupManagement() {
 
     setSearchingUser(true);
     try {
-      const response = await fetch(`http://localhost:3000/api/v1/user/search?identifier=${encodeURIComponent(inviteIdentifier)}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+      const response = await axios.get(`/user/search`, {
+        params: { identifier: inviteIdentifier }
       });
       
-      if (response.ok) {
-        const data = await response.json();
-        if (data.data) {
-          setFoundUser(data.data);
-          setInviteUserId(data.data.id);
-          toast.success(`Tìm thấy: ${data.data.fullName || data.data.email}`);
-        } else {
-          toast.error('Không tìm thấy người dùng');
-          setFoundUser(null);
-        }
+      if (response.data?.data) {
+        setFoundUser(response.data.data);
+        setInviteUserId(response.data.data.id);
+        toast.success(`Tìm thấy: ${response.data.data.fullName || response.data.data.email}`);
       } else {
         toast.error('Không tìm thấy người dùng');
         setFoundUser(null);
       }
     } catch (error) {
       console.error('Error searching user:', error);
-      toast.error('Lỗi tìm kiếm người dùng');
+      const errorMsg = error.response?.data?.message || 'Lỗi tìm kiếm người dùng';
+      toast.error(errorMsg);
       setFoundUser(null);
     } finally {
       setSearchingUser(false);
@@ -151,24 +145,51 @@ export default function GroupManagement() {
   };
 
   const handleInviteMember = async () => {
-    if (!inviteUserId || !groupData) return;
+    if (!inviteUserId || !groupData) {
+      toast.error('Vui lòng chọn người dùng để mời');
+      return;
+    }
+    
+    // Validate ownership percentage
+    if (inviteOwnership <= 0 || inviteOwnership > 100) {
+      toast.error('Tỷ lệ sở hữu phải từ 1-100%');
+      return;
+    }
     
     try {
+      // Check authentication token exists
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        toast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+        setTimeout(() => window.location.href = '/login', 1500);
+        return;
+      }
+
       await addMember(groupData.id, {
         userId: inviteUserId,
         ownershipPercentage: parseFloat(inviteOwnership)
       });
+      
       setInviteUserId("");
       setInviteIdentifier("");
       setFoundUser(null);
       setInviteOwnership(10);
       setShowInviteModal(false);
       toast.success('Đã thêm thành viên thành công');
+      
       // Refresh members
       await fetchGroupMembers(groupData.id);
     } catch (error) {
       console.error('Error inviting member:', error);
-      toast.error(error.response?.data?.message || 'Không thể gửi lời mời');
+      const errorMsg = error.response?.data?.error?.message || error.response?.data?.message || 'Không thể gửi lời mời';
+      
+      // Handle specific authentication errors
+      if (error.response?.status === 401 || errorMsg.includes('token') || errorMsg.includes('expired')) {
+        toast.error('Phiên đăng nhập đã hết hạn. Đang tải lại trang...');
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        toast.error(errorMsg);
+      }
     }
   };
 
@@ -183,11 +204,11 @@ export default function GroupManagement() {
     try {
       // Gửi notification đến tất cả thành viên trong nhóm qua API wrapper
       await notificationAPI.sendBulkNotification({
-        userIds: members.map(m => m.userId), // Changed from 'recipients' to 'userIds'
+        recipients: members.map(m => m.userId), // Array of userIds
         title: notificationTitle,
-        body: notificationMessage, // Changed from 'message' to 'body'
-        data: { // Moved to 'data' field
-          type: 'group_announcement',
+        message: notificationMessage, // Changed from 'body' back to 'message' for /bulk endpoint
+        type: 'group_announcement',
+        metadata: {
           groupId: groupData.id,
           groupName: groupData.groupName
         }
@@ -222,15 +243,62 @@ export default function GroupManagement() {
   const handleUpdateOwnership = async (memberId, newOwnership) => {
     if (!groupData) return;
     
+    // Validate ownership percentage
+    if (newOwnership <= 0 || newOwnership > 100) {
+      toast.error('Tỷ lệ sở hữu phải từ 1-100%');
+      return;
+    }
+    
     try {
-      await updateOwnership(groupData.id, memberId, parseFloat(newOwnership));
+      // Check authentication token exists
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        toast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+        setTimeout(() => window.location.href = '/login', 1500);
+        return;
+      }
+
+      // Find the member to get their userId
+      const member = members.find(m => m.id === memberId);
+      if (!member) {
+        toast.error('Không tìm thấy thành viên');
+        return;
+      }
+      
+      // Calculate total ownership of other members
+      const otherMembersOwnership = members
+        .filter(m => m.id !== memberId)
+        .reduce((sum, m) => sum + parseFloat(m.ownershipPercentage || 0), 0);
+      
+      // Check if new total would exceed 100%
+      const newTotal = otherMembersOwnership + parseFloat(newOwnership);
+      if (newTotal > 100) {
+        toast.error(`Tổng tỷ lệ sở hữu sẽ vượt quá 100% (hiện tại: ${otherMembersOwnership.toFixed(1)}% + ${newOwnership}% = ${newTotal.toFixed(1)}%)`);
+        return;
+      }
+      
+      await updateOwnership(groupData.id, member.userId, parseFloat(newOwnership));
       setEditingMember(null);
       toast.success('Đã cập nhật tỷ lệ sở hữu');
+      
+      // Show warning if total is not 100%
+      if (Math.abs(newTotal - 100) > 0.01) {
+        toast.warning(`Lưu ý: Tổng tỷ lệ sở hữu hiện tại là ${newTotal.toFixed(1)}%, không phải 100%`);
+      }
+      
       // Refresh members
       await fetchGroupMembers(groupData.id);
     } catch (error) {
       console.error('Error updating ownership:', error);
-      toast.error(error.response?.data?.message || 'Không thể cập nhật tỷ lệ sở hữu');
+      const errorMsg = error.response?.data?.error?.message || error.response?.data?.message || 'Không thể cập nhật tỷ lệ sở hữu';
+      
+      // Handle specific authentication errors
+      if (error.response?.status === 401 || errorMsg.includes('token') || errorMsg.includes('expired')) {
+        toast.error('Phiên đăng nhập đã hết hạn. Đang tải lại trang...');
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        toast.error(errorMsg);
+      }
     }
   };
 
@@ -238,7 +306,14 @@ export default function GroupManagement() {
     if (!groupData) return;
     
     try {
-      await updateMemberRole(groupData.id, memberId, newRoleValue);
+      // Find the member to get their userId
+      const member = members.find(m => m.id === memberId);
+      if (!member) {
+        toast.error('Không tìm thấy thành viên');
+        return;
+      }
+      
+      await updateMemberRole(groupData.id, member.userId, newRoleValue);
       setShowRoleModal(false);
       setMemberToEdit(null);
       setNewRole('member');
@@ -582,14 +657,13 @@ export default function GroupManagement() {
                       )}
                     </div>
                     <div className="space-y-3">
-                      {(groupData?.groupRules || []).map((rule, index) => (
-                        <div key={index} className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg">
-                          <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-bold mt-0.5">
-                            {index + 1}
-                          </div>
-                          <p className="text-gray-700">{rule}</p>
+                      {groupData?.groupRules ? (
+                        <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                          <p className="text-gray-700 whitespace-pre-wrap">{groupData.groupRules}</p>
                         </div>
-                      ))}
+                      ) : (
+                        <p className="text-gray-500 text-center py-4">Chưa có quy tắc nhóm nào</p>
+                      )}
                     </div>
                   </div>
                 )}

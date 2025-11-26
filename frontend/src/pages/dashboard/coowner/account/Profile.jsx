@@ -9,6 +9,28 @@ import { useNavigate } from 'react-router-dom';
 import { userAPI, authAPI } from "../../../../api";
 import { showToast, getErrorMessage } from '../../../../utils/toast';
 
+// Helper function to convert relative URLs to full URLs
+const getFullImageUrl = (relativePath) => {
+  if (!relativePath) return null;
+  if (relativePath.startsWith('http://') || relativePath.startsWith('https://')) {
+    return relativePath;
+  }
+  // Remove any trailing quote marks that might be in the URL
+  const cleanPath = relativePath.replace(/'+$/g, '');
+  
+  // Get API gateway URL (remove /api/v1 if present)
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+  const gatewayBase = API_BASE_URL.replace('/api/v1', '');
+  
+  // If path already starts with /api/v1, use it directly with gateway
+  if (cleanPath.startsWith('/api/v1')) {
+    return `${gatewayBase}${cleanPath}`;
+  }
+  
+  // Otherwise prepend /api/v1 (for /uploads/* paths)
+  return `${gatewayBase}/api/v1${cleanPath}`;
+};
+
 export default function Profile() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
@@ -75,18 +97,18 @@ export default function Profile() {
             setFormData(prev => ({
               ...prev,
               idNumber: payload.idCardNumber || prev.idNumber,
-              idCardFrontUrl: payload.idCardFrontUrl || prev.idCardFrontUrl,
-              idCardBackUrl: payload.idCardBackUrl || prev.idCardBackUrl,
+              idCardFrontUrl: getFullImageUrl(payload.idCardFrontUrl) || prev.idCardFrontUrl,
+              idCardBackUrl: getFullImageUrl(payload.idCardBackUrl) || prev.idCardBackUrl,
               driverLicenseNumber: payload.driverLicenseNumber || prev.driverLicenseNumber,
-              driverLicenseUrl: payload.driverLicenseUrl || prev.driverLicenseUrl
+              driverLicenseUrl: getFullImageUrl(payload.driverLicenseUrl) || prev.driverLicenseUrl
             }));
             setUserData(prev => ({
               ...(prev || {}),
               idNumber: payload.idCardNumber || prev?.idNumber,
-              idCardFrontUrl: payload.idCardFrontUrl || prev?.idCardFrontUrl,
-              idCardBackUrl: payload.idCardBackUrl || prev?.idCardBackUrl,
+              idCardFrontUrl: getFullImageUrl(payload.idCardFrontUrl) || prev?.idCardFrontUrl,
+              idCardBackUrl: getFullImageUrl(payload.idCardBackUrl) || prev?.idCardBackUrl,
               driverLicenseNumber: payload.driverLicenseNumber || prev?.driverLicenseNumber,
-              driverLicenseUrl: payload.driverLicenseUrl || prev?.driverLicenseUrl,
+              driverLicenseUrl: getFullImageUrl(payload.driverLicenseUrl) || prev?.driverLicenseUrl,
               kycStatus: payload.verificationStatus || payload.status || prev?.kycStatus
             }));
             setIdNumberInput(payload.idCardNumber || '');
@@ -120,19 +142,19 @@ export default function Profile() {
           setFormData(prev => ({
             ...prev,
             idNumber: payload.idCardNumber || prev.idNumber,
-            idCardFrontUrl: payload.idCardFrontUrl || prev.idCardFrontUrl,
-            idCardBackUrl: payload.idCardBackUrl || prev.idCardBackUrl,
+            idCardFrontUrl: getFullImageUrl(payload.idCardFrontUrl) || prev.idCardFrontUrl,
+            idCardBackUrl: getFullImageUrl(payload.idCardBackUrl) || prev.idCardBackUrl,
             driverLicenseNumber: payload.driverLicenseNumber || prev.driverLicenseNumber,
-            driverLicenseUrl: payload.driverLicenseUrl || prev.driverLicenseUrl
+            driverLicenseUrl: getFullImageUrl(payload.driverLicenseUrl) || prev.driverLicenseUrl
           }));
           // Also update userData so identification block shows authoritative values
           setUserData(prev => ({
             ...(prev || {}),
             idNumber: payload.idCardNumber || prev?.idNumber,
-            idCardFrontUrl: payload.idCardFrontUrl || prev?.idCardFrontUrl,
-            idCardBackUrl: payload.idCardBackUrl || prev?.idCardBackUrl,
+            idCardFrontUrl: getFullImageUrl(payload.idCardFrontUrl) || prev?.idCardFrontUrl,
+            idCardBackUrl: getFullImageUrl(payload.idCardBackUrl) || prev?.idCardBackUrl,
             driverLicenseNumber: payload.driverLicenseNumber || prev?.driverLicenseNumber,
-            driverLicenseUrl: payload.driverLicenseUrl || prev?.driverLicenseUrl,
+            driverLicenseUrl: getFullImageUrl(payload.driverLicenseUrl) || prev?.driverLicenseUrl,
             kycStatus: payload.verificationStatus || payload.status || prev?.kycStatus
           }));
           setIdNumberInput(payload.idCardNumber || '');
@@ -285,15 +307,11 @@ export default function Profile() {
 
     if (!candidate) return null;
 
-    // If candidate is an absolute URL, return as-is
-    try {
-      const url = new URL(candidate);
-      return url.href;
-    } catch (e) {
-      // Not an absolute URL — try to resolve relative paths to current origin
-      const path = String(candidate || '').replace(/^\/+/, '');
-      return `${window.location.origin}/${path}`;
-    }
+    // If it's a blob URL (file preview), return as-is
+    if (candidate.startsWith('blob:')) return candidate;
+
+    // Otherwise use getFullImageUrl helper to route through API gateway
+    return getFullImageUrl(candidate);
   };
 
   const handleSave = async () => {
@@ -301,27 +319,78 @@ export default function Profile() {
       setSaving(true);
       setError('');
       
-      // Map frontend fields back to backend UserProfile fields
-      const updateData = {
-        fullName: formData.name, // Map name back to fullName
-        email: formData.email,
-        phoneNumber: formData.phone, // Map phone back to phoneNumber
-        dateOfBirth: formData.dateOfBirth,
-        gender: formData.gender,
-        address: formData.address,
-        bio: formData.bio,
-        // Do not send base64 avatar data. If a new file is selected we'll upload it separately below.
-      };
-      // If user selected an avatar file, upload it first (server will update profile.avatarUrl)
+      // Separate data for auth-service (User model) and user-service (UserProfile model)
+      const authUpdateData = {};
+      const userUpdateData = {};
+
+      // Auth-service fields: email, phone
+      if (formData.email !== userData.email) {
+        authUpdateData.email = formData.email;
+      }
+      if (formData.phone !== userData.phone) {
+        authUpdateData.phone = formData.phone;
+      }
+
+      // User-service fields: fullName, dateOfBirth, gender, address, bio
+      if (formData.name !== userData.name) {
+        userUpdateData.fullName = formData.name;
+      }
+      if (formData.dateOfBirth !== userData.dateOfBirth) {
+        userUpdateData.dateOfBirth = formData.dateOfBirth;
+      }
+      if (formData.gender !== userData.gender) {
+        userUpdateData.gender = formData.gender;
+      }
+      if (formData.address !== userData.address) {
+        userUpdateData.address = formData.address;
+      }
+      if (formData.bio !== userData.bio) {
+        userUpdateData.bio = formData.bio;
+      }
+
+      // Also include phoneNumber and email in user-service for consistency
+      userUpdateData.phoneNumber = formData.phone;
+      userUpdateData.email = formData.email;
+
+      // If user selected an avatar file, upload it first (updates UserProfile.avatarUrl)
       if (avatarFile) {
         const fd = new FormData();
         fd.append('avatar', avatarFile);
-        // uploadAvatar returns the API response (success wrapper). We'll refetch profile below to get the new avatarUrl.
         await userAPI.uploadAvatar(fd);
       }
 
-      // Update profile fields (avatar already handled via uploadAvatar if present)
-      await userAPI.updateProfile(updateData);
+      // Call both services in parallel if there are updates
+      const updatePromises = [];
+      
+      if (Object.keys(authUpdateData).length > 0) {
+        updatePromises.push(
+          authAPI.updateProfile(authUpdateData).catch(err => {
+            console.error('Auth service update failed:', err);
+            throw new Error(`Failed to update authentication info: ${getErrorMessage(err)}`);
+          })
+        );
+      }
+      
+      if (Object.keys(userUpdateData).length > 0 || avatarFile) {
+        updatePromises.push(
+          userAPI.updateProfile(userUpdateData).catch(err => {
+            console.error('User service update failed:', err);
+            throw new Error(`Failed to update profile info: ${getErrorMessage(err)}`);
+          })
+        );
+      }
+
+      // Wait for all updates to complete
+      if (updatePromises.length > 0) {
+        const results = await Promise.allSettled(updatePromises);
+        
+        // Check if any failed
+        const failed = results.filter(r => r.status === 'rejected');
+        if (failed.length > 0) {
+          const errors = failed.map(f => f.reason.message).join('; ');
+          throw new Error(errors);
+        }
+      }
 
       // Refetch fresh profile and update local state immediately
       const fresh = await userAPI.getProfile();

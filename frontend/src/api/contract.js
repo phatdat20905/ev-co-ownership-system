@@ -160,7 +160,11 @@ export const contractAPI = {
   // Tài liệu - Upload
   uploadDocument: async (contractId, formData) => {
     try {
-      const response = await axios.post(`/contracts/documents/${contractId}/documents`, formData);
+      const response = await axios.post(`/contracts/documents/${contractId}/documents`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
       return { success: true, data: response.data.data, message: response.data.message || 'Upload tài liệu thành công' };
     } catch (error) {
       return { success: false, message: getErrorMessage(error), data: null };

@@ -7,6 +7,28 @@ import Footer from '../../../../components/layout/Footer';
 import { contractAPI } from '../../../../api/contract';
 import { showToast } from '../../../../utils/toast';
 
+// Helper function to convert relative URLs to full API gateway URLs
+const getFullImageUrl = (relativePath) => {
+  if (!relativePath) return '';
+  if (relativePath.startsWith('http://') || relativePath.startsWith('https://')) {
+    return relativePath;
+  }
+  // Remove any trailing quote marks
+  const cleanPath = relativePath.replace(/'+$/g, '');
+  
+  // Get API gateway URL
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+  const gatewayBase = API_BASE_URL.replace('/api/v1', '');
+  
+  // If path already starts with /api/v1, use it directly
+  if (cleanPath.startsWith('/api/v1')) {
+    return `${gatewayBase}${cleanPath}`;
+  }
+  
+  // Otherwise prepend /api/v1 (for /uploads/* paths)
+  return `${gatewayBase}/api/v1${cleanPath}`;
+};
+
 export default function DocumentUpload() {
   const [searchParams] = useSearchParams();
   const params = useParams();
@@ -184,15 +206,43 @@ export default function DocumentUpload() {
     if (!resolvedId) return;
 
     try {
-      // Call view endpoint which returns document info
-      const response = await contractAPI.viewDocument(resolvedId, documentId);
-      
-      if (response.success && response.data?.viewUrl) {
-        // Open document URL in new tab
-        window.open(response.data.viewUrl, '_blank');
-      } else {
-        showToast.error('Không thể xem tài liệu');
+      // Get auth token
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        showToast.error('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+        return;
       }
+
+      // Call view endpoint directly - it now streams the file
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+      const viewUrl = `${API_BASE_URL}/contracts/documents/${resolvedId}/documents/${documentId}/view`;
+      
+      const fileResponse = await fetch(viewUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!fileResponse.ok) {
+        if (fileResponse.status === 401) {
+          showToast.error('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+        } else if (fileResponse.status === 404) {
+          showToast.error('Không tìm thấy tài liệu');
+        } else {
+          throw new Error(`HTTP ${fileResponse.status}`);
+        }
+        return;
+      }
+      
+      // Create blob from response
+      const blob = await fileResponse.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
+      // Open blob URL in new tab (no auth needed for blob URLs)
+      window.open(blobUrl, '_blank');
+      
+      // Clean up blob URL after some time
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
     } catch (error) {
       console.error('View error:', error);
       showToast.error('Có lỗi xảy ra khi xem tài liệu');

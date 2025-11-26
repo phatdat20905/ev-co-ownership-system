@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import Footer from "../../components/layout/Footer";
 import Header from "../../components/layout/Header";
 import { useAuthStore } from "../../store";
+import { showToast } from "../../utils/toast";
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
@@ -21,19 +22,19 @@ export default function Login() {
   // Demo accounts để quick login (cho development)
   const demoAccounts = {
     user: {
-      email: "user@evcoownership.com",
-      phone: "0901234567",
-      password: "123456",
+      email: "ngophatdat1@gmail.com",
+      phone: "0903456781",
+      password: "Password123!",
     },
     admin: {
       email: "admin@evcoownership.com",
-      phone: "0909876543",
-      password: "123456",
+      phone: "0901234567",
+      password: "Password123!",
     },
     staff: {
-      email: "staff@evcoownership.com",
-      phone: "0905555555",
-      password: "123456",
+      email: "staff.nguyen@evcoownership.com",
+      phone: "0902345671",
+      password: "Password123!",
     }
   };
 
@@ -89,9 +90,13 @@ export default function Login() {
       // Trigger storage event để Header cập nhật
       window.dispatchEvent(new Event('storage'));
 
+      showToast.success("Đăng nhập thành công!");
+      
       // Navigation sẽ được xử lý bởi useEffect khi isAuthenticated thay đổi
     } catch (err) {
-      setError(err.response?.data?.message || "Email/Số điện thoại hoặc mật khẩu không đúng!");
+      const errorMsg = err.response?.data?.message || "Email/Số điện thoại hoặc mật khẩu không đúng!";
+      setError(errorMsg);
+      showToast.error(errorMsg);
       setLoading(false);
     }
   };
@@ -304,9 +309,9 @@ export default function Login() {
           >
             <p className="text-sm text-amber-800 text-center">
               <strong>Tài khoản Demo:</strong><br />
-              👤 <strong>User:</strong> user@evcoownership.com / 123456<br />
-              👔 <strong>Staff:</strong> staff@evcoownership.com / 123456<br />
-              ⚡ <strong>Admin:</strong> admin@evcoownership.com / 123456
+              👤 <strong>User:</strong> ngophatdat1@gmail.com / Password123!<br />
+              👔 <strong>Staff:</strong> staff.nguyen@evcoownership.com / Password123!<br />
+              ⚡ <strong>Admin:</strong> admin@evcoownership.com / Password123!
             </p>
           </motion.div>
         </motion.div>

@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import Footer from "../../components/layout/Footer";
 import Header from "../../components/layout/Header";
 import { authAPI } from "../../api";
+import { showToast } from "../../utils/toast";
 
 
 export default function ResetPassword() {
@@ -63,19 +64,25 @@ export default function ResetPassword() {
 
     // Validation
     if (!token) {
-      setError("Link đặt lại mật khẩu không hợp lệ!");
+      const errorMsg = "Link đặt lại mật khẩu không hợp lệ!";
+      setError(errorMsg);
+      showToast.error(errorMsg);
       setLoading(false);
       return;
     }
 
     if (password !== confirmPassword) {
-      setError("Mật khẩu xác nhận không khớp!");
+      const errorMsg = "Mật khẩu xác nhận không khớp!";
+      setError(errorMsg);
+      showToast.error(errorMsg);
       setLoading(false);
       return;
     }
 
     if (strength < 3) {
-      setError("Mật khẩu chưa đủ mạnh!");
+      const errorMsg = "Mật khẩu chưa đủ mạnh! Vui lòng thỏa mãn tất cả điều kiện.";
+      setError(errorMsg);
+      showToast.warning(errorMsg);
       setLoading(false);
       return;
     }
@@ -84,9 +91,12 @@ export default function ResetPassword() {
       await authAPI.resetPassword(token, password);
 
       setSuccess(true);
+      showToast.success("Đặt lại mật khẩu thành công! Đang chuyển đến trang đăng nhập...");
       setTimeout(() => navigate("/login"), 3000);
     } catch (err) {
-      setError(err.response?.data?.message || "Đặt lại mật khẩu thất bại. Link có thể đã hết hạn!");
+      const errorMsg = err.response?.data?.message || "Đặt lại mật khẩu thất bại. Link có thể đã hết hạn!";
+      setError(errorMsg);
+      showToast.error(errorMsg);
       setLoading(false);
     }
   };

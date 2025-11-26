@@ -5,6 +5,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Footer from "../../components/layout/Footer";
 import Header from "../../components/layout/Header";
 import { authAPI } from "../../api";
+import { showToast } from "../../utils/toast";
 
 export default function VerifyEmail() {
   const [searchParams] = useSearchParams();
@@ -17,26 +18,30 @@ export default function VerifyEmail() {
       const token = searchParams.get("token");
       
       if (!token) {
+        const errorMsg = "Thiếu mã xác thực. Vui lòng kiểm tra lại email của bạn.";
         setStatus("error");
-        setMessage("Thiếu mã xác thực. Vui lòng kiểm tra lại email của bạn.");
+        setMessage(errorMsg);
+        showToast.error(errorMsg);
         return;
       }
 
       try {
         const response = await authAPI.verifyEmail(token);
         setStatus("success");
-        setMessage(response.message || "Xác thực email thành công!");
+        const successMsg = response.message || "Xác thực email thành công!";
+        setMessage(successMsg);
+        showToast.success(successMsg);
         
         // Auto redirect to login after 3 seconds
         setTimeout(() => {
           navigate("/login");
         }, 3000);
       } catch (error) {
+        const errorMsg = error.response?.data?.message || 
+          "Xác thực thất bại. Link có thể đã hết hạn hoặc không hợp lệ.";
         setStatus("error");
-        setMessage(
-          error.response?.data?.message || 
-          "Xác thực thất bại. Link có thể đã hết hạn hoặc không hợp lệ."
-        );
+        setMessage(errorMsg);
+        showToast.error(errorMsg);
       }
     };
 

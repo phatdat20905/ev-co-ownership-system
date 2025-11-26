@@ -16,6 +16,7 @@ import Footer from "../../components/layout/Footer";
 import Header from "../../components/layout/Header";
 import { useAuthStore } from "../../store";
 import { userAPI } from "../../api/user";
+import { showToast } from "../../utils/toast";
 
 export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
@@ -71,50 +72,43 @@ export default function Register() {
     // Validation
     if (formData.password !== formData.confirmPassword) {
       setError("Mật khẩu xác nhận không khớp!");
+      showToast.error("Mật khẩu xác nhận không khớp!");
       setLoading(false);
       return;
     }
 
     if (strength < 3) {
       setError("Mật khẩu chưa đủ mạnh!");
+      showToast.warning("Mật khẩu chưa đủ mạnh! Vui lòng thỏa mãn tất cả điều kiện.");
       setLoading(false);
       return;
     }
 
     try {
-      // Step 1: Register user in auth-service
-      const registerResponse = await register({
+      // Step 1: Create pending user profile in user-service (without userId)
+      await userAPI.createProfile({
+        fullName: formData.fullName,
+        email: formData.email,
+        phoneNumber: formData.phone
+      });
+
+      // Step 2: Register user in auth-service
+      await register({
         email: formData.email,
         phone: formData.phone,
         password: formData.password,
         role: 'co_owner'
       });
 
-      // Extract userId from response (returned after successful registration)
-      const userId = registerResponse?.data?.user?.id;
-
-      if (userId) {
-        // Step 2: Create user profile in user-service with fullName
-        try {
-          await userAPI.createProfile({
-            userId: userId,
-            fullName: formData.fullName,
-            email: formData.email,
-            phoneNumber: formData.phone
-          });
-        } catch (profileErr) {
-          // Log profile creation error but don't block registration
-          console.error('Profile creation failed:', profileErr);
-          // Profile will be auto-created on first login if this fails
-        }
-      }
-
       // Show success message
       setRegisteredEmail(formData.email);
       setSuccess(true);
+      showToast.success(`Email xác thực đã được gửi đến ${formData.email}`);
       setLoading(false);
     } catch (err) {
-      setError(err.response?.data?.message || "Đăng ký thất bại. Vui lòng thử lại!");
+      const errorMsg = err.response?.data?.message || "Đăng ký thất bại. Vui lòng thử lại!";
+      setError(errorMsg);
+      showToast.error(errorMsg);
       setLoading(false);
     }
   };
