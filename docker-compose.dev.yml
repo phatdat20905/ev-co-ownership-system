@@ -288,11 +288,11 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/nifi-api/system-diagnostics || exit 1"]
+      test: ["CMD-SHELL", "pgrep -f 'org.apache.nifi.NiFi' > /dev/null || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 120s
+      start_period: 180s
 
   # ========== DEVELOPMENT SERVICES WITH PROFILES ==========
   
@@ -305,6 +305,8 @@ services:
     container_name: ev_api_gateway_dev
     ports:
       - "3000:3000"
+    env_file:
+      - ./backend/api-gateway/.env
     environment:
       NODE_ENV: development
       PORT: 3000
@@ -348,6 +350,9 @@ services:
       RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
       # Public-facing base URL used when the service builds absolute URLs (dev: gateway)
       AUTH_SERVICE_PUBLIC_URL: http://localhost:3000
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     depends_on:
       postgres-auth:
         condition: service_healthy
@@ -562,6 +567,7 @@ services:
     volumes:
       - ./backend/contract-service/src:/app/src
       - ./backend/contract-service/logs:/app/logs
+      - ./backend/contract-service/uploads:/app/uploads
       - ./backend/shared:/app/node_modules/@ev-coownership/shared
     command: npm run dev
 
