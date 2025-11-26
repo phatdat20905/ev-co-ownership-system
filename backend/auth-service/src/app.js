@@ -25,14 +25,16 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 // 🛡️ Security middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(createCorsMiddleware());
 
 // 📦 Body parsers
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// 📁 Static files - KYC uploads
+// 📁 Static files - KYC uploads (after CORS middleware)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // 🚦 Rate limiting is applied at route level (see authRoutes.js)

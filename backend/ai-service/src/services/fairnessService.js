@@ -19,18 +19,33 @@ export class FairnessService {
       // Calculate period dates
       const { periodStart, periodEnd } = this.calculatePeriod(timeRange, startDate, endDate);
 
-      // Fetch data from other services
-      const [bookingsData, groupData] = await Promise.all([
-        this.fetchBookingHistory(groupId, periodStart, periodEnd),
-        this.fetchGroupMembers(groupId)
-      ]);
+      // First fetch group members to get vehicleId
+      const groupData = await this.fetchGroupMembers(groupId);
 
       if (!groupData || !groupData.members || groupData.members.length === 0) {
         throw new Error('Group not found or has no members');
       }
 
+      // Then fetch booking history using the vehicleId from group data
+      const bookingsData = await this.fetchBookingHistoryByVehicle(
+        groupData.vehicleId, 
+        periodStart, 
+        periodEnd
+      );
+
+      // Ensure bookings is an array
+      const bookings = Array.isArray(bookingsData?.bookings) 
+        ? bookingsData.bookings 
+        : [];
+
+      logger.debug('Bookings fetched for fairness analysis', {
+        groupId,
+        vehicleId: groupData.vehicleId,
+        bookingCount: bookings.length
+      });
+
       // Calculate usage statistics
-      const usageStats = this.calculateUsageStats(bookingsData.bookings, groupData.members);
+      const usageStats = this.calculateUsageStats(bookings, groupData.members);
 
       // Calculate fairness scores
       const fairnessAnalysis = this.calculateFairnessScores(usageStats, groupData.members);
@@ -114,21 +129,28 @@ export class FairnessService {
   }
 
   /**
-   * Fetch booking history from booking service
+   * Fetch booking history from booking service by vehicleId
    */
-  async fetchBookingHistory(groupId, startDate, endDate) {
+  async fetchBookingHistoryByVehicle(vehicleId, startDate, endDate) {
     try {
+      if (!vehicleId) {
+        logger.warn('No vehicleId provided, cannot fetch bookings');
+        return { bookings: [], conflicts: 0 };
+      }
+
       const headers = {};
       if (process.env.INTERNAL_API_TOKEN) {
         headers['x-internal-token'] = process.env.INTERNAL_API_TOKEN;
       }
 
+      // Query bookings using vehicleId
       const response = await axios.get(`${this.bookingServiceUrl}/api/v1/bookings`, {
         params: {
-          groupId,
+          vehicleId,
           startDate: startDate.toISOString(),
           endDate: endDate.toISOString(),
-          status: 'completed'
+          status: 'completed',
+          limit: 1000 // Get more bookings for analysis
         },
         timeout: 10000,
         headers
@@ -140,8 +162,9 @@ export class FairnessService {
       };
     } catch (error) {
       logger.error('Failed to fetch booking history', {
-        groupId,
-        error: error.message
+        vehicleId,
+        error: error.message,
+        status: error.response?.status
       });
       // Return empty data instead of throwing
       return { bookings: [], conflicts: 0 };
@@ -226,6 +249,15 @@ export class FairnessService {
    * Calculate usage statistics for each member
    */
   calculateUsageStats(bookings, members) {
+    // Safety check: ensure bookings is an array
+    if (!Array.isArray(bookings)) {
+      logger.warn('calculateUsageStats called with non-array bookings', {
+        bookingsType: typeof bookings,
+        bookings: bookings
+      });
+      bookings = [];
+    }
+
     const stats = {};
     const totalHours = bookings.reduce((sum, booking) => {
       const hours = (new Date(booking.endTime) - new Date(booking.startTime)) / (1000 * 60 * 60);

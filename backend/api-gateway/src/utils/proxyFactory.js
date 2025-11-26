@@ -25,10 +25,19 @@ export const createServiceProxy = (serviceName, target, opts = {}) => {
     ...options,
     target,
     pathRewrite: (path, req) => {
+      // Special handling for static file uploads - don't add /api/v1 prefix
+      // These should be proxied directly to the backend service's express.static middleware
+      if (serviceName.startsWith('uploads-')) {
+        // For /uploads/avatars → /uploads/avatars
+        // For /uploads/kyc → /uploads/kyc
+        // For /uploads/documents → /uploads/documents
+        const uploadType = serviceName.replace('uploads-', '');
+        return `/uploads/${uploadType}${path}`;
+      }
+      
       // Express router strips: /api/v1 + /<serviceName>
       // So proxy receives only: /login, /register, etc.
       // We need to reconstruct: /api/v1/<serviceName><path>
-      
       return `/api/v1/${serviceName}${path}`;
     },
     onProxyReq(proxyReq, req, res) {

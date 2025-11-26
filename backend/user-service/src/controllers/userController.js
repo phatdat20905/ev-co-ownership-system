@@ -8,19 +8,15 @@ import {
 export class UserController {
   async createProfile(req, res, next) {
     try {
-      // Support both authenticated (has token) and unauthenticated (from verification) requests
-      // userId can come from token or from request body
-      const userId = req.user?.id || req.body.userId;
-      
-      if (!userId) {
-        throw new AppError('User ID is required', 400, 'USER_ID_REQUIRED');
-      }
+      // Accept unauthenticated requests (pending profile creation)
+      // userId can come from token, request body, or be omitted for pending profile
+      const userId = req.user?.id || req.body.userId || null;
 
       const profileData = req.body;
 
       const profile = await userService.createUserProfile(userId, profileData);
 
-      logger.info('User profile created successfully', { userId });
+      logger.info('User profile created successfully', { userId: profile.userId });
 
       return successResponse(res, 'Profile created successfully', profile, 201);
     } catch (error) {
@@ -116,21 +112,23 @@ export class UserController {
 
   async searchUsers(req, res, next) {
     try {
-      const { q } = req.query;
+      // Accept both 'q' (for general search) and 'identifier' (for specific email/phone search)
+      const { q, identifier } = req.query;
+      const searchQuery = q || identifier;
       
-      if (!q || q.length < 2) {
+      if (!searchQuery || searchQuery.length < 2) {
         throw new AppError('Search query must be at least 2 characters', 400, 'INVALID_QUERY');
       }
 
-      const users = await userService.searchUsers(q);
+      const users = await userService.searchUsers(searchQuery);
 
-      logger.info('User search completed', { query: q, results: users.length });
+      logger.info('User search completed', { query: searchQuery, results: users.length });
 
       return successResponse(res, 'Search completed', users);
     } catch (error) {
       logger.error('Failed to search users', { 
         error: error.message, 
-        query: req.query.q 
+        query: req.query.q || req.query.identifier 
       });
       next(error);
     }

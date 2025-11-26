@@ -195,7 +195,9 @@ export class BookingService {
         order = 'DESC'
       } = filters;
 
-      const where = { userId };
+      // Build where clause - only add userId if provided (not internal call)
+      const where = {};
+      if (userId) where.userId = userId;
       
       if (status) where.status = status;
       if (vehicleId) where.vehicleId = vehicleId;

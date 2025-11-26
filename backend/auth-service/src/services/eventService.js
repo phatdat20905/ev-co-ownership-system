@@ -52,14 +52,23 @@ class EventService {
   }
 
   // ---------------- Publish events ----------------
-  async publishUserRegistered(user) {
-    if (!user?.id || !user?.email) return;
+  async publishUserRegistered(userData) {
+    // Accept both user.id and userData.userId formats
+    const userId = userData?.userId || userData?.id;
+    const email = userData?.email;
+    
+    if (!userId || !email) {
+      logger.warn('Invalid user data for USER_REGISTERED event', { userData });
+      return;
+    }
+    
     await this.publishEvent(eventTypes.USER_REGISTERED, {
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-      isVerified: user.isVerified,
-      registeredAt: new Date().toISOString()
+      userId: userId,
+      email: email,
+      phone: userData.phone,
+      role: userData.role,
+      isVerified: userData.isVerified,
+      registeredAt: userData.registeredAt || new Date().toISOString()
     });
   }
 

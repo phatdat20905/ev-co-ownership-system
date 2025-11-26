@@ -12,33 +12,33 @@ const router = express.Router();
 router.use(authenticate);
 
 // Document management operations
-// These routes are already prefixed with /contracts/documents from index.js
-// So /:contractId/documents here becomes /contracts/documents/:contractId/documents
+// Routes mounted at /contracts/documents in index.js
+// Frontend calls: /api/v1/contracts/documents/:contractId/documents
+// So we need /:contractId/documents here
 router.post('/:contractId/documents', 
   contractAccess,
-  documentUpload.single('file'), // Changed from 'document' to 'file' to match frontend
-  validate(documentValidators.uploadDocument), 
-  documentController.uploadDocument
+  documentUpload.single('file'),
+  documentController.uploadDocument.bind(documentController)
 );
 
 router.get('/:contractId/documents', 
   contractAccess,
-  documentController.getDocuments
+  documentController.getDocuments.bind(documentController)
 );
 
 router.get('/:contractId/documents/:documentId/download', 
   contractAccess,
-  documentController.downloadDocument
+  documentController.downloadDocument.bind(documentController)
 );
 
 router.get('/:contractId/documents/:documentId/view',
   contractAccess,
-  documentController.viewDocument
+  documentController.viewDocument.bind(documentController)
 );
 
 router.delete('/:contractId/documents/:documentId', 
   contractAccess,
-  documentController.deleteDocument
+  documentController.deleteDocument.bind(documentController)
 );
 
 export default router;

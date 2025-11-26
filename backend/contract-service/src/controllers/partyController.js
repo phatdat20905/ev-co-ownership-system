@@ -89,7 +89,12 @@ export class PartyController {
       }
 
       const contract = await db.Contract.findByPk(contractId);
-      if (contract.status !== 'draft') {
+      
+      // Allow ownership percentage updates for active contracts
+      // But restrict other changes to draft contracts only
+      const isOwnershipUpdate = req.body.ownershipPercentage !== undefined && Object.keys(req.body).length === 1;
+      
+      if (!isOwnershipUpdate && contract.status !== 'draft') {
         throw new AppError('Parties can only be updated in draft contracts', 400, 'CONTRACT_NOT_EDITABLE');
       }
 

@@ -63,10 +63,17 @@ export class BookingController {
 
   async getUserBookings(req, res, next) {
     try {
-      const userId = req.user.id;
+      // For internal service calls (e.g., AI service), don't filter by userId
+      // Allow querying bookings by vehicleId only
+      const isInternalCall = req.user?.id === 'internal';
+      const userId = isInternalCall ? null : req.user.id;
       const filters = req.query;
 
-      logger.debug('Getting user bookings', { userId, filters });
+      logger.debug('Getting user bookings', { 
+        userId: userId || 'internal-service-call', 
+        isInternalCall,
+        filters 
+      });
 
       const result = await bookingService.getUserBookings(userId, filters);
 

@@ -1,6 +1,5 @@
-import { logger, notificationHelper, NOTIFICATION_TYPES } from '@ev-coownership/shared';
+import { logger } from '@ev-coownership/shared';
 import fairnessService from '../services/fairnessService.js';
-import axios from 'axios';
 
 export class FairnessController {
   /**
@@ -25,40 +24,11 @@ export class FairnessController {
         endDate
       });
 
-      // Send notification to all group members after analysis
-      if (result.success) {
-        try {
-          // Get group members from user-service
-          const userServiceUrl = process.env.USER_SERVICE_URL || 'http://user-service-dev:3002';
-          const groupResponse = await axios.get(`${userServiceUrl}/groups/${groupId}/members`);
-          
-          if (groupResponse.data?.data?.members) {
-            const userIds = groupResponse.data.data.members.map(m => m.userId);
-            
-            await notificationHelper.sendAIFairnessNotification(
-              {
-                id: result.data._id,
-                groupId: groupId,
-                groupName: groupResponse.data.data.groupName || 'Nhóm',
-                overallScore: result.data.overallFairnessScore,
-                fairnessLevel: result.data.fairnessLevel,
-                issuesFound: result.data.issues?.length || 0,
-                recommendations: result.data.recommendations
-              },
-              userIds
-            );
-            logger.info('Fairness analysis notification sent', { 
-              groupId, 
-              memberCount: userIds.length 
-            });
-          }
-        } catch (notifError) {
-          logger.error('Failed to send fairness notification', { 
-            error: notifError.message,
-            groupId 
-          });
-        }
-      }
+      // Notifications intentionally disabled for fairness analysis (performance & reliability)
+      logger.info('Fairness analysis completed successfully', {
+        groupId,
+        overallScore: result.data?.overallFairnessScore
+      });
 
       return res.status(200).json(result);
       

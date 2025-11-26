@@ -3,6 +3,11 @@ import helmet from 'helmet';
 import { config } from 'dotenv';
 import { createCorsMiddleware } from '@ev-coownership/shared';
 import { createHealthRoute } from '@ev-coownership/shared';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Shared imports
 import {
@@ -20,12 +25,17 @@ config();
 const app = express();
 
 // 🛡️ Security middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(createCorsMiddleware());
 
 // 📦 Body parsers
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// 📁 Static file serving for uploaded documents
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // 🚦 Rate limiting
 app.use(generalRateLimiter);

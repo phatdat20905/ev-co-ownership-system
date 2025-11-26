@@ -40,6 +40,12 @@ export default (sequelize, DataTypes) => {
       field: 'vehicle_id',
       comment: 'Reference to vehicle in vehicle-service'
     },
+    groupRules: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'group_rules',
+      comment: 'Group rules and guidelines for members'
+    },
     isActive: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,

@@ -61,29 +61,30 @@ class GeminiConfig {
 
       // REST fallback
       try {
-        const url = `${restUrlBase}/${encodeURIComponent(model)}:generateContent`;
+        let url = `${restUrlBase}/${encodeURIComponent(model)}:generateContent`;
         const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
         const signal = controller ? controller.signal : undefined;
 
+        // Use correct Gemini API format (not messages, but contents)
         const body = {
-          // Using simple messages format as a compatible fallback
-          messages: [
+          contents: Array.isArray(contents) ? contents : [
             {
-              author: 'user',
-              content: [
-                { type: 'text', text: contents }
+              role: 'user',
+              parts: [
+                { text: typeof contents === 'string' ? contents : JSON.stringify(contents) }
               ]
             }
-          ]
+          ],
+          generationConfig
         };
 
         const headers = {
           'Content-Type': 'application/json'
         };
 
-        // prefer X-goog-api-key if provided (user-provided example), otherwise try Authorization Bearer
+        // Use query parameter for API key authentication
         if (process.env.GEMINI_API_KEY) {
-          headers['X-goog-api-key'] = process.env.GEMINI_API_KEY;
+          url += `?key=${process.env.GEMINI_API_KEY}`;
         } else if (process.env.GEMINI_BEARER_TOKEN) {
           headers['Authorization'] = `Bearer ${process.env.GEMINI_BEARER_TOKEN}`;
         }

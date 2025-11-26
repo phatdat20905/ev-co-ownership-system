@@ -4,6 +4,12 @@ import {
   logger,
   AppError
 } from '@ev-coownership/shared';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export class DocumentController {
   async uploadDocument(req, res, next) {
@@ -85,19 +91,41 @@ export class DocumentController {
         throw new AppError('Document not found', 404, 'DOCUMENT_NOT_FOUND');
       }
 
-      // In a real implementation, you would stream the file from storage
-      // For now, return the document info with download URL
-      const downloadInfo = {
-        document,
-        downloadUrl: document.file_url // This would be a signed URL in production
-      };
+      // Construct file path from file_url
+      // file_url format: /uploads/documents/:contractId/:filename
+      const relativePath = document.file_url.replace('/uploads/', '');
+      const filepath = path.join(__dirname, '../../uploads', relativePath);
 
-      logger.info('Document download requested', { 
-        contractId,
-        documentId 
+      // Check if file exists
+      if (!fs.existsSync(filepath)) {
+        logger.error('File not found on disk', { filepath, fileUrl: document.file_url });
+        throw new AppError('File not found on disk', 404, 'FILE_NOT_FOUND');
+      }
+
+      // Set headers for download
+      res.setHeader('Content-Type', document.mime_type || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(document.document_name)}"`);
+      res.setHeader('Content-Length', document.file_size);
+
+      // Stream file to response
+      const fileStream = fs.createReadStream(filepath);
+      fileStream.pipe(res);
+
+      fileStream.on('error', (error) => {
+        logger.error('Error streaming file', { error: error.message, filepath });
+        if (!res.headersSent) {
+          next(new AppError('Error streaming file', 500, 'STREAM_ERROR'));
+        }
       });
 
-      return successResponse(res, 'Document download ready', downloadInfo);
+      fileStream.on('end', () => {
+        logger.info('Document downloaded successfully', { 
+          contractId,
+          documentId,
+          fileName: document.document_name
+        });
+      });
+
     } catch (error) {
       logger.error('Failed to download document', { 
         error: error.message, 
@@ -122,24 +150,40 @@ export class DocumentController {
         throw new AppError('Document not found', 404, 'DOCUMENT_NOT_FOUND');
       }
 
-      // Set appropriate headers for viewing in browser
-      res.setHeader('Content-Type', document.mime_type || 'application/pdf');
-      res.setHeader('Content-Disposition', 'inline'); // Display in browser, not download
-      
-      // In production, redirect to signed URL or stream from storage
-      // For now, return document info with view URL
-      const viewInfo = {
-        document,
-        viewUrl: document.file_url,
-        mimeType: document.mime_type
-      };
+      // Construct file path from file_url
+      const relativePath = document.file_url.replace('/uploads/', '');
+      const filepath = path.join(__dirname, '../../uploads', relativePath);
 
-      logger.info('Document view requested', { 
-        contractId,
-        documentId 
+      // Check if file exists
+      if (!fs.existsSync(filepath)) {
+        logger.error('File not found on disk', { filepath, fileUrl: document.file_url });
+        throw new AppError('File not found on disk', 404, 'FILE_NOT_FOUND');
+      }
+
+      // Set headers for inline viewing (not download)
+      res.setHeader('Content-Type', document.mime_type || 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline');
+      res.setHeader('Content-Length', document.file_size);
+
+      // Stream file to response
+      const fileStream = fs.createReadStream(filepath);
+      fileStream.pipe(res);
+
+      fileStream.on('error', (error) => {
+        logger.error('Error streaming file for view', { error: error.message, filepath });
+        if (!res.headersSent) {
+          next(new AppError('Error streaming file', 500, 'STREAM_ERROR'));
+        }
       });
 
-      return successResponse(res, 'Document view ready', viewInfo);
+      fileStream.on('end', () => {
+        logger.info('Document viewed successfully', { 
+          contractId,
+          documentId,
+          fileName: document.document_name
+        });
+      });
+
     } catch (error) {
       logger.error('Failed to view document', { 
         error: error.message, 
@@ -183,16 +227,42 @@ export class DocumentController {
   }
 
   async uploadToStorage(file, contractId) {
-    // Mock implementation - in production, use AWS S3, Google Cloud Storage, etc.
-    const mockUrl = `https://storage.evcoownership.com/contracts/${contractId}/documents/${Date.now()}-${file.originalname}`;
-    
-    logger.debug('File uploaded to storage', { 
-      url: mockUrl,
-      originalName: file.originalname,
-      size: file.size 
-    });
-    
-    return mockUrl;
+    try {
+      // Create uploads directory structure: uploads/documents/{contractId}/
+      const uploadsDir = path.join(__dirname, '../../uploads/documents', contractId);
+      
+      // Create directory if it doesn't exist (recursive)
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      // Generate unique filename with timestamp
+      const timestamp = Date.now();
+      const filename = `${timestamp}-${file.originalname}`;
+      const filepath = path.join(uploadsDir, filename);
+
+      // Write file to disk
+      fs.writeFileSync(filepath, file.buffer);
+
+      // Return relative URL path (will be served by express.static middleware)
+      const relativeUrl = `/uploads/documents/${contractId}/${filename}`;
+      
+      logger.info('File saved to local storage', { 
+        url: relativeUrl,
+        filepath,
+        originalName: file.originalname,
+        size: file.size 
+      });
+      
+      return relativeUrl;
+    } catch (error) {
+      logger.error('Failed to save file to storage', {
+        error: error.message,
+        contractId,
+        filename: file.originalname
+      });
+      throw new AppError('Failed to save file to storage', 500, 'STORAGE_ERROR');
+    }
   }
 }
 

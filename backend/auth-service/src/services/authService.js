@@ -350,6 +350,99 @@ export class AuthService {
       throw error;
     }
   }
+
+  async updateProfile(userId, updateData) {
+    const transaction = await db.sequelize.transaction();
+    
+    try {
+      const user = await db.User.findByPk(userId, { transaction });
+      
+      if (!user) {
+        throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+      }
+
+      // Only allow updating email and phone
+      const allowedFields = {};
+      if (updateData.email !== undefined && updateData.email !== user.email) {
+        // Check if email already exists
+        const existingUser = await db.User.findOne({
+          where: { email: updateData.email },
+          transaction
+        });
+        if (existingUser && existingUser.id !== userId) {
+          throw new AppError('Email already in use', 409, 'EMAIL_IN_USE');
+        }
+        allowedFields.email = updateData.email;
+        // Reset verification status if email changes
+        allowedFields.isVerified = false;
+      }
+
+      if (updateData.phone !== undefined && updateData.phone !== user.phone) {
+        // Check if phone already exists
+        if (updateData.phone) {
+          const existingUser = await db.User.findOne({
+            where: { phone: updateData.phone },
+            transaction
+          });
+          if (existingUser && existingUser.id !== userId) {
+            throw new AppError('Phone number already in use', 409, 'PHONE_IN_USE');
+          }
+        }
+        allowedFields.phone = updateData.phone;
+      }
+
+      // Update user if there are changes
+      if (Object.keys(allowedFields).length > 0) {
+        await user.update(allowedFields, { transaction });
+        
+        // If email changed, send new verification email
+        if (allowedFields.email) {
+          const verificationToken = CryptoUtils.generateUUID();
+          const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+          // Delete old verification tokens
+          await db.EmailVerification.destroy({
+            where: { userId: user.id },
+            transaction
+          });
+
+          // Create new verification token
+          await db.EmailVerification.create({
+            userId: user.id,
+            verificationToken,
+            expiresAt
+          }, { transaction });
+
+          await transaction.commit();
+
+          // Send verification email non-blocking
+          emailService.sendVerificationEmail(allowedFields.email, verificationToken)
+            .catch(error => logger.error('Failed to send verification email', { 
+              error: error.message, 
+              userId: user.id 
+            }));
+        } else {
+          await transaction.commit();
+        }
+
+        logger.info('User profile updated successfully', { 
+          userId: user.id, 
+          updatedFields: Object.keys(allowedFields) 
+        });
+      } else {
+        await transaction.commit();
+        logger.info('No changes to update', { userId });
+      }
+
+      // Return updated user
+      const updatedUser = await db.User.findByPk(userId);
+      return updatedUser.toJSON();
+    } catch (error) {
+      await transaction.rollback();
+      logger.error('Profile update failed', { error: error.message, userId });
+      throw error;
+    }
+  }
 }
 
 export default new AuthService();

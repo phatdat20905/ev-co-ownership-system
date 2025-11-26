@@ -8,7 +8,7 @@ export default (sequelize, DataTypes) => {
     },
     userId: {
       type: DataTypes.UUID,
-      allowNull: false,
+      allowNull: true,
       unique: true,
       field: 'user_id'
     },

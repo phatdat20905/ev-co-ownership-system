@@ -61,6 +61,12 @@ router.get('/profile',
   authController.getProfile
 );
 
+router.put('/profile',
+  generalRateLimiter,
+  authenticate,
+  authController.updateProfile
+);
+
 router.post('/send-verification-email', 
   authenticate,
   authController.sendVerificationEmail

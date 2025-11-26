@@ -11,7 +11,7 @@ export default {
       },
       user_id: {
         type: DataTypes.UUID,
-        allowNull: false,
+        allowNull: true,
         unique: true
       },
       full_name: {
