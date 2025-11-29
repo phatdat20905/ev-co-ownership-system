@@ -1,15 +1,12 @@
 import { motion } from "framer-motion";
 import { Eye, EyeOff, Loader2, Lock, Mail, Phone } from "lucide-react";
-import LoadingSkeleton from '../../components/LoadingSkeleton';
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Footer from "../../components/layout/Footer";
 import Header from "../../components/layout/Header";
-import { useAuthStore } from '../../stores/useAuthStore';
-import { useUserStore } from '../../stores/userStore';
-import { toast } from 'react-toastify';
 
 export default function Login() {
+  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
   const [loginType, setLoginType] = useState("email");
@@ -17,59 +14,123 @@ export default function Login() {
   const [password, setPassword] = useState("");
   
   const navigate = useNavigate();
-  const login = useAuthStore((state) => state.login);
-  const isLoading = useAuthStore((state) => state.isLoading);
-  const user = useUserStore((state) => state.user);
 
-  // Load remembered login
+  // Tài khoản giả lập - ĐÃ THÊM STAFF
+  const demoAccounts = {
+    user: {
+      email: "user@evcoownership.com",
+      phone: "0901234567",
+      password: "123456",
+      role: "co-owner",
+      name: "Nguyễn Văn A",
+      membershipType: "Co-owner Basic",
+      avatar: "NA"
+    },
+    admin: {
+      email: "admin@evcoownership.com",
+      phone: "0909876543",
+      password: "123456",
+      role: "admin",
+      name: "Admin",
+      membershipType: "Admin Premium",
+      avatar: "NA"
+    },
+    staff: {
+      email: "staff@evcoownership.com",
+      phone: "0905555555",
+      password: "123456",
+      role: "staff",
+      name: "Nguyễn Văn B",
+      membershipType: "Staff",
+      avatar: "NA",
+      position: "Nhân viên vận hành",
+      department: "Vận hành xe",
+      employeeId: "STF002"
+    }
+  };
+
+  // Lấy dữ liệu từ localStorage khi load
   useEffect(() => {
-    const remembered = localStorage.getItem('remembered-login');
-    if (remembered) {
-      try {
-        const { identifier: savedId, type } = JSON.parse(remembered);
-        setIdentifier(savedId);
-        setLoginType(type);
-        setRemember(true);
-      } catch (error) {
-        console.error('Failed to parse remembered login:', error);
-      }
+    const saved = localStorage.getItem("rememberedLogin");
+    if (saved) {
+      const data = JSON.parse(saved);
+      setIdentifier(data.identifier);
+      setLoginType(data.type);
+      setRemember(true);
     }
   }, []);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
+    setLoading(true);
 
-    try {
-      const credentials = {
-        [loginType]: identifier,
-        password: password,
-      };
+    // Giả lập đăng nhập
+    setTimeout(() => {
+      let userData = null;
 
-      const response = await login(credentials);
-
-      if (response.success) {
-        toast.success('Đăng nhập thành công!');
-        
-        // Save remember login
-        if (remember) {
-          localStorage.setItem('remembered-login', JSON.stringify({ identifier, type: loginType }));
-        } else {
-          localStorage.removeItem('remembered-login');
-        }
-        
-        // Navigate based on role
-        const userRole = response.data.user.role;
-        if (userRole === 'admin') {
-          navigate('/admin/dashboard');
-        } else if (userRole === 'staff') {
-          navigate('/staff/dashboard');
-        } else {
-          navigate('/dashboard');
-        }
+      // Kiểm tra đăng nhập với user
+      if (identifier === demoAccounts.user.email && password === demoAccounts.user.password) {
+        userData = demoAccounts.user;
       }
-    } catch (error) {
-      toast.error(error.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
-    }
+      // Kiểm tra đăng nhập với admin
+      else if (identifier === demoAccounts.admin.email && password === demoAccounts.admin.password) {
+        userData = demoAccounts.admin;
+      }
+      // KIỂM TRA ĐĂNG NHẬP VỚI STAFF - ĐÃ THÊM
+      else if (identifier === demoAccounts.staff.email && password === demoAccounts.staff.password) {
+        userData = demoAccounts.staff;
+      }
+
+      if (userData) {
+        // Lưu thông tin đăng nhập
+        const authData = {
+          token: "demo-token-" + Date.now(),
+          user: {
+            ...userData,
+            id: userData.role === "admin" ? 2 : userData.role === "staff" ? 3 : 1,
+            isVerified: true,
+            loginTime: new Date().toISOString()
+          },
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        };
+
+        localStorage.setItem("authToken", authData.token);
+        localStorage.setItem("userData", JSON.stringify(authData.user));
+        localStorage.setItem("authExpires", authData.expiresAt.toISOString());
+
+        if (remember) {
+          localStorage.setItem(
+            "rememberedLogin",
+            JSON.stringify({ identifier, type: loginType })
+          );
+        } else {
+          localStorage.removeItem("rememberedLogin");
+        }
+
+        // Trigger storage event để Header cập nhật
+        window.dispatchEvent(new Event('storage'));
+
+        // SỬA LẠI PHẦN CHUYỂN HƯỚNG - ĐÃ THÊM STAFF
+        if (userData.role === "admin") {
+          navigate("/admin");
+        } else if (userData.role === "staff") {
+          navigate("/staff"); // Route staff trong App.js là "/staff"
+        } else {
+          navigate("/dashboard/coowner");
+        }
+      } else {
+        alert("Email hoặc mật khẩu không đúng!");
+        setLoading(false);
+      }
+    }, 1500);
+  };
+
+  // Xử lý đăng nhập nhanh - ĐÃ THÊM STAFF
+  const handleQuickLogin = (accountType) => {
+    const account = demoAccounts[accountType];
+    setIdentifier(account.email);
+    setPassword(account.password);
+    setLoginType("email");
   };
 
   return (
@@ -88,6 +149,43 @@ export default function Login() {
           <h2 className="text-3xl font-bold text-center text-sky-700 mb-8 tracking-tight">
             Chào mừng trở lại
           </h2>
+
+          {/* Nút đăng nhập nhanh - ĐÃ THÊM STAFF */}
+          <div className="grid grid-cols-3 gap-3 mb-6">
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => handleQuickLogin("user")}
+              className="py-3 rounded-xl font-semibold bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg text-sm"
+            >
+              <span>👤 User</span>
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => handleQuickLogin("staff")}
+              className="py-3 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg text-sm"
+            >
+              <span>👔 Staff</span>
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => handleQuickLogin("admin")}
+              className="py-3 rounded-xl font-semibold bg-gradient-to-r from-purple-500 to-purple-600 text-white hover:from-purple-600 hover:to-purple-700 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg text-sm"
+            >
+              <span>⚡ Admin</span>
+            </motion.button>
+          </div>
+
+          <div className="relative mb-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white/70 text-gray-500">Hoặc đăng nhập thủ công</span>
+            </div>
+          </div>
 
           <form className="space-y-6" onSubmit={handleSubmit}>
             {/* Chọn loại đăng nhập */}
@@ -194,10 +292,10 @@ export default function Login() {
             {/* Nút đăng nhập */}
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={loading}
               className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-sky-500 to-sky-600 text-white hover:from-sky-600 hover:to-sky-700 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? (
+              {loading ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
                   Đang đăng nhập...

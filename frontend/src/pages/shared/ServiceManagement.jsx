@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { getUserData } from '../../utils/storage';
-import { useUserStore } from '../../stores/useUserStore';
 import {
   Wrench,
   Plus,
@@ -60,19 +58,29 @@ const ServiceManagement = () => {
     role: "staff",
   });
 
-  const currentUser = useUserStore(state => state.user);
-
   useEffect(() => {
-    const storedUserData = currentUser || getUserData();
+    // Lấy và xử lý thông tin user từ localStorage
+    const storedUserData = localStorage.getItem("userData");
     if (storedUserData) {
-      const cleanRole = (storedUserData.role || 'staff').trim().toLowerCase();
-      setUserData(storedUserData);
-      setUserRole(cleanRole);
+      try {
+        const parsedData = JSON.parse(storedUserData);
+        setUserData(parsedData);
+        // Đảm bảo role không có khoảng trắng thừa và chuyển về chữ thường
+        const cleanRole = (parsedData.role || "staff").trim().toLowerCase();
+        setUserRole(cleanRole);
+      } catch (error) {
+        console.error("Lỗi khi parse userData:", error);
+        setUserRole("staff");
+      }
     } else {
-      setUserData({ name: 'Nguyễn Văn B', role: 'staff' });
-      setUserRole('staff');
+      // Fallback data nếu không có trong localStorage
+      setUserData({
+        name: "Nguyễn Văn B",
+        role: "staff",
+      });
+      setUserRole("staff");
     }
-  }, [currentUser]);
+  }, []);
 
   // Menu items cho Admin
   const adminMenuItems = [
@@ -362,11 +370,12 @@ const ServiceManagement = () => {
 
   // Hàm xử lý logout
   const handleLogout = () => {
-    // Use central clearAuth helper
-    const { clearAuth } = require('../../utils/storage');
-    clearAuth();
-    window.dispatchEvent(new Event('storage'));
-    navigate('/');
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("userData");
+    localStorage.removeItem("authExpires");
+    localStorage.removeItem("rememberedLogin");
+    window.dispatchEvent(new Event("storage"));
+    navigate("/");
   };
 
   // Đóng menu khi click ra ngoài

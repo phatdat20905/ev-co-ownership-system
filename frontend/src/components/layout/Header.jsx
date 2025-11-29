@@ -1,10 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Search, Bell, Menu, X, Car, User, LogOut, Settings, ChevronDown } from "lucide-react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import NotificationCenter from "../notifications/NotificationCenter";
-import { useUserStore } from '../../stores/useUserStore';
-import { useAuthStore } from '../../stores/useAuthStore';
-import { clearAuth, getUserData, getAuthToken } from '../../utils/storage';
 
 // Hàm cuộn 
 const smoothScrollTo = (targetPosition, duration = 600) => {
@@ -33,8 +29,6 @@ export default function Header() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userData, setUserData] = useState(null);
-  const user = useUserStore(state => state.user);
-  const token = useAuthStore(state => state.token);
   const [openDropdown, setOpenDropdown] = useState(null);
   const [activeSection, setActiveSection] = useState("");
   
@@ -43,23 +37,29 @@ export default function Header() {
 
   // Kiểm tra trạng thái đăng nhập
   useEffect(() => {
-    // Subscribe to zustand stores via local selectors
-    setIsLoggedIn(!!token && !!user);
-    setUserData(user || null);
-
-    const onStorage = () => {
-      // fallback for legacy listeners that still write to localStorage
-      try {
-        const storedUser = getUserData();
-        setUserData(storedUser);
-        setIsLoggedIn(!!getAuthToken() && !!storedUser);
-      } catch (e) {}
+    const checkAuthStatus = () => {
+      const token = localStorage.getItem('authToken');
+      const user = JSON.parse(localStorage.getItem('userData') || 'null');
+      
+      if (token && user) {
+        setIsLoggedIn(true);
+        setUserData(user);
+      } else {
+        setIsLoggedIn(false);
+        setUserData(null);
+      }
     };
 
-    window.addEventListener('storage', onStorage);
-
-    return () => window.removeEventListener('storage', onStorage);
-  }, [token, user]);
+    checkAuthStatus();
+    window.addEventListener('storage', checkAuthStatus);
+    
+    const interval = setInterval(checkAuthStatus, 1000);
+    
+    return () => {
+      window.removeEventListener('storage', checkAuthStatus);
+      clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -120,7 +120,8 @@ export default function Header() {
   }, [location.pathname]);
 
   const handleLogout = () => {
-    clearAuth();
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('userData');
     setIsLoggedIn(false);
     setUserData(null);
     setIsUserMenuOpen(false);
@@ -352,7 +353,7 @@ export default function Header() {
                 <>
                   {/* Dashboard Link */}
                   <Link
-                    to="/coowner"
+                    to="/dashboard/coowner"
                     className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-300 hover:text-sky-600 hover:scale-105 ${
                       isDashboardActive() ? 'text-sky-600 bg-sky-50' : 'text-gray-600'
                     }`}
@@ -427,7 +428,12 @@ export default function Header() {
             </button>
 
             {/* Notification icon - CHỈ hiển thị khi đã login */}
-            {isLoggedIn && <NotificationCenter />}
+            {isLoggedIn && (
+              <button className="relative flex items-center justify-center w-10 h-10 bg-gray-100 rounded-full hover:bg-gray-200 cursor-pointer transition-all duration-300 hover:scale-110">
+                <Bell className="h-5 w-5 text-gray-600" />
+                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
+              </button>
+            )}
 
             {/* Auth Buttons hoặc User Menu */}
             {isLoggedIn ? (
@@ -510,7 +516,7 @@ export default function Header() {
               <>
                 {/* Dashboard Link */}
                 <Link
-                  to="/coowner"
+                  to="/dashboard/coowner"
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={`block w-full text-left py-3 px-4 text-sm font-medium rounded-lg transition-colors ${
                     isDashboardActive() 

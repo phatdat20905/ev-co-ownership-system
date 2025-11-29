@@ -1,10 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import LoadingSkeleton from '../../components/LoadingSkeleton';
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { AlertTriangle, Search, Filter, MessageCircle, CheckCircle, XCircle, Clock, User, Car,QrCode, Calendar, Download, FileText, CreditCard, MapPin, Wrench, BarChart3, Send, ChevronDown, X, MoreVertical, Bell, LogOut, Menu, Plus, PieChart } from "lucide-react";
-import adminService from "../../services/adminService";
-import { toast } from "../../utils/toast";
 
 const DisputeManagement = () => {
   const navigate = useNavigate();
@@ -16,10 +13,6 @@ const DisputeManagement = () => {
   const [selectedDispute, setSelectedDispute] = useState(null);
   const [newMessage, setNewMessage] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-
-  // API State
-  const [disputes, setDisputes] = useState([]);
-  const [loading, setLoading] = useState(true);
 
   // Thêm state cho dropdown menus
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -38,10 +31,13 @@ const DisputeManagement = () => {
 
   // Hàm xử lý đăng xuất
   const handleLogout = () => {
-    const { clearAuth } = require('../../utils/storage');
-    clearAuth();
+    // Xóa tất cả dữ liệu đăng nhập khỏi localStorage
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("userData");
+    localStorage.removeItem("authExpires");
+    localStorage.removeItem("rememberedLogin");
     window.dispatchEvent(new Event('storage'));
-    navigate('/');
+    navigate("/");
   };
 
   // useEffect để đóng dropdown khi click ra ngoài
@@ -81,57 +77,112 @@ const DisputeManagement = () => {
 
   const activeTab = getActiveTab();
 
-  // Load disputes on mount
-  useEffect(() => {
-    fetchDisputes();
-  }, []);
-
-  const fetchDisputes = async () => {
-    try {
-      setLoading(true);
-      const response = await adminService.listDisputes();
-      setDisputes(response.data || []);
-    } catch (error) {
-      console.error("Error fetching disputes:", error);
-      toast.error("Không thể tải danh sách tranh chấp");
-      setDisputes([]);
-    } finally {
-      setLoading(false);
+  const disputes = [
+    {
+      id: 1,
+      title: "Tranh chấp lịch sử dụng",
+      description: "Xung đột lịch sử dụng xe giữa các thành viên",
+      users: ["Minh Nguyễn", "Lan Phương"],
+      car: "VF e34 - 29A-123.45",
+      createdAt: "15/11/2024",
+      status: "pending",
+      priority: "high",
+      type: "schedule",
+      financialImpact: 0,
+      messages: [
+        { 
+          user: "Minh Nguyễn", 
+          message: "Tôi đã đặt lịch trước nhưng không được sử dụng xe vào ngày 14/11", 
+          time: "10:30 AM",
+          role: "Co-owner"
+        },
+        { 
+          user: "Lan Phương", 
+          message: "Tôi không nhận được thông báo về lịch này và đã có kế hoạch sử dụng xe", 
+          time: "10:45 AM",
+          role: "Co-owner"
+        },
+        { 
+          user: "Admin System", 
+          message: "Hệ thống ghi nhận cả hai đều đặt lịch cho cùng khung giờ. Đề xuất giải pháp?", 
+          time: "11:00 AM",
+          role: "System"
+        }
+      ]
+    },
+    {
+      id: 2,
+      title: "Vấn đề thanh toán",
+      description: "Thành viên chưa thanh toán chi phí chia sẻ",
+      users: ["Tuấn Anh"],
+      car: "VinFast VF 8 - 29A-678.90",
+      createdAt: "14/11/2024",
+      status: "in_progress",
+      priority: "medium",
+      type: "payment",
+      financialImpact: 2450000,
+      messages: [
+        { 
+          user: "Tuấn Anh", 
+          message: "Tôi chưa nhận được hóa đơn thanh toán cho tháng 11", 
+          time: "09:15 AM",
+          role: "Co-owner"
+        },
+        { 
+          user: "Staff Support", 
+          message: "Đã gửi lại hóa đơn qua email. Vui lòng kiểm tra hộp thư", 
+          time: "10:30 AM",
+          role: "Staff"
+        }
+      ]
+    },
+    {
+      id: 3,
+      title: "Hư hỏng xe",
+      description: "Báo cáo hư hỏng sau khi sử dụng",
+      users: ["Hồng Nhung"],
+      car: "VF 9 - 29B-123.45",
+      createdAt: "13/11/2024",
+      status: "resolved",
+      priority: "high",
+      type: "damage",
+      financialImpact: 8500000,
+      messages: [
+        { 
+          user: "Hồng Nhung", 
+          message: "Xe có vấn đề về phanh sau khi sử dụng. Cần kiểm tra gấp", 
+          time: "03:20 PM",
+          role: "Co-owner"
+        },
+        { 
+          user: "Kỹ thuật viên", 
+          message: "Đã kiểm tra và sửa chữa xong. Chi phí 8.5M VND", 
+          time: "04:45 PM",
+          role: "Staff"
+        }
+      ]
+    },
+    {
+      id: 4,
+      title: "Tranh chấp vị trí đỗ xe",
+      description: "Không tìm thấy xe tại vị trí đã đỗ",
+      users: ["Văn Nam", "Minh Nguyễn"],
+      car: "VF e34 - 30A-543.21",
+      createdAt: "12/11/2024",
+      status: "in_progress",
+      priority: "medium",
+      type: "location",
+      financialImpact: 0,
+      messages: [
+        { 
+          user: "Văn Nam", 
+          message: "Xe không có tại bãi đỗ đã thỏa thuận. Không thể sử dụng", 
+          time: "08:15 AM",
+          role: "Co-owner"
+        }
+      ]
     }
-  };
-
-  const handleAssignDispute = async (disputeId, staffId) => {
-    try {
-      await adminService.assignDispute(disputeId, { staffId });
-      toast.success("Phân công xử lý tranh chấp thành công");
-      fetchDisputes();
-    } catch (error) {
-      console.error("Error assigning dispute:", error);
-      toast.error("Không thể phân công tranh chấp");
-    }
-  };
-
-  const handleResolveDispute = async (disputeId, resolution) => {
-    try {
-      await adminService.resolveDispute(disputeId, { resolution });
-      toast.success("Giải quyết tranh chấp thành công");
-      fetchDisputes();
-      setSelectedDispute(null);
-    } catch (error) {
-      console.error("Error resolving dispute:", error);
-      toast.error("Không thể giải quyết tranh chấp");
-    }
-  };
-
-  const disputeStats = {
-    total: disputes.length,
-    pending: disputes.filter(d => d.status === 'pending').length,
-    inProgress: disputes.filter(d => d.status === 'in_progress').length,
-    resolved: disputes.filter(d => d.status === 'resolved').length,
-    totalFinancialImpact: disputes.reduce((sum, dispute) => sum + (dispute.financialImpact || 0), 0)
-  };
-
-  const unreadNotifications = notifications.filter(n => !n.read).length;
+  ];
 
   const statusOptions = [
     { value: "all", label: "Tất cả trạng thái", color: "gray" },
@@ -198,12 +249,22 @@ const DisputeManagement = () => {
 
     const updatedDispute = {
       ...selectedDispute,
-      messages: [...(selectedDispute.messages || []), newMsg]
+      messages: [...selectedDispute.messages, newMsg]
     };
 
     setSelectedDispute(updatedDispute);
     setNewMessage("");
   };
+
+  const disputeStats = {
+    total: disputes.length,
+    pending: disputes.filter(d => d.status === 'pending').length,
+    inProgress: disputes.filter(d => d.status === 'in_progress').length,
+    resolved: disputes.filter(d => d.status === 'resolved').length,
+    totalFinancialImpact: disputes.reduce((sum, dispute) => sum + dispute.financialImpact, 0)
+  };
+
+  const unreadNotifications = notifications.filter(n => !n.read).length;
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -526,15 +587,7 @@ const DisputeManagement = () => {
                 </div>
               </div>
 
-              {/* Loading State */}
-              {loading && (
-                <div className="py-6">
-                  <LoadingSkeleton.ListSkeleton items={4} />
-                </div>
-              )}
-
               {/* Mobile Filters Modal */}
-              {!loading && (
               <AnimatePresence>
                 {mobileFiltersOpen && (
                   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end lg:hidden z-40">
@@ -582,10 +635,8 @@ const DisputeManagement = () => {
                   </div>
                 )}
               </AnimatePresence>
-              )}
 
               {/* Disputes Grid */}
-              {!loading && (
               <div className="space-y-4">
                 {filteredDisputes.map((dispute) => (
                   <motion.div
@@ -667,11 +718,9 @@ const DisputeManagement = () => {
                   </motion.div>
                 )}
               </div>
-              )}
             </div>
 
             {/* Dispute Detail Sidebar */}
-            {!loading && (
             <div className="lg:col-span-1">
               {selectedDispute ? (
                 <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm border border-gray-100 sticky top-8">
@@ -800,7 +849,6 @@ const DisputeManagement = () => {
                 </div>
               )}
             </div>
-            )}
           </div>
         </main>
       </div>

@@ -1,141 +1,170 @@
-import { Route, BrowserRouter as Router, Routes, Navigate } from "react-router-dom";
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import { Suspense, lazy } from 'react';
-import ErrorBoundary from "./components/ErrorBoundary";
-import LoadingSkeleton from "./components/LoadingSkeleton";
-import ProtectedRoute from "./components/auth/ProtectedRoute";
-import PublicRoute from "./components/auth/PublicRoute";
-
-// Lazy load pages
-// Auth Pages
-const Login = lazy(() => import("./pages/auth/Login"));
-const Register = lazy(() => import("./pages/auth/Register"));
-const ForgotPassword = lazy(() => import("./pages/auth/ForgotPassword"));
-const ResetPassword = lazy(() => import("./pages/auth/ResetPassword"));
-const VerifyEmail = lazy(() => import("./pages/auth/VerifyEmail"));
-
-// Dashboard Pages
-const CoownerDashboard = lazy(() => import("./pages/dashboard/CoownerDashboard"));
-const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
-const StaffDashboard = lazy(() => import("./pages/dashboard/StaffDashboard"));
-
-// Group Pages
-const GroupList = lazy(() => import("./pages/groups/GroupList"));
-const GroupDetail = lazy(() => import("./pages/groups/GroupDetail"));
-const GroupCreate = lazy(() => import("./pages/groups/GroupCreate"));
-
-// Booking Pages
-const BookingCalendar = lazy(() => import("./pages/bookings/BookingCalendar"));
-const BookingList = lazy(() => import("./pages/bookings/BookingList"));
-const BookingDetail = lazy(() => import("./pages/bookings/BookingDetail"));
-const BookingCreate = lazy(() => import("./pages/bookings/BookingCreate"));
-
-// Cost Pages
-const CostList = lazy(() => import("./pages/costs/CostList"));
-const CostDetail = lazy(() => import("./pages/costs/CostDetail"));
-const CostSummary = lazy(() => import("./pages/costs/CostSummary"));
-
-// Vehicle Pages
-const VehicleList = lazy(() => import("./pages/vehicles/VehicleList"));
-const VehicleDetail = lazy(() => import("./pages/vehicles/VehicleDetail"));
-
-// Contract Pages
-const ContractList = lazy(() => import("./pages/contracts/ContractList"));
-const ContractDetail = lazy(() => import("./pages/contracts/ContractDetail"));
-
-// Profile Pages
-const Profile = lazy(() => import("./pages/profile/Profile"));
+import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
+import ScrollToTop from "./components/layout/ScrollToTop";
 
 // Admin Pages
-const AdminGroups = lazy(() => import("./pages/admin/AdminGroups"));
-const AdminVehicles = lazy(() => import("./pages/admin/AdminVehicles"));
-const AdminReports = lazy(() => import("./pages/admin/AdminReports"));
-const AdminStaff = lazy(() => import("./pages/admin/AdminStaff"));
-const AdminDisputes = lazy(() => import("./pages/admin/AdminDisputes"));
-const AdminKYC = lazy(() => import("./pages/admin/AdminKYC"));
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import DisputeManagement from "./pages/admin/DisputeManagement";
+import FinancialReports from "./pages/admin/FinancialReports";
+import StaffManagement from "./pages/admin/StaffManagement";
+import AdminProfile from "./pages/admin/AdminProfile";
+
+// Shared Pages (dùng chung cho admin và staff)
+import CarManagement from "./pages/shared/CarManagement";
+import ContractManagement from "./pages/shared/ContractManagement";
+import ServiceManagement from "./pages/shared/ServiceManagement";
+import CheckInOutManagement from "./pages/shared/CheckInOutManagement";
+
+// Auth Pages
+import ForgotPassword from "./pages/auth/ForgotPassword";
+import Login from "./pages/auth/Login";
+import Register from "./pages/auth/Register";
+import ResetPassword from "./pages/auth/ResetPassword";
+import VerifyEmail from "./pages/auth/VerifyEmail";
+import VerifyIdentity from "./pages/auth/VerifyIdentity";
+import VerifyOtp from "./pages/auth/VerifyOTP";
+import VerifyPhone from "./pages/auth/VerifyPhone";
+import VerifySuccess from "./pages/auth/VerifySuccess";
+
+// Dashboard & Co-owner Pages
+import Home from "./pages/dashboard/Dashboard";
+import CoownerDashboard from "./pages/dashboard/coowner/CoownerDashboard";
+import OwnershipManagement from "./pages/dashboard/coowner/ownership/OwnershipManagement";
+import ContractViewer from "./pages/dashboard/coowner/ownership/ContractViewer";
+import DocumentUpload from "./pages/dashboard/coowner/ownership/DocumentUpload";
+import BookingCalendar from "./pages/dashboard/coowner/booking/BookingCalendar";
+import BookingForm from "./pages/dashboard/coowner/booking/BookingForm";
+import ScheduleView from "./pages/dashboard/coowner/booking/ScheduleView";
+import CostBreakdown from "./pages/dashboard/coowner/financial/CostBreakdown";
+import PaymentHistory from "./pages/dashboard/coowner/financial/PaymentHistory";
+import ExpenseTracking from "./pages/dashboard/coowner/financial/ExpenseTracking";
+import UsageHistory from "./pages/dashboard/coowner/history/UsageHistory";
+import UsageAnalytics from "./pages/dashboard/coowner/history/UsageAnalytics";
+import GroupManagement from "./pages/dashboard/coowner/group/GroupManagement";
+import VotingSystem from "./pages/dashboard/coowner/group/VotingSystem";
+import CommonFund from "./pages/dashboard/coowner/group/CommonFund";
+import Profile from "./pages/dashboard/coowner/account/Profile";
+
+// Staff Pages
+import StaffDashboard from "./pages/staff/StaffDashboard";
+import StaffProfile from "./pages/staff/StaffProfile";
+
+// Policies Pages
+import ChinhSachBaoMat from "./pages/policies/ChinhSachBaoMat";
+import QuyDinhHoatDong from "./pages/policies/QuyDinhHoatDong";
+import QuyenLoiThanhVien from "./pages/policies/QuyenLoiThanhVien";
 
 export default function App() {
   return (
-    <ErrorBoundary>
-      <Router>
-        <Suspense fallback={<LoadingSkeleton />}>
-          <Routes>
-            {/* Public Routes */}
-            <Route element={<PublicRoute />}>
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/verify-email" element={<VerifyEmail />} />
-            </Route>
+    <Router>
+      <ScrollToTop />
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/verify-identity" element={<VerifyIdentity />} />
+        <Route path="/verify-otp" element={<VerifyOtp />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/verify-success" element={<VerifySuccess />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/verify-phone" element={<VerifyPhone />} />
 
-            {/* Protected Routes - Co-owner */}
-            <Route element={<ProtectedRoute allowedRoles={['co-owner', 'user']} />}>
-              <Route path="/dashboard" element={<CoownerDashboard />} />
-              
-              {/* Groups */}
-              <Route path="/groups" element={<GroupList />} />
-              <Route path="/groups/create" element={<GroupCreate />} />
-              <Route path="/groups/:groupId" element={<GroupDetail />} />
-
-              {/* Bookings */}
-              <Route path="/bookings" element={<BookingList />} />
-              <Route path="/bookings/calendar" element={<BookingCalendar />} />
-              <Route path="/bookings/create" element={<BookingCreate />} />
-              <Route path="/bookings/:bookingId" element={<BookingDetail />} />
-
-              {/* Costs */}
-              <Route path="/costs" element={<CostList />} />
-              <Route path="/costs/summary" element={<CostSummary />} />
-              <Route path="/costs/:costId" element={<CostDetail />} />
-
-              {/* Vehicles */}
-              <Route path="/vehicles" element={<VehicleList />} />
-              <Route path="/vehicles/:vehicleId" element={<VehicleDetail />} />
-
-              {/* Contracts */}
-              <Route path="/contracts" element={<ContractList />} />
-              <Route path="/contracts/:contractId" element={<ContractDetail />} />
-
-              {/* Profile */}
-              <Route path="/profile" element={<Profile />} />
-            </Route>
-
-            {/* Protected Routes - Admin */}
-            <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-              <Route path="/admin/dashboard" element={<AdminDashboard />} />
-              <Route path="/admin/groups" element={<AdminGroups />} />
-              <Route path="/admin/vehicles" element={<AdminVehicles />} />
-              <Route path="/admin/reports" element={<AdminReports />} />
-              <Route path="/admin/staff" element={<AdminStaff />} />
-              <Route path="/admin/disputes" element={<AdminDisputes />} />
-              <Route path="/admin/kyc" element={<AdminKYC />} />
-            </Route>
-
-            {/* Protected Routes - Staff */}
-            <Route element={<ProtectedRoute allowedRoles={['staff']} />}>
-              <Route path="/staff/dashboard" element={<StaffDashboard />} />
-            </Route>
-
-            {/* Default redirect */}
-            <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-        </Suspense>
-
-        <ToastContainer
-          position="top-right"
-          autoClose={3000}
-          hideProgressBar={false}
-          newestOnTop={true}
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
+        {/* Policy Routes */}
+        <Route path="/quy-dinh-hoat-dong" element={<QuyDinhHoatDong />} />
+        <Route path="/chinh-sach-bao-mat" element={<ChinhSachBaoMat />} />
+        <Route
+          path="/bang-quyen-loi-thanh-vien"
+          element={<QuyenLoiThanhVien />}
         />
-      </Router>
-    </ErrorBoundary>
+
+        {/* Admin Routes */}
+        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin/staff" element={<StaffManagement />} />
+        <Route path="/admin/profile" element={<AdminProfile />} />
+        <Route path="/admin/disputes" element={<DisputeManagement />} />
+        <Route path="/admin/financial-reports" element={<FinancialReports />} />
+
+        {/* Shared Management Routes - Dùng chung cho Admin và Staff */}
+        <Route path="/admin/cars" element={<CarManagement />} />
+        <Route path="/admin/contracts" element={<ContractManagement />} />
+        <Route path="/admin/services" element={<ServiceManagement />} />
+        <Route path="/admin/checkin" element={<CheckInOutManagement />} />
+
+        {/* Staff Routes - Sử dụng cùng các component shared */}
+        <Route path="/staff" element={<StaffDashboard />} />
+        <Route path="/staff/dashboard" element={<StaffDashboard />} />
+        <Route path="/staff/profile" element={<StaffProfile />} />
+        <Route path="/staff/cars" element={<CarManagement />} />
+        <Route path="/staff/contracts" element={<ContractManagement />} />
+        <Route path="/staff/services" element={<ServiceManagement />} />
+        <Route path="/staff/checkin" element={<CheckInOutManagement />} />
+
+        {/* Co-owner Routes */}
+        <Route path="/dashboard/coowner" element={<CoownerDashboard />} />
+        <Route
+          path="/dashboard/coowner/ownership"
+          element={<OwnershipManagement />}
+        />
+        <Route
+          path="/dashboard/coowner/ownership/contracts"
+          element={<ContractViewer />}
+        />
+        <Route
+          path="/dashboard/coowner/ownership/contract"
+          element={<ContractViewer />}
+        />
+        <Route
+          path="/dashboard/coowner/ownership/documents"
+          element={<DocumentUpload />}
+        />
+        <Route
+          path="/dashboard/coowner/booking"
+          element={<BookingCalendar />}
+        />
+        <Route
+          path="/dashboard/coowner/booking/new"
+          element={<BookingForm />}
+        />
+        <Route
+          path="/dashboard/coowner/booking/schedule"
+          element={<ScheduleView />}
+        />
+        <Route
+          path="/dashboard/coowner/financial"
+          element={<CostBreakdown />}
+        />
+        <Route
+          path="/dashboard/coowner/financial/cost-breakdown"
+          element={<CostBreakdown />}
+        />
+        <Route
+          path="/dashboard/coowner/financial/payment"
+          element={<PaymentHistory />}
+        />
+        <Route
+          path="/dashboard/coowner/financial/expense-tracking"
+          element={<ExpenseTracking />}
+        />
+        <Route path="/dashboard/coowner/history" element={<UsageHistory />} />
+        <Route
+          path="/dashboard/coowner/history/analytics"
+          element={<UsageAnalytics />}
+        />
+        <Route path="/dashboard/coowner/group" element={<GroupManagement />} />
+        <Route
+          path="/dashboard/coowner/group/voting"
+          element={<VotingSystem />}
+        />
+        <Route path="/dashboard/coowner/group/fund" element={<CommonFund />} />
+        <Route
+          path="/dashboard/coowner/account/profile"
+          element={<Profile />}
+        />
+
+        {/* Fallback Route */}
+        <Route path="*" element={<div>404 - Page Not Found</div>} />
+      </Routes>
+    </Router>
   );
 }
